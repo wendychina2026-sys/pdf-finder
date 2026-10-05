@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,6 +13,8 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -38,15 +42,47 @@ public class MainActivity extends Activity {
             this.name = name;
             this.path = path;
         }
+    }
+
+    // Each row: file name (bold) on top, full path (small, grey) below.
+    private class PdfAdapter extends ArrayAdapter<Pdf> {
+        PdfAdapter() {
+            super(MainActivity.this, 0, new ArrayList<Pdf>());
+        }
 
         @Override
-        public String toString() {
-            return name + "\n" + path;
+        public View getView(int position, View convertView, ViewGroup parent) {
+            LinearLayout row;
+            if (convertView == null) {
+                row = new LinearLayout(getContext());
+                row.setOrientation(LinearLayout.VERTICAL);
+                row.setPadding(16, 20, 16, 20);
+
+                TextView name = new TextView(getContext());
+                name.setTextSize(16);
+                name.setTypeface(null, Typeface.BOLD);
+                name.setTextColor(Color.BLACK);
+
+                TextView path = new TextView(getContext());
+                path.setTextSize(12);
+                path.setTextColor(Color.GRAY);
+
+                row.addView(name);
+                row.addView(path);
+                row.setTag(new TextView[]{name, path});
+            } else {
+                row = (LinearLayout) convertView;
+            }
+            TextView[] views = (TextView[]) row.getTag();
+            Pdf p = getItem(position);
+            views[0].setText(p.name);
+            views[1].setText(p.path);
+            return row;
         }
     }
 
     private List<Pdf> allPdfs = new ArrayList<>();
-    private ArrayAdapter<Pdf> adapter;
+    private PdfAdapter adapter;
     private EditText searchBox;
     private TextView status;
     private Button findButton;
@@ -80,8 +116,7 @@ public class MainActivity extends Activity {
         status.setText("Tap Find PDFs to start");
         status.setPadding(0, 16, 0, 16);
 
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1,
-                new ArrayList<Pdf>());
+        adapter = new PdfAdapter();
         ListView list = new ListView(this);
         list.setAdapter(adapter);
 
@@ -174,7 +209,12 @@ public class MainActivity extends Activity {
                 for (File f : children) {
                     String name = f.getName();
                     if (f.isDirectory()) {
-                        if (!name.equals("Android") && !name.startsWith(".")) stack.push(f);
+                        String p = f.getAbsolutePath();
+                        // Android/media (WhatsApp, Telegram...) is allowed.
+                        // Android/data and Android/obb are blocked on Android 11+.
+                        boolean blocked = Build.VERSION.SDK_INT >= 30
+                                && (p.endsWith("/Android/data") || p.endsWith("/Android/obb"));
+                        if (!blocked && !name.startsWith(".")) stack.push(f);
                     } else if (name.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
                         found.add(new Pdf(name, f.getAbsolutePath()));
                     }
