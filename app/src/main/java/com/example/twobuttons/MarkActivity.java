@@ -75,6 +75,14 @@ public class MarkActivity extends Activity {
                 startActivity(new Intent(this, CategoryActivity.class)));
         top.addView(name, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        Button details = new Button(this);
+        details.setText("Details");
+        details.setOnClickListener(v -> {
+            Intent di = new Intent(this, CaseDetailsActivity.class);
+            di.putExtra("path", path);
+            startActivity(di);
+        });
+        top.addView(details);
         top.addView(categories);
 
         TextView hint = new TextView(this);
