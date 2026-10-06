@@ -6,6 +6,15 @@ android {
     namespace = "com.example.twobuttons"
     compileSdk = 34
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.twobuttons"
         minSdk = 24
@@ -22,4 +31,5 @@ android {
 
 dependencies {
     implementation("androidx.core:core:1.13.1")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 }

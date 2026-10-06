@@ -57,4 +57,14 @@ class MarkStore {
             // ignore
         }
     }
+
+    // every PDF path that has marks -> its marks
+    Map<String, Map<Integer, String>> everything() {
+        Map<String, Map<Integer, String>> out = new HashMap<>();
+        for (String path : prefs.getAll().keySet()) {
+            Map<Integer, String> m = all(path);
+            if (!m.isEmpty()) out.put(path, m);
+        }
+        return out;
+    }
 }

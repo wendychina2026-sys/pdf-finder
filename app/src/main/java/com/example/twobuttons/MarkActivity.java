@@ -161,11 +161,12 @@ public class MarkActivity extends Activity {
         return b;
     }
 
-    // Row: label / page image with star badge at top right
+    // Row: label / page image with "Mark as X" tag top-left and star top-right
     static class PageRow extends LinearLayout {
         final TextView label;
         final ImageView image;
         final ImageView badge;
+        final TextView tag;
 
         PageRow(Context c) {
             super(c);
@@ -185,9 +186,21 @@ public class MarkActivity extends Activity {
                     size, size, Gravity.TOP | Gravity.END);
             bp.setMargins(0, 8, 8, 0);
 
+            tag = new TextView(c);
+            tag.setTextColor(Color.WHITE);
+            tag.setTypeface(null, Typeface.BOLD);
+            tag.setTextSize(14);
+            tag.setBackgroundColor(0xCC2E7D32);
+            tag.setPadding(16, 8, 16, 8);
+            FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP | Gravity.START);
+            tp.setMargins(8, 8, 0, 0);
+
             FrameLayout frame = new FrameLayout(c);
             frame.addView(image, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            frame.addView(tag, tp);
             frame.addView(badge, bp);
 
             addView(label);
@@ -206,10 +219,17 @@ public class MarkActivity extends Activity {
             PageRow r = (convertView == null)
                     ? new PageRow(MarkActivity.this) : (PageRow) convertView;
             String sub = marks.get(i);
-            r.label.setText("Page " + (i + 1) + " / " + getCount()
-                    + (sub != null ? "  -  " + sub : ""));
+            r.label.setText("Page " + (i + 1) + " / " + getCount());
             r.image.setImageBitmap(render(i));
-            r.badge.setVisibility(sub != null ? View.VISIBLE : View.GONE);
+            if (sub != null) {
+                r.tag.setText("Mark as " + sub);
+                r.tag.setVisibility(View.VISIBLE);
+                r.badge.setVisibility(View.VISIBLE);
+            } else {
+                r.tag.setVisibility(View.GONE);
+                r.badge.setVisibility(View.GONE);
+            }
+            r.tag.setOnClickListener(v -> showMarkDialog(i));
             r.badge.setOnClickListener(v -> showMarkDialog(i));
             return r;
         }

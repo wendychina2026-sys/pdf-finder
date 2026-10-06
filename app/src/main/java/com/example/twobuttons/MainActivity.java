@@ -1,6 +1,7 @@
 package com.example.twobuttons;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -74,6 +75,24 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(actions.buildSelectionBar(), wide);
         root.addView(findButton, wide);
+
+        Button markedButton = new Button(this);
+        markedButton.setText("Marked pages");
+        markedButton.setOnClickListener(v ->
+                startActivity(new Intent(this, MarkedActivity.class)));
+        root.addView(markedButton, wide);
+
+        Button filesButton = new Button(this);
+        filesButton.setText("Marked PDFs");
+        filesButton.setOnClickListener(v ->
+                startActivity(new Intent(this, MarkedFilesActivity.class)));
+        root.addView(filesButton, wide);
+
+        Button searchCatButton = new Button(this);
+        searchCatButton.setText("Search by category");
+        searchCatButton.setOnClickListener(v ->
+                startActivity(new Intent(this, CategorySearchActivity.class)));
+        root.addView(searchCatButton, wide);
         root.addView(searchBox, wide);
         root.addView(status, wide);
         root.addView(list, new LinearLayout.LayoutParams(
