@@ -189,28 +189,35 @@ public class MainActivity extends Activity {
         avatar.setOnClickListener(v -> takePhoto());
         loadAvatar();
 
-        LinearLayout text = new LinearLayout(this);
-        text.setOrientation(LinearLayout.VERTICAL);
-        text.setPadding(dp(16), 0, 0, 0);
-
-        TextView title = new TextView(this);
-        title.setText("Shaifali's App");
-        title.setTextSize(20);
-        title.setTypeface(null, Typeface.BOLD);
+        TextView icon = new TextView(this);
+        icon.setTextSize(28);
+        icon.setPadding(dp(16), 0, dp(8), 0);
+        tickIcon(icon);
 
         TextClock clock = new TextClock(this);
         clock.setFormat12Hour("EEE, dd MMM yyyy  hh:mm:ss a");
         clock.setFormat24Hour("EEE, dd MMM yyyy  hh:mm:ss a");
-        clock.setTextSize(14);
+        clock.setTextSize(16);
         clock.setTypeface(null, Typeface.BOLD);
 
-        text.addView(title);
-        text.addView(clock);
-
         row.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
-        row.addView(text, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(icon);
+        row.addView(clock);
         return row;
+    }
+
+    // day / noon / evening / night logo
+    private void tickIcon(TextView icon) {
+        int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        String sym;
+        if (h >= 5 && h < 12) sym = "\uD83C\uDF24\uFE0F";        // day
+        else if (h >= 12 && h < 16) sym = "\u2600\uFE0F";         // noon
+        else if (h >= 16 && h < 20) sym = "\uD83C\uDF07";         // evening
+        else sym = "\uD83C\uDF19";                                // night
+        icon.setText(sym);
+        icon.postDelayed(() -> {
+            if (icon.isAttachedToWindow()) tickIcon(icon);
+        }, 30000);
     }
 
     private File photoFile() { return new File(getFilesDir(), "profile.jpg"); }

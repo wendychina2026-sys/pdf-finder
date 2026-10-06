@@ -93,12 +93,12 @@ public class AdvancedSearchActivity extends Activity {
         fileEdit.setHint("File name");
         fileEdit.setSingleLine(true);
 
-        filters.addView(label("Topic (marked category)"));
-        filters.addView(topicSpin);
         filters.addView(label("Case type"));
         filters.addView(caseSpin);
         filters.addView(label("Sub case type"));
         filters.addView(subSpin);
+        filters.addView(label("Topic (marked category)"));
+        filters.addView(topicSpin);
         filters.addView(label("Court"));
         filters.addView(courtSpin);
         filters.addView(label("Year of filing"));
@@ -138,15 +138,6 @@ public class AdvancedSearchActivity extends Activity {
         lawyerEdit.addTextChangedListener(watcher);
         fileEdit.addTextChangedListener(watcher);
 
-        Button toggle = new Button(this);
-        toggle.setText("Hide filters");
-        toggle.setAllCaps(false);
-        toggle.setOnClickListener(v -> {
-            boolean show = filterScroll.getVisibility() != View.VISIBLE;
-            filterScroll.setVisibility(show ? View.VISIBLE : View.GONE);
-            toggle.setText(show ? "Hide filters" : "Show filters");
-        });
-
         status = new TextView(this);
         status.setPadding(0, 8, 0, 8);
 
@@ -161,7 +152,6 @@ public class AdvancedSearchActivity extends Activity {
 
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        root.addView(toggle, wide);
         root.addView(filterScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(status, wide);
@@ -255,8 +245,9 @@ public class AdvancedSearchActivity extends Activity {
         Map<String, DetailsStore.Details> allDetails = details.everything();
 
         TreeSet<String> paths = new TreeSet<>();
-        paths.addAll(allMarks.keySet());
-        paths.addAll(allDetails.keySet());
+        for (Map.Entry<String, Map<Integer, String>> e : allMarks.entrySet()) {
+            if (e.getValue() != null && !e.getValue().isEmpty()) paths.add(e.getKey());
+        }
 
         List<String> sorted = new ArrayList<>();
         for (String p : paths) {
