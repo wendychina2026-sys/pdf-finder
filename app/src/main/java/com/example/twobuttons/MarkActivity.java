@@ -1,6 +1,8 @@
 package com.example.twobuttons;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -10,28 +12,39 @@ import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
 import android.util.LruCache;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Map;
 
 public class MarkActivity extends Activity {
 
+    private String path;
     private ParcelFileDescriptor pfd;
     private PdfRenderer renderer;
     private final LruCache<Integer, Bitmap> cache = new LruCache<>(4);
+    private MarkStore store;
+    private Map<Integer, String> marks;
+    private PageAdapter pageAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        String path = getIntent().getStringExtra("path");
+        setTitle("Category marker");
+        path = getIntent().getStringExtra("path");
 
         try {
             pfd = ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.MODE_READ_ONLY);
@@ -41,6 +54,9 @@ public class MarkActivity extends Activity {
             finish();
             return;
         }
+
+        store = new MarkStore(this);
+        marks = store.all(path);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -61,11 +77,23 @@ public class MarkActivity extends Activity {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         top.addView(categories);
 
-        ListView pages = new ListView(this);
-        pages.setAdapter(new PageAdapter());
+        TextView hint = new TextView(this);
+        hint.setText("Long-press a page to mark it");
+        hint.setTextSize(12);
+        hint.setTextColor(Color.GRAY);
 
-        root.addView(top, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        pageAdapter = new PageAdapter();
+        ListView pages = new ListView(this);
+        pages.setAdapter(pageAdapter);
+        pages.setOnItemLongClickListener((parent, view, pos, id) -> {
+            showMarkDialog(pos);
+            return true;
+        });
+
+        LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        root.addView(top, wide);
+        root.addView(hint, wide);
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
@@ -79,6 +107,44 @@ public class MarkActivity extends Activity {
             if (pfd != null) pfd.close();
         } catch (Exception ignored) {
         }
+    }
+
+    // New mark, or view/edit existing mark.
+    private void showMarkDialog(int page) {
+        String current = marks.get(page);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(48, 24, 48, 0);
+        TextView msg = new TextView(this);
+        msg.setText("Mark page " + (page + 1) + " as:");
+        Spinner spin = new Spinner(this);
+        spin.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, MarkStore.SUBS));
+        if (current != null) {
+            spin.setSelection(Math.max(Arrays.asList(MarkStore.SUBS).indexOf(current), 0));
+        }
+        box.addView(msg);
+        box.addView(spin);
+
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(current == null ? "Mark page" : "Page mark")
+                .setView(box)
+                .setPositiveButton("OK", (d, w) -> {
+                    String sub = (String) spin.getSelectedItem();
+                    store.set(path, page, sub);
+                    marks.put(page, sub);
+                    pageAdapter.notifyDataSetChanged();
+                })
+                .setNegativeButton("Cancel", null);
+        if (current != null) {
+            b.setNeutralButton("Remove mark", (d, w) -> {
+                store.remove(path, page);
+                marks.remove(page);
+                pageAdapter.notifyDataSetChanged();
+            });
+        }
+        b.show();
     }
 
     private Bitmap render(int index) {
@@ -95,6 +161,41 @@ public class MarkActivity extends Activity {
         return b;
     }
 
+    // Row: label / page image with star badge at top right
+    static class PageRow extends LinearLayout {
+        final TextView label;
+        final ImageView image;
+        final ImageView badge;
+
+        PageRow(Context c) {
+            super(c);
+            setOrientation(VERTICAL);
+            setPadding(0, 8, 0, 8);
+
+            label = new TextView(c);
+            label.setTypeface(null, Typeface.BOLD);
+
+            image = new ImageView(c);
+            image.setAdjustViewBounds(true);
+
+            badge = new ImageView(c);
+            badge.setImageResource(android.R.drawable.star_big_on);
+            int size = (int) (44 * c.getResources().getDisplayMetrics().density);
+            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(
+                    size, size, Gravity.TOP | Gravity.END);
+            bp.setMargins(0, 8, 8, 0);
+
+            FrameLayout frame = new FrameLayout(c);
+            frame.addView(image, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            frame.addView(badge, bp);
+
+            addView(label);
+            addView(frame, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+    }
+
     private class PageAdapter extends BaseAdapter {
         @Override public int getCount() { return renderer.getPageCount(); }
         @Override public Object getItem(int i) { return i; }
@@ -102,28 +203,15 @@ public class MarkActivity extends Activity {
 
         @Override
         public View getView(int i, View convertView, ViewGroup parent) {
-            LinearLayout row;
-            TextView label;
-            ImageView image;
-            if (convertView == null) {
-                row = new LinearLayout(MarkActivity.this);
-                row.setOrientation(LinearLayout.VERTICAL);
-                row.setPadding(0, 8, 0, 8);
-                label = new TextView(MarkActivity.this);
-                image = new ImageView(MarkActivity.this);
-                image.setAdjustViewBounds(true);
-                row.addView(label);
-                row.addView(image, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT));
-            } else {
-                row = (LinearLayout) convertView;
-                label = (TextView) row.getChildAt(0);
-                image = (ImageView) row.getChildAt(1);
-            }
-            label.setText("Page " + (i + 1) + " / " + getCount());
-            image.setImageBitmap(render(i));
-            return row;
+            PageRow r = (convertView == null)
+                    ? new PageRow(MarkActivity.this) : (PageRow) convertView;
+            String sub = marks.get(i);
+            r.label.setText("Page " + (i + 1) + " / " + getCount()
+                    + (sub != null ? "  -  " + sub : ""));
+            r.image.setImageBitmap(render(i));
+            r.badge.setVisibility(sub != null ? View.VISIBLE : View.GONE);
+            r.badge.setOnClickListener(v -> showMarkDialog(i));
+            return r;
         }
     }
 }
