@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.TextClock;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -73,6 +74,14 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        TextClock clock = new TextClock(this);
+        clock.setFormat12Hour("EEE, dd MMM yyyy  hh:mm:ss a");
+        clock.setFormat24Hour("EEE, dd MMM yyyy  HH:mm:ss");
+        clock.setTextSize(18);
+        clock.setGravity(android.view.Gravity.CENTER);
+        clock.setPadding(0, 0, 0, 16);
+        root.addView(clock, wide);
+
         root.addView(actions.buildSelectionBar(), wide);
         root.addView(findButton, wide);
 
