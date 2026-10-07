@@ -35,5 +35,6 @@
         <activity android:name=".MarkedFilesActivity" android:exported="false" />
         <activity android:name=".CaseDetailsActivity" android:exported="false" />
         <activity android:name=".AdvancedSearchActivity" android:exported="false" />
+        <activity android:name=".OptionsEditorActivity" android:exported="false" />
     </application>
 </manifest>
