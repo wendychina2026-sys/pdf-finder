@@ -19,32 +19,10 @@ import java.util.Map;
 
 class DetailsStore {
 
-    static final String[] CASE_TYPES = {"Civil", "Criminal"};
-
-    static final String[] CIVIL_SUBS = {
-            "Suit for Recovery of Money", "Suit for Partition", "Suit for Injunction",
-            "Suit for Declaration", "Specific Performance", "Eviction / Rent",
-            "Civil Appeal", "Execution Petition", "Other Civil"
-    };
-
-    static final String[] CRIMINAL_SUBS = {
-            "Bail Application", "Criminal Complaint", "Cheque Bounce (NI Act 138)",
-            "Murder", "Theft / Robbery", "Cheating / Fraud", "Domestic Violence",
-            "Criminal Appeal", "Criminal Revision", "Other Criminal"
-    };
-
-    static final String[] COURTS = {
-            "Civil Judge", "Magistrate Court", "District Court", "Sessions Court",
-            "Family Court", "Consumer Forum", "Tribunal", "High Court", "Supreme Court", "Other"
-    };
-
-    static String[] subsFor(String caseType) {
-        return "Criminal".equals(caseType) ? CRIMINAL_SUBS : CIVIL_SUBS;
-    }
-
     static class Details {
         String caseType = "";
         String subType = "";
+        String subSubType = "";
         String court = "";
         int year = 0;            // 0 = not set
         String nextDate = "";    // yyyy-MM-dd or ""
@@ -65,6 +43,7 @@ class DetailsStore {
         StringBuilder sb = new StringBuilder();
         add(sb, d.caseType);
         add(sb, d.subType);
+        add(sb, d.subSubType);
         add(sb, d.court);
         if (d.year > 0) add(sb, String.valueOf(d.year));
         String line1 = sb.toString();
@@ -102,6 +81,8 @@ class DetailsStore {
             Details d = new Details();
             d.caseType = o.optString("caseType", "");
             d.subType = o.optString("subType", "");
+            d.subSubType = o.optString("subSubType", "");
+            if ("Civil".equals(d.caseType)) d.caseType = CaseOptions.CIVIL;
             d.court = o.optString("court", "");
             d.year = o.optInt("year", 0);
             d.nextDate = o.optString("nextDate", "");
@@ -117,6 +98,7 @@ class DetailsStore {
             JSONObject o = new JSONObject();
             o.put("caseType", d.caseType);
             o.put("subType", d.subType);
+            o.put("subSubType", d.subSubType);
             o.put("court", d.court);
             o.put("year", d.year);
             o.put("nextDate", d.nextDate);
@@ -126,6 +108,62 @@ class DetailsStore {
             // ignore
         }
     }
+
+    // ----- bulk helpers used by OptionsEditorActivity -----
+
+    int countWhere(java.util.function.Predicate<Details> m) {
+        int n = 0;
+        for (String path : prefs.getAll().keySet()) {
+            Details d = get(path);
+            if (d != null && m.test(d)) n++;
+        }
+        return n;
+    }
+
+    int updateWhere(java.util.function.Predicate<Details> m,
+                    java.util.function.Consumer<Details> change) {
+        int n = 0;
+        for (String path : prefs.getAll().keySet()) {
+            Details d = get(path);
+            if (d != null && m.test(d)) {
+                change.accept(d);
+                save(path, d);
+                n++;
+            }
+        }
+        return n;
+    }
+
+    int renameType(String old, String n) {
+        return updateWhere(d -> old.equals(d.caseType), d -> d.caseType = n);
+    }
+
+    int renameSub(String type, String old, String n) {
+        return updateWhere(d -> type.equals(d.caseType) && old.equals(d.subType),
+                d -> d.subType = n);
+    }
+
+    int renameSubSub(String type, String sub, String old, String n) {
+        return updateWhere(d -> type.equals(d.caseType) && sub.equals(d.subType)
+                && old.equals(d.subSubType), d -> d.subSubType = n);
+    }
+
+    int renameCourt(String old, String n) {
+        return updateWhere(d -> old.equals(d.court), d -> d.court = n);
+    }
+
+    int usesType(String t) { return countWhere(d -> t.equals(d.caseType)); }
+
+    int usesSub(String t, String s) {
+        return countWhere(d -> t.equals(d.caseType) && s.equals(d.subType));
+    }
+
+    int usesSubSub(String t, String s, String ss) {
+        return countWhere(d -> t.equals(d.caseType) && s.equals(d.subType)
+                && ss.equals(d.subSubType));
+    }
+
+    int usesCourt(String c) { return countWhere(d -> c.equals(d.court)); }
 
     Map<String, Details> everything() {
         Map<String, Details> out = new HashMap<>();

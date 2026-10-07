@@ -81,7 +81,7 @@ public class MarkActivity extends Activity {
         top.addView(name, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         Button details = new Button(this);
-        details.setText("Details");
+        details.setText("File details");
         details.setOnClickListener(v -> {
             Intent di = new Intent(this, CaseDetailsActivity.class);
             di.putExtra("path", path);

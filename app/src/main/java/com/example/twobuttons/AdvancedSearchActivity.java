@@ -54,6 +54,8 @@ public class AdvancedSearchActivity extends Activity {
     private Spinner topicSpin;
     private Spinner caseSpin;
     private Spinner subSpin;
+    private Spinner subSubSpin;
+    private CaseOptions opts;
     private Spinner courtSpin;
     private Spinner yearSpin;
     private AutoCompleteTextView lawyerEdit;
@@ -69,6 +71,7 @@ public class AdvancedSearchActivity extends Activity {
         setTitle("Advanced search");
         marks = new MarkStore(this);
         details = new DetailsStore(this);
+        opts = new CaseOptions(this);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -79,9 +82,10 @@ public class AdvancedSearchActivity extends Activity {
         filters.setOrientation(LinearLayout.VERTICAL);
 
         topicSpin = spinner(MarkStore.SUBS);
-        caseSpin = spinner(DetailsStore.CASE_TYPES);
-        subSpin = spinner(allSubs());
-        courtSpin = spinner(DetailsStore.COURTS);
+        caseSpin = spinner(CaseOptions.arr(opts.types()));
+        subSpin = spinner(CaseOptions.arr(opts.allSubs()));
+        subSubSpin = spinner(new String[0]);
+        courtSpin = spinner(CaseOptions.arr(opts.courts()));
         yearSpin = spinner(years());
 
         lawyerEdit = new AutoCompleteTextView(this);
@@ -99,6 +103,8 @@ public class AdvancedSearchActivity extends Activity {
         filters.addView(caseSpin);
         filters.addView(label("Sub case type"));
         filters.addView(subSpin);
+        filters.addView(label("Sub-sub case type"));
+        filters.addView(subSubSpin);
         filters.addView(label("Topic (marked category)"));
         filters.addView(topicSpin);
         filters.addView(label("Court"));
@@ -118,13 +124,26 @@ public class AdvancedSearchActivity extends Activity {
             @Override public void onNothingSelected(AdapterView<?> p) {}
         };
         topicSpin.setOnItemSelectedListener(refresher);
-        subSpin.setOnItemSelectedListener(refresher);
+        subSubSpin.setOnItemSelectedListener(refresher);
+        subSpin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                String ct = val(caseSpin);
+                String sb = val(subSpin);
+                java.util.List<String> l = sb.isEmpty() ? new ArrayList<String>()
+                        : (ct.isEmpty() ? opts.subSubsAnyType(sb) : opts.subSubs(ct, sb));
+                subSubSpin.setAdapter(new ArrayAdapter<>(AdvancedSearchActivity.this,
+                        android.R.layout.simple_spinner_dropdown_item,
+                        withAll(CaseOptions.arr(l))));
+                refresh();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
         courtSpin.setOnItemSelectedListener(refresher);
         yearSpin.setOnItemSelectedListener(refresher);
         caseSpin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                 String ct = val(caseSpin);
-                String[] subs = ct.isEmpty() ? allSubs() : DetailsStore.subsFor(ct);
+                String[] subs = CaseOptions.arr(ct.isEmpty() ? opts.allSubs() : opts.subs(ct));
                 subSpin.setAdapter(new ArrayAdapter<>(AdvancedSearchActivity.this,
                         android.R.layout.simple_spinner_dropdown_item, withAll(subs)));
                 refresh();
@@ -183,14 +202,6 @@ public class AdvancedSearchActivity extends Activity {
         return s;
     }
 
-    private String[] allSubs() {
-        String[] out = new String[DetailsStore.CIVIL_SUBS.length + DetailsStore.CRIMINAL_SUBS.length];
-        System.arraycopy(DetailsStore.CIVIL_SUBS, 0, out, 0, DetailsStore.CIVIL_SUBS.length);
-        System.arraycopy(DetailsStore.CRIMINAL_SUBS, 0, out,
-                DetailsStore.CIVIL_SUBS.length, DetailsStore.CRIMINAL_SUBS.length);
-        return out;
-    }
-
     private String[] years() {
         int now = Calendar.getInstance().get(Calendar.YEAR);
         String[] out = new String[now - 1950 + 1];
@@ -236,12 +247,13 @@ public class AdvancedSearchActivity extends Activity {
         String topic = val(topicSpin);
         String ct = val(caseSpin);
         String sub = val(subSpin);
+        String subSub = val(subSubSpin);
         String court = val(courtSpin);
         String yearStr = val(yearSpin);
         int year = yearStr.isEmpty() ? 0 : Integer.parseInt(yearStr);
         String lawyerQ = lawyerEdit.getText().toString().trim().toLowerCase(Locale.ROOT);
         String fileQ = fileEdit.getText().toString().trim().toLowerCase(Locale.ROOT);
-        boolean detailFilter = !ct.isEmpty() || !sub.isEmpty() || !court.isEmpty()
+        boolean detailFilter = !ct.isEmpty() || !sub.isEmpty() || !subSub.isEmpty() || !court.isEmpty()
                 || year != 0 || !lawyerQ.isEmpty();
 
         Map<String, Map<Integer, String>> allMarks = marks.everything();
@@ -270,6 +282,7 @@ public class AdvancedSearchActivity extends Activity {
                 if (d == null) continue;
                 if (!ct.isEmpty() && !ct.equals(d.caseType)) continue;
                 if (!sub.isEmpty() && !sub.equals(d.subType)) continue;
+                if (!subSub.isEmpty() && !subSub.equals(d.subSubType)) continue;
                 if (!court.isEmpty() && !court.equals(d.court)) continue;
                 if (year != 0 && year != d.year) continue;
                 if (!lawyerQ.isEmpty()

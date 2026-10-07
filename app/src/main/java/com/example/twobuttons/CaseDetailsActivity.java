@@ -2,6 +2,7 @@ package com.example.twobuttons;
 
 import android.app.Activity;
 import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.widget.AdapterView;
@@ -30,19 +31,25 @@ public class CaseDetailsActivity extends Activity {
     private DetailsStore store;
     private Spinner caseSpin;
     private Spinner subSpin;
+    private Spinner subSubSpin;
+    private TextView subSubLabel;
+    private CaseOptions opts;
+    private boolean needsRefresh = false;
     private Spinner courtSpin;
     private Spinner yearSpin;
     private Button nextBtn;
     private AutoCompleteTextView lawyer;
     private String nextDate = "";
     private String pendingSub = null;
+    private String pendingSubSub = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("Case details");
+        setTitle("File details");
         path = getIntent().getStringExtra("path");
         store = new DetailsStore(this);
+        opts = new CaseOptions(this);
         DetailsStore.Details saved = store.get(path);
 
         ScrollView sv = new ScrollView(this);
@@ -57,15 +64,21 @@ public class CaseDetailsActivity extends Activity {
         file.setTypeface(null, Typeface.BOLD);
         root.addView(file);
 
-        caseSpin = spinner(DetailsStore.CASE_TYPES);
+        caseSpin = spinner(CaseOptions.arr(opts.types()));
         subSpin = spinner(new String[0]);
-        courtSpin = spinner(DetailsStore.COURTS);
+        subSubSpin = spinner(new String[0]);
+        courtSpin = spinner(CaseOptions.arr(opts.courts()));
         yearSpin = spinner(years());
 
         root.addView(label("Case type"));
         root.addView(caseSpin);
         root.addView(label("Sub case type"));
         root.addView(subSpin);
+        subSubLabel = label("Sub-sub case type");
+        root.addView(subSubLabel);
+        root.addView(subSubSpin);
+        subSubLabel.setVisibility(android.view.View.GONE);
+        subSubSpin.setVisibility(android.view.View.GONE);
         root.addView(label("Court"));
         root.addView(courtSpin);
         root.addView(label("Year of filing"));
@@ -97,6 +110,14 @@ public class CaseDetailsActivity extends Activity {
         root.addView(label("Lawyer name"));
         root.addView(lawyer);
 
+        Button edit = new Button(this);
+        edit.setText("Edit dropdown lists");
+        edit.setOnClickListener(v -> {
+            needsRefresh = true;
+            startActivity(new Intent(this, OptionsEditorActivity.class));
+        });
+        root.addView(edit);
+
         Button save = new Button(this);
         save.setText("Save");
         save.setOnClickListener(v -> save());
@@ -104,6 +125,7 @@ public class CaseDetailsActivity extends Activity {
 
         if (saved != null) {
             pendingSub = saved.subType.isEmpty() ? null : saved.subType;
+            pendingSubSub = saved.subSubType.isEmpty() ? null : saved.subSubType;
             select(caseSpin, saved.caseType);
             select(courtSpin, saved.court);
             if (saved.year > 0) select(yearSpin, String.valueOf(saved.year));
@@ -119,12 +141,54 @@ public class CaseDetailsActivity extends Activity {
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
 
+        subSpin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, android.view.View v, int pos, long id) {
+                fillSubSubs();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+
         setContentView(sv);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!needsRefresh) return;
+        needsRefresh = false;
+        String ct = val(caseSpin), sb = val(subSpin), ss = val(subSubSpin), cr = val(courtSpin);
+        opts = new CaseOptions(this);
+        courtSpin.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                withSelect(CaseOptions.arr(opts.courts()))));
+        select(courtSpin, cr);
+        pendingSub = sb.isEmpty() ? null : sb;
+        pendingSubSub = ss.isEmpty() ? null : ss;
+        caseSpin.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                withSelect(CaseOptions.arr(opts.types()))));
+        select(caseSpin, ct);
+    }
+
+    private void fillSubSubs() {
+        String ct = val(caseSpin);
+        String sb = val(subSpin);
+        String[] items = (ct.isEmpty() || sb.isEmpty())
+                ? new String[0] : CaseOptions.arr(opts.subSubs(ct, sb));
+        boolean show = items.length > 0;
+        subSubLabel.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
+        subSubSpin.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
+        subSubSpin.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, withSelect(items)));
+        if (pendingSubSub != null) {
+            select(subSubSpin, pendingSubSub);
+            pendingSubSub = null;
+        }
     }
 
     private void fillSubs() {
         String ct = val(caseSpin);
-        String[] subs = ct.isEmpty() ? new String[0] : DetailsStore.subsFor(ct);
+        String[] subs = ct.isEmpty() ? new String[0] : CaseOptions.arr(opts.subs(ct));
         subSpin.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, withSelect(subs)));
         if (pendingSub != null) {
@@ -215,6 +279,7 @@ public class CaseDetailsActivity extends Activity {
         DetailsStore.Details d = new DetailsStore.Details();
         d.caseType = val(caseSpin);
         d.subType = val(subSpin);
+        d.subSubType = subSubSpin.getVisibility() == android.view.View.VISIBLE ? val(subSubSpin) : "";
         d.court = val(courtSpin);
         String y = val(yearSpin);
         d.year = y.isEmpty() ? 0 : Integer.parseInt(y);
