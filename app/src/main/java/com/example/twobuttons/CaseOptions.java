@@ -10,6 +10,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -165,6 +166,16 @@ class CaseOptions {
             if (m.containsKey(sub)) return new ArrayList<>(m.get(sub));
         }
         return new ArrayList<>();
+    }
+
+    /** Every sub-sub type. type empty/null = all case types together (civil + criminal). */
+    List<String> allSubSubs(String type) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        for (Map.Entry<String, Map<String, List<String>>> e : tree.entrySet()) {
+            if (type != null && !type.isEmpty() && !type.equals(e.getKey())) continue;
+            for (List<String> l : e.getValue().values()) out.addAll(l);
+        }
+        return new ArrayList<>(out);
     }
 
     List<String> allSubs() {

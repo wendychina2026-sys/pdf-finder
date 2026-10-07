@@ -1,6 +1,7 @@
 package com.example.twobuttons;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -38,7 +39,6 @@ public class MainActivity extends Activity {
     private ImageView avatar;
     private EditText searchBox;
     private LinearLayout sections;
-    private LinearLayout results;
     private ScrollView scroll;
 
     @Override
@@ -57,11 +57,6 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(buildHeader(), wide);
         root.addView(buildSearch());
-
-        results = new LinearLayout(this);
-        results.setOrientation(LinearLayout.VERTICAL);
-        results.setVisibility(android.view.View.GONE);
-        root.addView(results, wide);
 
         sections = new LinearLayout(this);
         sections.setOrientation(LinearLayout.VERTICAL);
@@ -144,7 +139,7 @@ public class MainActivity extends Activity {
         box.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
 
         searchBox = new EditText(this);
-        searchBox.setHint("Search by case name");
+        searchBox.setHint("Search today's cases by case name");
         searchBox.setSingleLine(true);
         searchBox.setTextSize(15);
         searchBox.setBackground(null);
@@ -168,28 +163,10 @@ public class MainActivity extends Activity {
 
     private void refresh() {
         if (searchBox == null) return;
-        String q = searchBox.getText().toString().trim();
-        if (q.isEmpty()) showSections(); else showResults(q);
-    }
-
-    private void showResults(String q) {
-        sections.setVisibility(android.view.View.GONE);
-        results.setVisibility(android.view.View.VISIBLE);
-        results.removeAllViews();
-        results.addView(plainHeader("Search results"));
-        List<CaseItems.Item> found = CaseItems.search(this, q);
-        if (found.isEmpty()) {
-            results.addView(CaseViews.emptyNote(this, "No case found"));
-            return;
-        }
-        for (CaseItems.Item it : found) {
-            results.addView(CaseViews.caseRow(this, it,
-                    v -> CaseViews.openPdf(this, it.path)), CaseViews.lp(this, 0, 10));
-        }
+        showSections();
     }
 
     private void showSections() {
-        results.setVisibility(android.view.View.GONE);
         sections.setVisibility(android.view.View.VISIBLE);
         sections.removeAllViews();
 
@@ -206,11 +183,13 @@ public class MainActivity extends Activity {
         // Today's Schedule
         sections.addView(CaseViews.sectionHeader(this, "Today's Schedule",
                 v -> openList("today")));
-        List<CaseItems.Item> today = CaseItems.today(this);
+        String q = searchBox.getText().toString().trim();
+        List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
         if (today.isEmpty()) {
-            sections.addView(CaseViews.emptyNote(this, "Nothing scheduled today"));
+            sections.addView(CaseViews.emptyNote(this,
+                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"));
         } else {
-            int n = Math.min(3, today.size());
+            int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
             for (int i = 0; i < n; i++) {
                 CaseItems.Item it = today.get(i);
                 sections.addView(CaseViews.caseRow(this, it,
@@ -252,12 +231,12 @@ public class MainActivity extends Activity {
         avatar.setBackground(bg);
         avatar.setClipToOutline(true);
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
-        avatar.setOnClickListener(v -> takePhoto());
+        avatar.setOnClickListener(v -> onAvatarClick());
         loadAvatar();
 
         TextView icon = new TextView(this);
         icon.setTextSize(28);
-        icon.setPadding(dp(16), 0, dp(8), 0);
+        icon.setPadding(dp(8), 0, 0, 0);
         tickIcon(icon);
 
         TextClock clock = new TextClock(this);
@@ -265,10 +244,11 @@ public class MainActivity extends Activity {
         clock.setFormat24Hour("EEE, dd MMM yyyy  hh:mm:ss a");
         clock.setTextSize(16);
         clock.setTypeface(null, Typeface.BOLD);
+        clock.setPadding(dp(16), 0, 0, 0);
 
         row.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
-        row.addView(icon);
         row.addView(clock);
+        row.addView(icon);
         return row;
     }
 
@@ -276,10 +256,11 @@ public class MainActivity extends Activity {
     private void tickIcon(TextView icon) {
         int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
         String sym;
-        if (h >= 5 && h < 12) sym = "\uD83C\uDF24\uFE0F";        // day
-        else if (h >= 12 && h < 16) sym = "\u2600\uFE0F";         // noon
-        else if (h >= 16 && h < 20) sym = "\uD83C\uDF07";         // evening
-        else sym = "\uD83C\uDF19";                                // night
+        if (h >= 5 && h < 10) sym = "\uD83C\uDF24\uFE0F";          // morning 5-10
+        else if (h >= 10 && h < 17) sym = "\u2600\uFE0F";           // noon 10-5pm
+        else if (h >= 17 && h < 19) sym = "\uD83C\uDF07";           // evening 5-7pm
+        else if (h >= 19 || h < 2) sym = "\uD83C\uDF19";            // midnight 7pm-2am
+        else sym = "\uD83C\uDF04";                                  // early morning 2-5am
         icon.setText(sym);
         icon.postDelayed(() -> {
             if (icon.isAttachedToWindow()) tickIcon(icon);
@@ -314,44 +295,82 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void loadAvatar() {
+    // Decode saved profile photo, rotated upright. null if none/broken.
+    private Bitmap decodePhoto(int target) {
         File f = photoFile();
-        if (f.exists()) {
-            try {
-                BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(f.getAbsolutePath(), o);
-                int sample = 1;
-                while (o.outWidth / (sample * 2) >= 400 && o.outHeight / (sample * 2) >= 400) {
-                    sample *= 2;
-                }
-                o = new BitmapFactory.Options();
-                o.inSampleSize = sample;
-                Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
-                if (b != null) {
-                    int rot = 0;
-                    int ori = new ExifInterface(f.getAbsolutePath())
-                            .getAttributeInt(ExifInterface.TAG_ORIENTATION,
-                                    ExifInterface.ORIENTATION_NORMAL);
-                    if (ori == ExifInterface.ORIENTATION_ROTATE_90) rot = 90;
-                    else if (ori == ExifInterface.ORIENTATION_ROTATE_180) rot = 180;
-                    else if (ori == ExifInterface.ORIENTATION_ROTATE_270) rot = 270;
-                    if (rot != 0) {
-                        Matrix m = new Matrix();
-                        m.postRotate(rot);
-                        b = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
-                    }
-                    avatar.setPadding(0, 0, 0, 0);
-                    avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    avatar.setImageBitmap(b);
-                    return;
-                }
-            } catch (Exception ignored) {
+        if (!f.exists()) return null;
+        try {
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+            int sample = 1;
+            while (o.outWidth / (sample * 2) >= target && o.outHeight / (sample * 2) >= target) {
+                sample *= 2;
             }
+            o = new BitmapFactory.Options();
+            o.inSampleSize = sample;
+            Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+            if (b == null) return null;
+            int rot = 0;
+            int ori = new ExifInterface(f.getAbsolutePath())
+                    .getAttributeInt(ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL);
+            if (ori == ExifInterface.ORIENTATION_ROTATE_90) rot = 90;
+            else if (ori == ExifInterface.ORIENTATION_ROTATE_180) rot = 180;
+            else if (ori == ExifInterface.ORIENTATION_ROTATE_270) rot = 270;
+            if (rot != 0) {
+                Matrix m = new Matrix();
+                m.postRotate(rot);
+                b = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+            }
+            return b;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void loadAvatar() {
+        Bitmap b = decodePhoto(400);
+        if (b != null) {
+            avatar.setPadding(0, 0, 0, 0);
+            avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            avatar.setImageBitmap(b);
+            return;
         }
         avatar.setPadding(dp(20), dp(20), dp(20), dp(20));
         avatar.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         avatar.setImageResource(android.R.drawable.ic_menu_camera);
     }
 
+    // No photo -> camera. Photo saved -> show it, with Replace / Remove.
+    private void onAvatarClick() {
+        Bitmap big = decodePhoto(900);
+        if (big == null) {
+            takePhoto();
+            return;
+        }
+        ImageView iv = new ImageView(this);
+        iv.setImageBitmap(big);
+        iv.setAdjustViewBounds(true);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iv.setPadding(dp(8), dp(8), dp(8), dp(8));
+        new AlertDialog.Builder(this)
+                .setTitle("Profile picture")
+                .setView(iv)
+                .setPositiveButton("Replace", (d, w) -> takePhoto())
+                .setNegativeButton("Remove", (d, w) -> confirmRemovePhoto())
+                .setNeutralButton("Close", null)
+                .show();
+    }
+
+    private void confirmRemovePhoto() {
+        new AlertDialog.Builder(this)
+                .setTitle("Remove profile picture?")
+                .setPositiveButton("Remove", (d, w) -> {
+                    photoFile().delete();
+                    loadAvatar();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
 }

@@ -110,8 +110,8 @@ class CaseViews {
         names.setOrientation(LinearLayout.VERTICAL);
         names.setPadding(dp(a, 12), 0, 0, 0);
         names.addView(text(a, it.title(), 16, Color.WHITE, true));
-        String sub = it.subtitle();
-        if (!sub.isEmpty()) names.addView(text(a, sub, 13, 0xFFD0D3F5, false));
+        if (!it.caseType.isEmpty()) names.addView(text(a, it.caseType, 13, 0xFFD0D3F5, false));
+        if (!it.subType.isEmpty()) names.addView(text(a, it.subType, 13, 0xFFD0D3F5, false));
         top.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         card.addView(top);
 

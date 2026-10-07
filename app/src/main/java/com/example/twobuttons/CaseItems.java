@@ -25,12 +25,9 @@ class CaseItems {
         String court = "";
         String nextDate = "";   // yyyy-MM-dd or ""
 
+        /** Case name only. File name is never shown on the dashboard. */
         String title() {
-            if (!caseTitle.isEmpty()) return caseTitle;
-            if (fileName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-                return fileName.substring(0, fileName.length() - 4);
-            }
-            return fileName;
+            return caseTitle.isEmpty() ? "(No case name)" : caseTitle;
         }
 
         /** case type | sub case type */
@@ -41,7 +38,7 @@ class CaseItems {
         }
 
         String initial() {
-            String t = title().trim();
+            String t = caseTitle.trim();
             return t.isEmpty() ? "?" : t.substring(0, 1).toUpperCase(Locale.ROOT);
         }
     }
@@ -108,16 +105,13 @@ class CaseItems {
         return out;
     }
 
-    /** Match case name or file name. */
-    static List<Item> search(Context c, String query) {
+    /** Today's cases whose case name contains query. Empty query = all. */
+    static List<Item> todayMatching(Context c, String query) {
         String q = query.trim().toLowerCase(Locale.ROOT);
         List<Item> out = new ArrayList<>();
-        if (q.isEmpty()) return out;
-        for (Item it : all(c)) {
-            String hay = (it.caseTitle + " " + it.fileName).toLowerCase(Locale.ROOT);
-            if (hay.contains(q)) out.add(it);
+        for (Item it : today(c)) {
+            if (q.isEmpty() || it.caseTitle.toLowerCase(Locale.ROOT).contains(q)) out.add(it);
         }
-        Collections.sort(out, (a, b) -> a.title().compareToIgnoreCase(b.title()));
         return out;
     }
 }

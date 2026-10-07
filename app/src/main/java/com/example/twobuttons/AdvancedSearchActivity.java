@@ -21,6 +21,8 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import android.widget.HorizontalScrollView;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -51,7 +53,12 @@ public class AdvancedSearchActivity extends Activity {
 
     private final List<Item> items = new ArrayList<>();
     private BaseAdapter adapter;
-    private Spinner topicSpin;
+    private String topicSel = "";          // marked category chip, "" = all
+    private final List<TextView> chips = new ArrayList<>();
+    private List<Pdf> scannedPdfs = new ArrayList<>();
+    private boolean scanned = false;
+    private boolean scanning = false;
+    private PermissionHelper perms;
     private Spinner caseSpin;
     private Spinner subSpin;
     private Spinner subSubSpin;
@@ -72,6 +79,7 @@ public class AdvancedSearchActivity extends Activity {
         marks = new MarkStore(this);
         details = new DetailsStore(this);
         opts = new CaseOptions(this);
+        perms = new PermissionHelper(this);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -81,10 +89,9 @@ public class AdvancedSearchActivity extends Activity {
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.VERTICAL);
 
-        topicSpin = spinner(MarkStore.SUBS);
         caseSpin = spinner(CaseOptions.arr(opts.types()));
         subSpin = spinner(CaseOptions.arr(opts.allSubs()));
-        subSubSpin = spinner(new String[0]);
+        subSubSpin = spinner(CaseOptions.arr(opts.allSubSubs("")));
         courtSpin = spinner(CaseOptions.arr(opts.courts()));
         yearSpin = spinner(years());
 
@@ -96,8 +103,11 @@ public class AdvancedSearchActivity extends Activity {
                 android.R.layout.simple_dropdown_item_1line, details.lawyers()));
 
         fileEdit = new EditText(this);
-        fileEdit.setHint("File name");
+        fileEdit.setHint("Search file name or case name");
         fileEdit.setSingleLine(true);
+        fileEdit.setTextSize(15);
+        fileEdit.setBackground(null);
+        fileEdit.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 10), 0, CaseViews.dp(this, 10));
 
         filters.addView(label("Case type"));
         filters.addView(caseSpin);
@@ -105,16 +115,12 @@ public class AdvancedSearchActivity extends Activity {
         filters.addView(subSpin);
         filters.addView(label("Sub-sub case type"));
         filters.addView(subSubSpin);
-        filters.addView(label("Topic (marked category)"));
-        filters.addView(topicSpin);
         filters.addView(label("Court"));
         filters.addView(courtSpin);
         filters.addView(label("Year of filing"));
         filters.addView(yearSpin);
         filters.addView(label("Lawyer"));
         filters.addView(lawyerEdit);
-        filters.addView(label("File name"));
-        filters.addView(fileEdit);
 
         filterScroll = new ScrollView(this);
         filterScroll.addView(filters);
@@ -123,13 +129,13 @@ public class AdvancedSearchActivity extends Activity {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { refresh(); }
             @Override public void onNothingSelected(AdapterView<?> p) {}
         };
-        topicSpin.setOnItemSelectedListener(refresher);
         subSubSpin.setOnItemSelectedListener(refresher);
         subSpin.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                 String ct = val(caseSpin);
                 String sb = val(subSpin);
-                java.util.List<String> l = sb.isEmpty() ? new ArrayList<String>()
+                // sub = All -> every sub-sub of chosen type, or civil + criminal together
+                java.util.List<String> l = sb.isEmpty() ? opts.allSubSubs(ct)
                         : (ct.isEmpty() ? opts.subSubsAnyType(sb) : opts.subSubs(ct, sb));
                 subSubSpin.setAdapter(new ArrayAdapter<>(AdvancedSearchActivity.this,
                         android.R.layout.simple_spinner_dropdown_item,
@@ -174,6 +180,41 @@ public class AdvancedSearchActivity extends Activity {
 
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+
+        // search box (always visible)
+        LinearLayout searchRow = new LinearLayout(this);
+        searchRow.setOrientation(LinearLayout.HORIZONTAL);
+        searchRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        searchRow.setPadding(CaseViews.dp(this, 14), 0, CaseViews.dp(this, 14), 0);
+        searchRow.setBackground(CaseViews.box(this, Color.WHITE, 10, 0xFFD9DBE6, 1));
+        searchRow.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
+        searchRow.addView(fileEdit, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        root.addView(searchRow, wide);
+
+        // marked category chips
+        HorizontalScrollView chipScroll = new HorizontalScrollView(this);
+        chipScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout chipRow = new LinearLayout(this);
+        chipRow.setOrientation(LinearLayout.HORIZONTAL);
+        chipRow.setPadding(0, CaseViews.dp(this, 10), 0, CaseViews.dp(this, 6));
+        chipRow.addView(makeChip("All", ""));
+        for (String t : MarkStore.SUBS) chipRow.addView(makeChip(t, t));
+        chipScroll.addView(chipRow);
+        root.addView(chipScroll, wide);
+        styleChips();
+
+        // filters toggle
+        Button toggle = new Button(this);
+        toggle.setText("Case filters  \u25B2");
+        toggle.setAllCaps(false);
+        toggle.setOnClickListener(v -> {
+            boolean show = filterScroll.getVisibility() != View.VISIBLE;
+            filterScroll.setVisibility(show ? View.VISIBLE : View.GONE);
+            toggle.setText(show ? "Case filters  \u25B2" : "Case filters  \u25BC");
+        });
+        root.addView(toggle, wide);
+
         root.addView(filterScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(status, wide);
@@ -185,7 +226,51 @@ public class AdvancedSearchActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        maybeScan();
         refresh();
+    }
+
+    // scan phone once so unmarked PDFs can be searched too
+    private void maybeScan() {
+        if (scanned || scanning || !perms.hasAccess()) return;
+        scanning = true;
+        PdfScanner.scan(this, found -> {
+            scannedPdfs = found;
+            scanned = true;
+            scanning = false;
+            refresh();
+        });
+    }
+
+    private TextView makeChip(String label, String value) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(13);
+        t.setTag(value);
+        t.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 8),
+                CaseViews.dp(this, 14), CaseViews.dp(this, 8));
+        t.setOnClickListener(v -> {
+            topicSel = (String) v.getTag();
+            styleChips();
+            refresh();
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = CaseViews.dp(this, 8);
+        t.setLayoutParams(lp);
+        chips.add(t);
+        return t;
+    }
+
+    private void styleChips() {
+        for (TextView t : chips) {
+            boolean on = topicSel.equals(t.getTag());
+            t.setTextColor(on ? Color.WHITE : Color.BLACK);
+            t.setTypeface(null, on ? Typeface.BOLD : Typeface.NORMAL);
+            t.setBackground(on
+                    ? CaseViews.box(this, CaseViews.NAVY, 18, 0, 0)
+                    : CaseViews.box(this, 0xFFF4F5FA, 18, 0xFFD9DBE6, 1));
+        }
     }
 
     private String[] withAll(String[] items) {
@@ -242,9 +327,9 @@ public class AdvancedSearchActivity extends Activity {
     }
 
     private void refresh() {
-        if (status == null || topicSpin.getSelectedItem() == null) return;
+        if (status == null || yearSpin == null || yearSpin.getSelectedItem() == null) return;
 
-        String topic = val(topicSpin);
+        String topic = topicSel;
         String ct = val(caseSpin);
         String sub = val(subSpin);
         String subSub = val(subSubSpin);
@@ -263,12 +348,17 @@ public class AdvancedSearchActivity extends Activity {
         for (Map.Entry<String, Map<Integer, String>> e : allMarks.entrySet()) {
             if (e.getValue() != null && !e.getValue().isEmpty()) paths.add(e.getKey());
         }
+        for (Pdf sp : scannedPdfs) paths.add(sp.path);   // unmarked files too
 
         List<String> sorted = new ArrayList<>();
         for (String p : paths) {
             File f = new File(p);
             if (!f.exists()) continue;
-            if (!fileQ.isEmpty() && !f.getName().toLowerCase(Locale.ROOT).contains(fileQ)) continue;
+            if (!fileQ.isEmpty()) {
+                DetailsStore.Details dq = allDetails.get(p);
+                String hay = f.getName() + " " + (dq == null ? "" : dq.caseName);
+                if (!hay.toLowerCase(Locale.ROOT).contains(fileQ)) continue;
+            }
             sorted.add(p);
         }
         Collections.sort(sorted, (a, b) ->
@@ -310,7 +400,9 @@ public class AdvancedSearchActivity extends Activity {
             String dt = d == null ? "" : DetailsStore.summary(d);
             items.add(new Item(p, tb.toString(), dt, topic));
         }
-        status.setText(items.size() + (items.size() == 1 ? " file" : " files"));
+        String st = items.size() + (items.size() == 1 ? " file" : " files");
+        if (!perms.hasAccess()) st += "  (allow storage access in Find PDF to include unmarked files)";
+        status.setText(st);
         adapter.notifyDataSetChanged();
     }
 

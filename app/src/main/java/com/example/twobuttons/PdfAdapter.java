@@ -48,6 +48,7 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
         Pdf p = getItem(position);
         r.name.setText(p.name);
         r.path.setText(p.path);
+        r.size.setText(Pdf.formatSize(p.size));
         boolean isSelected = selected.contains(p.path);
         r.box.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
         r.box.setChecked(isSelected);
@@ -60,6 +61,7 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
         final CheckBox box;
         final TextView name;
         final TextView path;
+        final TextView size;
 
         Row(Context c) {
             super(c);
@@ -83,8 +85,14 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
             col.addView(name);
             col.addView(path);
 
+            size = new TextView(c);
+            size.setTextSize(12);
+            size.setTextColor(Color.DKGRAY);
+            size.setPadding(16, 0, 0, 0);
+
             addView(box, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             addView(col, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+            addView(size, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
     }
 }

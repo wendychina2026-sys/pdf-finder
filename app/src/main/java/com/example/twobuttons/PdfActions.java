@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Typeface;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
+import android.provider.DocumentsContract;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -118,12 +119,14 @@ class PdfActions {
     private void showOptions(Pdf p) {
         new AlertDialog.Builder(activity)
                 .setTitle(p.name)
-                .setItems(new String[]{"Mark", "Delete", "Select multiple"}, (d, which) -> {
+                .setItems(new String[]{"Mark", "Open containing folder", "Delete", "Select multiple"}, (d, which) -> {
                     if (which == 0) {
                         Intent i = new Intent(activity, MarkActivity.class);
                         i.putExtra("path", p.path);
                         activity.startActivity(i);
                     } else if (which == 1) {
+                        openFolder(p);
+                    } else if (which == 2) {
                         List<String> one = new ArrayList<>();
                         one.add(p.path);
                         confirmDelete(one);
@@ -135,6 +138,58 @@ class PdfActions {
                     }
                 })
                 .show();
+    }
+
+    // Opens the folder holding the file in the Files app (DocumentsUI).
+    private void openFolder(Pdf p) {
+        File dir = new File(p.path).getParentFile();
+        if (dir == null) {
+            Toast.makeText(activity, "Folder not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String docId = folderDocId(dir.getAbsolutePath());
+        if (docId != null) {
+            Uri uri = DocumentsContract.buildDocumentUri(
+                    "com.android.externalstorage.documents", docId);
+            try {
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                activity.startActivity(i);
+                return;
+            } catch (ActivityNotFoundException ignored) {
+                // fall through
+            }
+            try {
+                // Fallback: file picker opened at that folder
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/pdf");
+                i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri);
+                activity.startActivity(i);
+                return;
+            } catch (ActivityNotFoundException ignored) {
+                // fall through
+            }
+        }
+        Toast.makeText(activity, "Cannot open folder: " + dir.getAbsolutePath(),
+                Toast.LENGTH_LONG).show();
+    }
+
+    // /storage/emulated/0/X/Y -> primary:X/Y ; /storage/ABCD-1234/X -> ABCD-1234:X
+    private static String folderDocId(String path) {
+        String[] prefixes = {"/storage/emulated/0", "/sdcard", "/storage/self/primary"};
+        for (String pre : prefixes) {
+            if (path.equals(pre)) return "primary:";
+            if (path.startsWith(pre + "/")) return "primary:" + path.substring(pre.length() + 1);
+        }
+        if (path.startsWith("/storage/")) {
+            String rest = path.substring("/storage/".length());
+            int slash = rest.indexOf('/');
+            if (slash < 0) return rest + ":";
+            return rest.substring(0, slash) + ":" + rest.substring(slash + 1);
+        }
+        return null;
     }
 
     private void confirmDelete(List<String> paths) {

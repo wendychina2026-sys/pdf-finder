@@ -37,7 +37,7 @@ class PdfScanner {
                                 && (p.endsWith("/Android/data") || p.endsWith("/Android/obb"));
                         if (!blocked && !name.startsWith(".")) stack.push(f);
                     } else if (name.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-                        found.add(new Pdf(name, f.getAbsolutePath()));
+                        found.add(new Pdf(name, f.getAbsolutePath(), f.length()));
                     }
                 }
             }
