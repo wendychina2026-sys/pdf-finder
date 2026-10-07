@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private EditText searchBox;
     private LinearLayout sections;
     private LinearLayout results;
+    private ScrollView scroll;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,7 +68,62 @@ public class MainActivity extends Activity {
         root.addView(sections, wide);
 
         sv.addView(root);
-        setContentView(sv);
+        scroll = sv;
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        page.addView(sv, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        page.addView(buildNav(), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        setContentView(page);
+    }
+
+    // ---------- bottom nav: Home | Find PDF | Marked PDF | Advanced Search ----------
+
+    private LinearLayout buildNav() {
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setPadding(dp(8), dp(10), dp(8), dp(10));
+        float r = dp(20);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFFF4F5FA);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        nav.setBackground(bg);
+        nav.setElevation(dp(8));
+
+        nav.addView(navItem(R.drawable.ic_home, "Home", true,
+                v -> scroll.smoothScrollTo(0, 0)), navLp());
+        nav.addView(navItem(R.drawable.ic_pdf, "Find PDF", false,
+                v -> startActivity(new Intent(this, FindPdfsActivity.class))), navLp());
+        nav.addView(navItem(R.drawable.ic_marked, "Marked PDF", false,
+                v -> startActivity(new Intent(this, MarkedFilesActivity.class))), navLp());
+        nav.addView(navItem(R.drawable.ic_advsearch, "Advanced Search", false,
+                v -> startActivity(new Intent(this, AdvancedSearchActivity.class))), navLp());
+        return nav;
+    }
+
+    private LinearLayout.LayoutParams navLp() {
+        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+    }
+
+    private LinearLayout navItem(int iconRes, String label, boolean active,
+                                 android.view.View.OnClickListener click) {
+        int color = active ? CaseViews.NAVY : 0xFF333344;
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER_HORIZONTAL);
+        item.setPadding(0, dp(4), 0, dp(4));
+        ImageView ic = CaseViews.icon(this, iconRes, color, 24);
+        item.addView(ic);
+        TextView t = CaseViews.text(this, label, 11, color, active);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        t.setPadding(0, dp(4), 0, 0);
+        item.addView(t);
+        item.setOnClickListener(click);
+        return item;
     }
 
     @Override
@@ -165,25 +221,12 @@ public class MainActivity extends Activity {
                         13, CaseViews.GREY, false));
             }
         }
-
-        // Tools
-        sections.addView(plainHeader("Tools"));
-        sections.addView(toolButton("Find PDFs", FindPdfsActivity.class), CaseViews.lp(this, 0, 8));
-        sections.addView(toolButton("Marked PDFs", MarkedFilesActivity.class), CaseViews.lp(this, 0, 8));
-        sections.addView(toolButton("Advanced search", AdvancedSearchActivity.class), CaseViews.lp(this, 0, 8));
     }
 
     private TextView plainHeader(String title) {
         TextView t = CaseViews.text(this, title, 18, Color.BLACK, true);
         t.setPadding(0, dp(22), 0, dp(10));
         return t;
-    }
-
-    private Button toolButton(String label, Class<?> target) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setOnClickListener(v -> startActivity(new Intent(this, target)));
-        return b;
     }
 
     private void openList(String mode) {

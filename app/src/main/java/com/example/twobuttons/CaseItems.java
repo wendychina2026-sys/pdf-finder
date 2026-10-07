@@ -8,12 +8,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /** Reads saved file details + cases and answers: upcoming, today, search. */
 class CaseItems {
@@ -22,7 +19,6 @@ class CaseItems {
         String path = "";
         String fileName = "";
         String caseTitle = "";
-        String caseNumber = "";
         String caseType = "";
         String subType = "";
         String subSubType = "";
@@ -37,12 +33,11 @@ class CaseItems {
             return fileName;
         }
 
+        /** case type | sub case type */
         String subtitle() {
-            String s = !subType.isEmpty() ? subType : caseType;
-            if (!caseNumber.isEmpty()) {
-                s = s.isEmpty() ? "No. " + caseNumber : s + "  |  No. " + caseNumber;
-            }
-            return s;
+            if (caseType.isEmpty()) return subType;
+            if (subType.isEmpty()) return caseType;
+            return caseType + "  |  " + subType;
         }
 
         String initial() {
@@ -68,9 +63,6 @@ class CaseItems {
 
     /** Every PDF that has saved file details and still exists. */
     static List<Item> all(Context c) {
-        Map<String, CaseEntry> byId = new HashMap<>();
-        for (CaseEntry e : new CaseStore(c).load()) byId.put(e.id, e);
-
         List<Item> out = new ArrayList<>();
         Map<String, DetailsStore.Details> map = new DetailsStore(c).everything();
         for (Map.Entry<String, DetailsStore.Details> e : map.entrySet()) {
@@ -85,11 +77,7 @@ class CaseItems {
             it.subSubType = d.subSubType;
             it.court = d.court;
             it.nextDate = d.nextDate;
-            CaseEntry ce = d.caseId.isEmpty() ? null : byId.get(d.caseId);
-            if (ce != null) {
-                it.caseTitle = ce.title;
-                it.caseNumber = ce.number;
-            }
+            it.caseTitle = d.caseName;
             out.add(it);
         }
         return out;
@@ -120,35 +108,15 @@ class CaseItems {
         return out;
     }
 
-    /** Match case name, case number or file name. Also lists cases with no file linked. */
+    /** Match case name or file name. */
     static List<Item> search(Context c, String query) {
         String q = query.trim().toLowerCase(Locale.ROOT);
         List<Item> out = new ArrayList<>();
         if (q.isEmpty()) return out;
-
-        Set<String> linked = new HashSet<>();
-        Map<String, DetailsStore.Details> map = new DetailsStore(c).everything();
-        for (DetailsStore.Details d : map.values()) {
-            if (!d.caseId.isEmpty()) linked.add(d.caseId);
-        }
-
         for (Item it : all(c)) {
-            String hay = (it.title() + " " + it.caseNumber + " " + it.fileName)
-                    .toLowerCase(Locale.ROOT);
+            String hay = (it.caseTitle + " " + it.fileName).toLowerCase(Locale.ROOT);
             if (hay.contains(q)) out.add(it);
         }
-
-        for (CaseEntry e : new CaseStore(c).load()) {
-            if (linked.contains(e.id)) continue;
-            String hay = (e.title + " " + e.number).toLowerCase(Locale.ROOT);
-            if (!hay.contains(q)) continue;
-            Item it = new Item();
-            it.caseTitle = e.title;
-            it.caseNumber = e.number;
-            it.caseType = e.type;
-            out.add(it);
-        }
-
         Collections.sort(out, (a, b) -> a.title().compareToIgnoreCase(b.title()));
         return out;
     }
