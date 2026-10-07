@@ -95,23 +95,11 @@ public class MainActivity extends Activity {
         root.addView(actions.buildSelectionBar(), wide);
         root.addView(findButton, wide);
 
-        Button markedButton = new Button(this);
-        markedButton.setText("Marked pages");
-        markedButton.setOnClickListener(v ->
-                startActivity(new Intent(this, MarkedActivity.class)));
-        root.addView(markedButton, wide);
-
         Button filesButton = new Button(this);
         filesButton.setText("Marked PDFs");
         filesButton.setOnClickListener(v ->
                 startActivity(new Intent(this, MarkedFilesActivity.class)));
         root.addView(filesButton, wide);
-
-        Button searchCatButton = new Button(this);
-        searchCatButton.setText("Search by category");
-        searchCatButton.setOnClickListener(v ->
-                startActivity(new Intent(this, CategorySearchActivity.class)));
-        root.addView(searchCatButton, wide);
 
         Button advButton = new Button(this);
         advButton.setText("Advanced search");
