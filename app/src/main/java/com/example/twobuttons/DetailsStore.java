@@ -20,6 +20,7 @@ import java.util.Map;
 class DetailsStore {
 
     static class Details {
+        String caseId = "";      // links to CaseEntry.id (Categories page)
         String caseType = "";
         String subType = "";
         String subSubType = "";
@@ -79,6 +80,7 @@ class DetailsStore {
         try {
             JSONObject o = new JSONObject(raw);
             Details d = new Details();
+            d.caseId = o.optString("caseId", "");
             d.caseType = o.optString("caseType", "");
             d.subType = o.optString("subType", "");
             d.subSubType = o.optString("subSubType", "");
@@ -96,6 +98,7 @@ class DetailsStore {
     void save(String path, Details d) {
         try {
             JSONObject o = new JSONObject();
+            o.put("caseId", d.caseId);
             o.put("caseType", d.caseType);
             o.put("subType", d.subType);
             o.put("subSubType", d.subSubType);

@@ -5,156 +5,191 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.ExifInterface;
 import android.net.Uri;
-import android.provider.MediaStore;
-import android.view.ViewOutlineProvider;
-import android.widget.ImageView;
-import android.widget.Toast;
-import androidx.core.content.FileProvider;
-import java.io.File;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.ViewOutlineProvider;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.TextClock;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import java.util.ArrayList;
+import androidx.core.content.FileProvider;
+
+import java.io.File;
 import java.util.List;
 
 public class MainActivity extends Activity {
 
-    private List<Pdf> allPdfs = new ArrayList<>();
-    private PdfAdapter adapter;
-    private PdfActions actions;
-    private PermissionHelper perms;
-    private EditText searchBox;
-    private TextView status;
-    private Button findButton;
-    private boolean scanned = false;
-    private boolean waitingForPermission = false;
     private static final int REQ_CAMERA = 21;
+
     private ImageView avatar;
+    private EditText searchBox;
+    private LinearLayout sections;
+    private LinearLayout results;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        perms = new PermissionHelper(this);
-        adapter = new PdfAdapter(this);
-        actions = new PdfActions(this, adapter, new PdfActions.Host() {
-            @Override public List<Pdf> pdfs() { return allPdfs; }
-            @Override public void onListChanged() { applyFilter(); }
-        });
+        ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(Color.WHITE);
+        sv.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-
-        findButton = new Button(this);
-        findButton.setText("Find PDFs");
-        findButton.setOnClickListener(v -> startScan());
-
-        searchBox = new EditText(this);
-        searchBox.setHint("Search PDF name");
-        searchBox.setSingleLine(true);
-        searchBox.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                if (scanned) applyFilter();
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        status = new TextView(this);
-        status.setText("Tap Find PDFs to start");
-        status.setPadding(0, 16, 0, 16);
-
-        ListView list = new ListView(this);
-        list.setAdapter(adapter);
-        list.setOnItemClickListener((parent, view, pos, id) ->
-                actions.onItemClick(adapter.getItem(pos)));
-        list.setOnItemLongClickListener((parent, view, pos, id) -> {
-            actions.onItemLongClick(adapter.getItem(pos));
-            return true;
-        });
+        root.setPadding(dp(16), dp(16), dp(16), dp(24));
 
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(buildHeader(), wide);
+        root.addView(buildSearch());
 
-        root.addView(actions.buildSelectionBar(), wide);
-        root.addView(findButton, wide);
+        results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        results.setVisibility(android.view.View.GONE);
+        root.addView(results, wide);
 
-        Button filesButton = new Button(this);
-        filesButton.setText("Marked PDFs");
-        filesButton.setOnClickListener(v ->
-                startActivity(new Intent(this, MarkedFilesActivity.class)));
-        root.addView(filesButton, wide);
+        sections = new LinearLayout(this);
+        sections.setOrientation(LinearLayout.VERTICAL);
+        root.addView(sections, wide);
 
-        Button advButton = new Button(this);
-        advButton.setText("Advanced search");
-        advButton.setOnClickListener(v ->
-                startActivity(new Intent(this, AdvancedSearchActivity.class)));
-        root.addView(advButton, wide);
-        root.addView(searchBox, wide);
-        root.addView(status, wide);
-        root.addView(list, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        setContentView(root);
+        sv.addView(root);
+        setContentView(sv);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (waitingForPermission && perms.hasAccess()) {
-            waitingForPermission = false;
-            scan();
-        }
+        refresh();
     }
 
-    @Override
-    public void onRequestPermissionsResult(int code, String[] p, int[] results) {
-        super.onRequestPermissionsResult(code, p, results);
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-            scan();
-        } else {
-            status.setText("Permission denied - cannot search for PDFs");
-        }
-    }
+    // ---------- search box (rounded, magnifier icon) ----------
 
-    @Override
-    public void onBackPressed() {
-        if (!actions.handleBack()) super.onBackPressed();
-    }
+    private LinearLayout buildSearch() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.HORIZONTAL);
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(dp(14), dp(2), dp(14), dp(2));
+        box.setBackground(CaseViews.box(this, Color.WHITE, 10, 0xFFD9DBE6, 1));
 
-    private void startScan() {
-        if (perms.hasAccess()) {
-            scan();
-        } else {
-            waitingForPermission = Build.VERSION.SDK_INT >= 30;
-            perms.request();
-        }
-    }
+        box.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
 
-    private void scan() {
-        status.setText("Scanning...");
-        findButton.setEnabled(false);
-        PdfScanner.scan(this, found -> {
-            allPdfs = found;
-            scanned = true;
-            findButton.setEnabled(true);
-            applyFilter();
+        searchBox = new EditText(this);
+        searchBox.setHint("Search by case name");
+        searchBox.setSingleLine(true);
+        searchBox.setTextSize(15);
+        searchBox.setBackground(null);
+        searchBox.setPadding(dp(12), dp(12), 0, dp(12));
+        searchBox.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refresh(); }
+            @Override public void afterTextChanged(Editable s) {}
         });
+        box.addView(searchBox, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(8);
+        box.setLayoutParams(lp);
+        return box;
+    }
+
+    // ---------- content ----------
+
+    private void refresh() {
+        if (searchBox == null) return;
+        String q = searchBox.getText().toString().trim();
+        if (q.isEmpty()) showSections(); else showResults(q);
+    }
+
+    private void showResults(String q) {
+        sections.setVisibility(android.view.View.GONE);
+        results.setVisibility(android.view.View.VISIBLE);
+        results.removeAllViews();
+        results.addView(plainHeader("Search results"));
+        List<CaseItems.Item> found = CaseItems.search(this, q);
+        if (found.isEmpty()) {
+            results.addView(CaseViews.emptyNote(this, "No case found"));
+            return;
+        }
+        for (CaseItems.Item it : found) {
+            results.addView(CaseViews.caseRow(this, it,
+                    v -> CaseViews.openPdf(this, it.path)), CaseViews.lp(this, 0, 10));
+        }
+    }
+
+    private void showSections() {
+        results.setVisibility(android.view.View.GONE);
+        sections.setVisibility(android.view.View.VISIBLE);
+        sections.removeAllViews();
+
+        // Upcoming Cases
+        sections.addView(CaseViews.sectionHeader(this, "Upcoming Cases",
+                v -> openList("upcoming")));
+        List<CaseItems.Item> up = CaseItems.upcoming(this);
+        if (up.isEmpty()) {
+            sections.addView(CaseViews.emptyNote(this, "No upcoming cases"));
+        } else {
+            sections.addView(CaseViews.upcomingCard(this, up.get(0), this::refresh));
+        }
+
+        // Today's Schedule
+        sections.addView(CaseViews.sectionHeader(this, "Today's Schedule",
+                v -> openList("today")));
+        List<CaseItems.Item> today = CaseItems.today(this);
+        if (today.isEmpty()) {
+            sections.addView(CaseViews.emptyNote(this, "Nothing scheduled today"));
+        } else {
+            int n = Math.min(3, today.size());
+            for (int i = 0; i < n; i++) {
+                CaseItems.Item it = today.get(i);
+                sections.addView(CaseViews.caseRow(this, it,
+                        v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 0, 10));
+            }
+            if (today.size() > n) {
+                sections.addView(CaseViews.text(this, "+" + (today.size() - n) + " more",
+                        13, CaseViews.GREY, false));
+            }
+        }
+
+        // Tools
+        sections.addView(plainHeader("Tools"));
+        sections.addView(toolButton("Find PDFs", FindPdfsActivity.class), CaseViews.lp(this, 0, 8));
+        sections.addView(toolButton("Marked PDFs", MarkedFilesActivity.class), CaseViews.lp(this, 0, 8));
+        sections.addView(toolButton("Advanced search", AdvancedSearchActivity.class), CaseViews.lp(this, 0, 8));
+    }
+
+    private TextView plainHeader(String title) {
+        TextView t = CaseViews.text(this, title, 18, Color.BLACK, true);
+        t.setPadding(0, dp(22), 0, dp(10));
+        return t;
+    }
+
+    private Button toolButton(String label, Class<?> target) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(v -> startActivity(new Intent(this, target)));
+        return b;
+    }
+
+    private void openList(String mode) {
+        Intent i = new Intent(this, CasesListActivity.class);
+        i.putExtra("mode", mode);
+        startActivity(i);
     }
 
     private int dp(int v) {
@@ -276,9 +311,4 @@ public class MainActivity extends Activity {
         avatar.setImageResource(android.R.drawable.ic_menu_camera);
     }
 
-    private void applyFilter() {
-        int shown = adapter.filter(allPdfs, searchBox.getText().toString());
-        status.setText(shown + " of " + allPdfs.size() + " PDFs");
-        actions.refresh();
-    }
 }

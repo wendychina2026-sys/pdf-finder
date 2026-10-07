@@ -20,6 +20,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class CaseDetailsActivity extends Activity {
@@ -29,6 +30,8 @@ public class CaseDetailsActivity extends Activity {
 
     private String path;
     private DetailsStore store;
+    private Spinner caseNameSpin;
+    private List<CaseEntry> caseEntries;
     private Spinner caseSpin;
     private Spinner subSpin;
     private Spinner subSubSpin;
@@ -63,6 +66,16 @@ public class CaseDetailsActivity extends Activity {
         file.setTextSize(16);
         file.setTypeface(null, Typeface.BOLD);
         root.addView(file);
+
+        caseEntries = new CaseStore(this).load();
+        String[] caseNames = new String[caseEntries.size()];
+        for (int i = 0; i < caseNames.length; i++) {
+            CaseEntry ce = caseEntries.get(i);
+            caseNames[i] = ce.number.isEmpty() ? ce.title : ce.title + " (" + ce.number + ")";
+        }
+        caseNameSpin = spinner(caseNames);
+        root.addView(label("Case name (from Categories)"));
+        root.addView(caseNameSpin);
 
         caseSpin = spinner(CaseOptions.arr(opts.types()));
         subSpin = spinner(new String[0]);
@@ -124,6 +137,9 @@ public class CaseDetailsActivity extends Activity {
         root.addView(save);
 
         if (saved != null) {
+            for (int i = 0; i < caseEntries.size(); i++) {
+                if (caseEntries.get(i).id.equals(saved.caseId)) caseNameSpin.setSelection(i + 1);
+            }
             pendingSub = saved.subType.isEmpty() ? null : saved.subType;
             pendingSubSub = saved.subSubType.isEmpty() ? null : saved.subSubType;
             select(caseSpin, saved.caseType);
@@ -277,6 +293,8 @@ public class CaseDetailsActivity extends Activity {
 
     private void save() {
         DetailsStore.Details d = new DetailsStore.Details();
+        int ci = caseNameSpin.getSelectedItemPosition();
+        d.caseId = (ci > 0 && ci - 1 < caseEntries.size()) ? caseEntries.get(ci - 1).id : "";
         d.caseType = val(caseSpin);
         d.subType = val(subSpin);
         d.subSubType = subSubSpin.getVisibility() == android.view.View.VISIBLE ? val(subSubSpin) : "";
