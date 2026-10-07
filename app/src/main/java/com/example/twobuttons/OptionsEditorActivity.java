@@ -131,8 +131,8 @@ public class OptionsEditorActivity extends Activity {
                         ask("Rename", item, n -> {
                             String nn = n.trim();
                             if (rename(item, nn)) {
-                                int c = migrate(item, nn);
-                                if (c > 0) toast(c + (c == 1 ? " file updated" : " files updated"));
+                                int moved = migrate(item, nn);
+                                if (moved > 0) toast(moved + (moved == 1 ? " file updated" : " files updated"));
                             } else {
                                 toast("Empty or duplicate name");
                             }
