@@ -39,6 +39,8 @@ public class MarkActivity extends Activity {
     private MarkStore store;
     private Map<Integer, String> marks;
     private PageAdapter pageAdapter;
+    private String onlySub = "";
+    private int[] visible = null;   // null = all pages; else real page indexes to show
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +59,9 @@ public class MarkActivity extends Activity {
 
         store = new MarkStore(this);
         marks = store.all(path);
+        String o = getIntent().getStringExtra("only_sub");
+        onlySub = o == null ? "" : o;
+        rebuildVisible();
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -86,7 +91,9 @@ public class MarkActivity extends Activity {
         top.addView(categories);
 
         TextView hint = new TextView(this);
-        hint.setText("Long-press a page to mark it");
+        hint.setText(onlySub.isEmpty()
+                ? "Long-press a page to mark it"
+                : "Showing only pages marked: " + onlySub + "  (long-press to edit mark)");
         hint.setTextSize(12);
         hint.setTextColor(Color.GRAY);
 
@@ -94,7 +101,7 @@ public class MarkActivity extends Activity {
         ListView pages = new ListView(this);
         pages.setAdapter(pageAdapter);
         pages.setOnItemLongClickListener((parent, view, pos, id) -> {
-            showMarkDialog(pos);
+            showMarkDialog(realPage(pos));
             return true;
         });
 
@@ -115,6 +122,24 @@ public class MarkActivity extends Activity {
             if (pfd != null) pfd.close();
         } catch (Exception ignored) {
         }
+    }
+
+    private void rebuildVisible() {
+        if (onlySub.isEmpty()) {
+            visible = null;
+            return;
+        }
+        java.util.List<Integer> list = new java.util.ArrayList<>();
+        for (Map.Entry<Integer, String> e : marks.entrySet()) {
+            if (onlySub.equals(e.getValue())) list.add(e.getKey());
+        }
+        java.util.Collections.sort(list);
+        visible = new int[list.size()];
+        for (int i = 0; i < visible.length; i++) visible[i] = list.get(i);
+    }
+
+    private int realPage(int pos) {
+        return visible == null ? pos : visible[pos];
     }
 
     // New mark, or view/edit existing mark.
@@ -218,7 +243,13 @@ public class MarkActivity extends Activity {
     }
 
     private class PageAdapter extends BaseAdapter {
-        @Override public int getCount() { return renderer.getPageCount(); }
+        @Override public int getCount() {
+            return visible == null ? renderer.getPageCount() : visible.length;
+        }
+        @Override public void notifyDataSetChanged() {
+            rebuildVisible();
+            super.notifyDataSetChanged();
+        }
         @Override public Object getItem(int i) { return i; }
         @Override public long getItemId(int i) { return i; }
 
@@ -226,9 +257,10 @@ public class MarkActivity extends Activity {
         public View getView(int i, View convertView, ViewGroup parent) {
             PageRow r = (convertView == null)
                     ? new PageRow(MarkActivity.this) : (PageRow) convertView;
-            String sub = marks.get(i);
-            r.label.setText("Page " + (i + 1) + " / " + getCount());
-            r.image.setImageBitmap(render(i));
+            final int pg = realPage(i);
+            String sub = marks.get(pg);
+            r.label.setText("Page " + (pg + 1) + " / " + renderer.getPageCount());
+            r.image.setImageBitmap(render(pg));
             if (sub != null) {
                 r.tag.setText("Mark as " + sub);
                 r.tag.setVisibility(View.VISIBLE);
@@ -237,8 +269,8 @@ public class MarkActivity extends Activity {
                 r.tag.setVisibility(View.GONE);
                 r.badge.setVisibility(View.GONE);
             }
-            r.tag.setOnClickListener(v -> showMarkDialog(i));
-            r.badge.setOnClickListener(v -> showMarkDialog(i));
+            r.tag.setOnClickListener(v -> showMarkDialog(pg));
+            r.badge.setOnClickListener(v -> showMarkDialog(pg));
             return r;
         }
     }

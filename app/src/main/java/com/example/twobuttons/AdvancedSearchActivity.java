@@ -39,11 +39,13 @@ public class AdvancedSearchActivity extends Activity {
         final String path;
         final String topics;
         final String details;
+        final String topic;   // selected topic filter, "" = all
 
-        Item(String path, String topics, String details) {
+        Item(String path, String topics, String details, String topic) {
             this.path = path;
             this.topics = topics;
             this.details = details;
+            this.topic = topic;
         }
     }
 
@@ -147,6 +149,7 @@ public class AdvancedSearchActivity extends Activity {
         list.setOnItemClickListener((parent, view, pos, id) -> {
             Intent i = new Intent(this, MarkActivity.class);
             i.putExtra("path", items.get(pos).path);
+            i.putExtra("only_sub", items.get(pos).topic);
             startActivity(i);
         });
 
@@ -292,7 +295,7 @@ public class AdvancedSearchActivity extends Activity {
                 tb.append(e.getKey()).append(": pages ").append(ranges(e.getValue()));
             }
             String dt = d == null ? "" : DetailsStore.summary(d);
-            items.add(new Item(p, tb.toString(), dt));
+            items.add(new Item(p, tb.toString(), dt, topic));
         }
         status.setText(items.size() + (items.size() == 1 ? " file" : " files"));
         adapter.notifyDataSetChanged();
