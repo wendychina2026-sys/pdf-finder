@@ -36,5 +36,7 @@
         <activity android:name=".CaseDetailsActivity" android:exported="false" />
         <activity android:name=".AdvancedSearchActivity" android:exported="false" />
         <activity android:name=".OptionsEditorActivity" android:exported="false" />
+        <activity android:name=".FindPdfsActivity" android:exported="false" />
+        <activity android:name=".CasesListActivity" android:exported="false" />
     </application>
 </manifest>
