@@ -90,14 +90,21 @@ public class MarkedFilesActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        loadAll();
+        applyFilter();
+    }
+
+    private void loadAll() {
         all.clear();
         Map<String, Map<Integer, String>> everything = store.everything();
         List<String> paths = new ArrayList<>();
-        for (String p : everything.keySet()) if (new File(p).exists()) paths.add(p);
+        for (String p : everything.keySet()) {
+            Map<Integer, String> m = everything.get(p);
+            if (new File(p).exists() && m != null && !m.isEmpty()) paths.add(p);
+        }
         Collections.sort(paths, (a, b) ->
                 new File(a).getName().compareToIgnoreCase(new File(b).getName()));
         for (String p : paths) all.add(new Item(p, everything.get(p)));
-        applyFilter();
     }
 
     private void applyFilter() {
@@ -150,25 +157,77 @@ public class MarkedFilesActivity extends Activity {
     private void showDetails(Item it) {
         int total = totalPages(it.path);
 
-        StringBuilder sb = new StringBuilder();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(48, 24, 48, 24);
+
         // keep MarkStore.SUBS order, then any unknown names
         List<String> order = new ArrayList<>();
         Collections.addAll(order, MarkStore.SUBS);
         for (String s : new TreeSet<>(it.marks.values())) if (!order.contains(s)) order.add(s);
 
+        final AlertDialog[] holder = new AlertDialog[1];
+
         for (String sub : order) {
-            List<Integer> pages = new ArrayList<>();
+            final List<Integer> pages = new ArrayList<>();
             for (Map.Entry<Integer, String> e : it.marks.entrySet()) {
                 if (sub.equals(e.getValue())) pages.add(e.getKey());
             }
             if (pages.isEmpty()) continue;
             Collections.sort(pages);
-            sb.append(sub).append(" (").append(pages.size())
-                    .append(pages.size() == 1 ? " page)" : " pages)").append('\n')
-                    .append("  Pages: ").append(ranges(pages)).append("\n\n");
+            final String subName = sub;
+            final String rangeText = ranges(pages);
+
+            TextView t = new TextView(this);
+            t.setText(sub + " (" + pages.size() + (pages.size() == 1 ? " page)" : " pages)")
+                    + "\n  Pages: " + rangeText);
+            t.setTextSize(15);
+            t.setTextColor(Color.BLACK);
+            t.setPadding(0, 16, 0, 0);
+
+            LinearLayout btns = new LinearLayout(this);
+            btns.setOrientation(LinearLayout.HORIZONTAL);
+
+            Button view = new Button(this);
+            view.setText("View");
+            view.setAllCaps(false);
+            view.setOnClickListener(v -> {
+                Intent i = new Intent(this, MarkActivity.class);
+                i.putExtra("path", it.path);
+                i.putExtra("only_sub", subName);
+                startActivity(i);
+                if (holder[0] != null) holder[0].dismiss();
+            });
+
+            Button del = new Button(this);
+            del.setText("Delete");
+            del.setAllCaps(false);
+            del.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Unmark " + subName + "?")
+                    .setMessage("Remove " + subName + " mark from pages " + rangeText + "?")
+                    .setPositiveButton("Delete", (d, w) -> {
+                        for (int pg : pages) store.remove(it.path, pg);
+                        if (holder[0] != null) holder[0].dismiss();
+                        loadAll();
+                        applyFilter();
+                        for (Item n : all) {
+                            if (n.path.equals(it.path)) {
+                                showDetails(n);
+                                break;
+                            }
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
+
+            btns.addView(view);
+            btns.addView(del);
+            box.addView(t);
+            box.addView(btns);
         }
 
         int marked = it.marks.size();
+        StringBuilder sb = new StringBuilder();
         sb.append("Marked pages: ").append(marked).append('\n');
         if (total >= 0) {
             sb.append("Unmarked pages: ").append(Math.max(0, total - marked)).append('\n');
@@ -176,16 +235,17 @@ public class MarkedFilesActivity extends Activity {
         } else {
             sb.append("Total pages: unknown (cannot read PDF)");
         }
+        TextView sum = new TextView(this);
+        sum.setText(sb.toString());
+        sum.setTextSize(15);
+        sum.setTextColor(Color.BLACK);
+        sum.setPadding(0, 24, 0, 0);
+        box.addView(sum);
 
-        TextView tv = new TextView(this);
-        tv.setText(sb.toString());
-        tv.setTextSize(15);
-        tv.setTextColor(Color.BLACK);
-        tv.setPadding(48, 24, 48, 24);
         ScrollView sv = new ScrollView(this);
-        sv.addView(tv);
+        sv.addView(box);
 
-        new AlertDialog.Builder(this)
+        holder[0] = new AlertDialog.Builder(this)
                 .setTitle(new File(it.path).getName())
                 .setView(sv)
                 .setPositiveButton("Close", null)
