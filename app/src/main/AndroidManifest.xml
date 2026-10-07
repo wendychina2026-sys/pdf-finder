@@ -32,9 +32,7 @@
 
         <activity android:name=".MarkActivity" android:exported="false" />
         <activity android:name=".CategoryActivity" android:exported="false" />
-        <activity android:name=".MarkedActivity" android:exported="false" />
         <activity android:name=".MarkedFilesActivity" android:exported="false" />
-        <activity android:name=".CategorySearchActivity" android:exported="false" />
         <activity android:name=".CaseDetailsActivity" android:exported="false" />
         <activity android:name=".AdvancedSearchActivity" android:exported="false" />
     </application>
