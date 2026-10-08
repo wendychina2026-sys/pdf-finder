@@ -38,5 +38,6 @@
         <activity android:name=".OptionsEditorActivity" android:exported="false" />
         <activity android:name=".FindPdfsActivity" android:exported="false" />
         <activity android:name=".CasesListActivity" android:exported="false" />
+        <activity android:name=".SettingsActivity" android:exported="false" />
     </application>
 </manifest>
