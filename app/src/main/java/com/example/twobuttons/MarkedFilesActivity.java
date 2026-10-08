@@ -182,7 +182,7 @@ public class MarkedFilesActivity extends BaseActivity {
             t.setText(sub + " (" + pages.size() + (pages.size() == 1 ? " page)" : " pages)")
                     + "\n  Pages: " + rangeText);
             t.setTextSize(15);
-            t.setTextColor(AppTheme.text(this));
+            t.setTextColor(AppTheme.text(MarkedFilesActivity.this));
             t.setPadding(0, 16, 0, 0);
 
             LinearLayout btns = new LinearLayout(this);
@@ -238,7 +238,7 @@ public class MarkedFilesActivity extends BaseActivity {
         TextView sum = new TextView(this);
         sum.setText(sb.toString());
         sum.setTextSize(15);
-        sum.setTextColor(AppTheme.text(this));
+        sum.setTextColor(AppTheme.text(MarkedFilesActivity.this));
         sum.setPadding(0, 24, 0, 0);
         box.addView(sum);
 
@@ -268,7 +268,7 @@ public class MarkedFilesActivity extends BaseActivity {
             name.setText(new File(it.path).getName());
             name.setTextSize(16);
             name.setTypeface(null, Typeface.BOLD);
-            name.setTextColor(AppTheme.text(this));
+            name.setTextColor(AppTheme.text(MarkedFilesActivity.this));
 
             TextView path = new TextView(MarkedFilesActivity.this);
             path.setText(it.path);
