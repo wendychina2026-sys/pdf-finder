@@ -206,4 +206,24 @@ final class LegalUi {
         b.setBackground(CaseViews.box(c, Color.TRANSPARENT, 10, AppTheme.accent(c), 1));
         return b;
     }
+
+    /** Date picker writing dd/MM/yyyy into the field. */
+    static void pickDmy(Context c, EditText target) {
+        Calendar cal = Calendar.getInstance();
+        Date d = DiaryStore.parse(target.getText().toString());
+        if (d != null) cal.setTime(d);
+        new DatePickerDialog(c, (view, y, m, day) -> {
+            Calendar x = Calendar.getInstance();
+            x.set(y, m, day);
+            target.setText(DiaryStore.fmt(x.getTime()));
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    /** Read-only field, tap -> dd/MM/yyyy picker. */
+    static EditText dmyInput(Context c, LinearLayout f, String label, String value) {
+        EditText e = input(c, f, label, value, InputType.TYPE_NULL);
+        e.setFocusable(false);
+        e.setOnClickListener(v -> pickDmy(c, e));
+        return e;
+    }
 }

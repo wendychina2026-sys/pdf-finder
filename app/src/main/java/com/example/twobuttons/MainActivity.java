@@ -217,6 +217,16 @@ public class MainActivity extends BaseActivity {
                 "Petitions, orders, evidence and files", DocumentsActivity.class), CaseViews.lp(this, 0, 10));
         sections.addView(LegalUi.navRow(this, R.drawable.ic_bell, "Reminders",
                 "Hearing reminders sent to clients", ReminderDetailsActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_calendar, "Today & Weekly",
+                "Hearings today / this week, add case", CasesHomeActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_court, "Hearings timeline",
+                "All hearings, bill and payment per case", HearingsActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_pdf, "Case List",
+                "Search cases by court, contact, date", SarthCaseListActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_court, "Manage Court",
+                "Add, rename, delete courts", ManageCourtActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_lock, "Sign In",
+                "Sarth login screen (layout only)", SignInActivity.class), CaseViews.lp(this, 0, 10));
     }
 
     private TextView plainHeader(String title) {
