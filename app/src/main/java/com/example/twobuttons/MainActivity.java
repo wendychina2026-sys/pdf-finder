@@ -209,6 +209,14 @@ public class MainActivity extends BaseActivity {
                         13, AppTheme.sub(this), false));
             }
         }
+        // Legal Diary pages
+        sections.addView(plainHeader("Legal Diary"));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_person, "Clients",
+                "Contacts, cases and payments", ClientDetailsActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_pdf, "Documents",
+                "Petitions, orders, evidence and files", DocumentsActivity.class), CaseViews.lp(this, 0, 10));
+        sections.addView(LegalUi.navRow(this, R.drawable.ic_bell, "Reminders",
+                "Hearing reminders sent to clients", ReminderDetailsActivity.class), CaseViews.lp(this, 0, 10));
     }
 
     private TextView plainHeader(String title) {
