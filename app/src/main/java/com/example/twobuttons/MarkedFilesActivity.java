@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 
-public class MarkedFilesActivity extends Activity {
+public class MarkedFilesActivity extends BaseActivity {
 
     static class Item {
         final String path;
@@ -182,7 +182,7 @@ public class MarkedFilesActivity extends Activity {
             t.setText(sub + " (" + pages.size() + (pages.size() == 1 ? " page)" : " pages)")
                     + "\n  Pages: " + rangeText);
             t.setTextSize(15);
-            t.setTextColor(Color.BLACK);
+            t.setTextColor(AppTheme.text(this));
             t.setPadding(0, 16, 0, 0);
 
             LinearLayout btns = new LinearLayout(this);
@@ -238,7 +238,7 @@ public class MarkedFilesActivity extends Activity {
         TextView sum = new TextView(this);
         sum.setText(sb.toString());
         sum.setTextSize(15);
-        sum.setTextColor(Color.BLACK);
+        sum.setTextColor(AppTheme.text(this));
         sum.setPadding(0, 24, 0, 0);
         box.addView(sum);
 
@@ -268,7 +268,7 @@ public class MarkedFilesActivity extends Activity {
             name.setText(new File(it.path).getName());
             name.setTextSize(16);
             name.setTypeface(null, Typeface.BOLD);
-            name.setTextColor(Color.BLACK);
+            name.setTextColor(AppTheme.text(this));
 
             TextView path = new TextView(MarkedFilesActivity.this);
             path.setText(it.path);

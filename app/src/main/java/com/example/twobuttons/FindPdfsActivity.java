@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Scans phone for PDFs and lists them. Search by PDF name lives here. */
-public class FindPdfsActivity extends Activity {
+public class FindPdfsActivity extends BaseActivity {
 
     private List<Pdf> allPdfs = new ArrayList<>();
     private PdfAdapter adapter;

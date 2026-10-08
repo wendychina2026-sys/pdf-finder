@@ -22,7 +22,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
-public class CaseDetailsActivity extends Activity {
+public class CaseDetailsActivity extends BaseActivity {
 
     private static final String SELECT = "-- Select --";
     private static final SimpleDateFormat ISO = new SimpleDateFormat("yyyy-MM-dd", Locale.US);

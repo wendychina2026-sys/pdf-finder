@@ -75,8 +75,8 @@ class CaseViews {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(c, 22), 0, dp(c, 10));
-        TextView t = text(c, title, 18, Color.BLACK, true);
-        TextView all = text(c, "View All", 14, NAVY, true);
+        TextView t = text(c, title, 18, AppTheme.text(c), true);
+        TextView all = text(c, "View All", 14, AppTheme.accent(c), true);
         all.setPadding(dp(c, 8), dp(c, 4), 0, dp(c, 4));
         all.setOnClickListener(viewAll);
         row.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -85,9 +85,9 @@ class CaseViews {
     }
 
     static TextView emptyNote(Context c, String s) {
-        TextView t = text(c, s, 14, GREY, false);
+        TextView t = text(c, s, 14, AppTheme.sub(c), false);
         t.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18));
-        t.setBackground(box(c, 0xFFF4F5FA, 12, 0xFFE3E5F0, 1));
+        t.setBackground(box(c, AppTheme.card(c), 12, AppTheme.cardStroke(c), 1));
         return t;
     }
 
@@ -183,17 +183,17 @@ class CaseViews {
         LinearLayout row = new LinearLayout(a);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(dp(a, 14), dp(a, 12), dp(a, 14), dp(a, 12));
-        row.setBackground(box(a, 0xFFF4F5FA, 12, 0xFFE3E5F0, 1));
-        row.addView(text(a, it.title(), 16, Color.BLACK, true));
+        row.setBackground(box(a, AppTheme.card(a), 12, AppTheme.cardStroke(a), 1));
+        row.addView(text(a, it.title(), 16, AppTheme.text(a), true));
         String sub = it.subtitle();
-        if (!sub.isEmpty()) row.addView(text(a, sub, 13, GREY, false));
+        if (!sub.isEmpty()) row.addView(text(a, sub, 13, AppTheme.sub(a), false));
         StringBuilder info = new StringBuilder();
         if (!it.nextDate.isEmpty()) info.append(CaseItems.pretty(it.nextDate));
         if (!it.court.isEmpty()) {
             if (info.length() > 0) info.append("  |  ");
             info.append(it.court);
         }
-        if (info.length() > 0) row.addView(text(a, info.toString(), 13, NAVY, false));
+        if (info.length() > 0) row.addView(text(a, info.toString(), 13, AppTheme.accent(a), false));
         row.setOnClickListener(click);
         return row;
     }

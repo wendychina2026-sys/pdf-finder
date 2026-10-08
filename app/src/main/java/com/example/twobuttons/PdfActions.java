@@ -140,7 +140,8 @@ class PdfActions {
                 .show();
     }
 
-    // Opens the folder holding the file in the Files app (DocumentsUI).
+    // Opens system file picker already inside the file's folder (works on any Android 8+ phone).
+    // ACTION_VIEW on a folder is not reliable: many Files apps ignore it or hang.
     private void openFolder(Pdf p) {
         File dir = new File(p.path).getParentFile();
         if (dir == null) {
@@ -148,32 +149,19 @@ class PdfActions {
             return;
         }
         String docId = folderDocId(dir.getAbsolutePath());
-        if (docId != null) {
+        Toast.makeText(activity, "Folder: " + dir.getAbsolutePath(), Toast.LENGTH_LONG).show();
+        if (docId == null) return;
+        try {
             Uri uri = DocumentsContract.buildDocumentUri(
                     "com.android.externalstorage.documents", docId);
-            try {
-                Intent i = new Intent(Intent.ACTION_VIEW);
-                i.setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR);
-                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                activity.startActivity(i);
-                return;
-            } catch (ActivityNotFoundException ignored) {
-                // fall through
-            }
-            try {
-                // Fallback: file picker opened at that folder
-                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("application/pdf");
-                i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri);
-                activity.startActivity(i);
-                return;
-            } catch (ActivityNotFoundException ignored) {
-                // fall through
-            }
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("application/pdf");
+            i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri);
+            activity.startActivity(i);
+        } catch (Exception e) {
+            Toast.makeText(activity, "Cannot open folder picker", Toast.LENGTH_SHORT).show();
         }
-        Toast.makeText(activity, "Cannot open folder: " + dir.getAbsolutePath(),
-                Toast.LENGTH_LONG).show();
     }
 
     // /storage/emulated/0/X/Y -> primary:X/Y ; /storage/ABCD-1234/X -> ABCD-1234:X

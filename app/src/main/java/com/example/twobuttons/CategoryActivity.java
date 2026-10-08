@@ -15,7 +15,7 @@ import android.widget.Toast;
 
 import java.util.Arrays;
 
-public class CategoryActivity extends Activity {
+public class CategoryActivity extends BaseActivity {
 
     private CaseStore store;
     private ArrayAdapter<CaseEntry> adapter;

@@ -30,7 +30,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Map;
 
-public class MarkActivity extends Activity {
+public class MarkActivity extends BaseActivity {
 
     private String path;
     private ParcelFileDescriptor pfd;

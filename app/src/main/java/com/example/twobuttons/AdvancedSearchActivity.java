@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-public class AdvancedSearchActivity extends Activity {
+public class AdvancedSearchActivity extends BaseActivity {
 
     private static final String ALL = "All";
 
@@ -186,7 +186,7 @@ public class AdvancedSearchActivity extends Activity {
         searchRow.setOrientation(LinearLayout.HORIZONTAL);
         searchRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
         searchRow.setPadding(CaseViews.dp(this, 14), 0, CaseViews.dp(this, 14), 0);
-        searchRow.setBackground(CaseViews.box(this, Color.WHITE, 10, 0xFFD9DBE6, 1));
+        searchRow.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
         searchRow.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
         searchRow.addView(fileEdit, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -265,11 +265,11 @@ public class AdvancedSearchActivity extends Activity {
     private void styleChips() {
         for (TextView t : chips) {
             boolean on = topicSel.equals(t.getTag());
-            t.setTextColor(on ? Color.WHITE : Color.BLACK);
+            t.setTextColor(on ? Color.WHITE : AppTheme.text(this));
             t.setTypeface(null, on ? Typeface.BOLD : Typeface.NORMAL);
             t.setBackground(on
-                    ? CaseViews.box(this, CaseViews.NAVY, 18, 0, 0)
-                    : CaseViews.box(this, 0xFFF4F5FA, 18, 0xFFD9DBE6, 1));
+                    ? CaseViews.box(this, AppTheme.isDark(this) ? 0xFF3F51B5 : CaseViews.NAVY, 18, 0, 0)
+                    : CaseViews.box(this, AppTheme.card(this), 18, AppTheme.fieldStroke(this), 1));
         }
     }
 
@@ -422,7 +422,7 @@ public class AdvancedSearchActivity extends Activity {
             name.setText(new File(it.path).getName());
             name.setTextSize(16);
             name.setTypeface(null, Typeface.BOLD);
-            name.setTextColor(Color.BLACK);
+            name.setTextColor(AppTheme.text(AdvancedSearchActivity.this));
 
             TextView path = new TextView(AdvancedSearchActivity.this);
             path.setText(it.path);
@@ -436,14 +436,14 @@ public class AdvancedSearchActivity extends Activity {
                 TextView t = new TextView(AdvancedSearchActivity.this);
                 t.setText(it.topics);
                 t.setTextSize(13);
-                t.setTextColor(0xFF2E7D32);
+                t.setTextColor(AppTheme.topics(AdvancedSearchActivity.this));
                 row.addView(t);
             }
             if (!it.details.isEmpty()) {
                 TextView t = new TextView(AdvancedSearchActivity.this);
                 t.setText(it.details);
                 t.setTextSize(13);
-                t.setTextColor(0xFF1565C0);
+                t.setTextColor(AppTheme.info(AdvancedSearchActivity.this));
                 row.addView(t);
             }
             return row;

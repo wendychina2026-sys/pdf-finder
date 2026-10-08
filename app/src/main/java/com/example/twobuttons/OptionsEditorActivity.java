@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /** Edit case types, sub case types, sub-sub case types and courts from inside the app. */
-public class OptionsEditorActivity extends Activity {
+public class OptionsEditorActivity extends BaseActivity {
 
     private static final int ROOT = 0, TYPES = 1, SUBS = 2, SUBSUBS = 3, COURTS = 4;
 

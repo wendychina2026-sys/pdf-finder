@@ -78,7 +78,7 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
             name = new TextView(c);
             name.setTextSize(16);
             name.setTypeface(null, Typeface.BOLD);
-            name.setTextColor(Color.BLACK);
+            name.setTextColor(AppTheme.text(c));
             path = new TextView(c);
             path.setTextSize(12);
             path.setTextColor(Color.GRAY);
@@ -87,7 +87,7 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
 
             size = new TextView(c);
             size.setTextSize(12);
-            size.setTextColor(Color.DKGRAY);
+            size.setTextColor(AppTheme.sub(c));
             size.setPadding(16, 0, 0, 0);
 
             addView(box, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));

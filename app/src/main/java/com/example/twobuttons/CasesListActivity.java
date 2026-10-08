@@ -9,7 +9,7 @@ import android.widget.ScrollView;
 import java.util.List;
 
 /** "View All" page. mode = "upcoming" or "today". */
-public class CasesListActivity extends Activity {
+public class CasesListActivity extends BaseActivity {
 
     private LinearLayout box;
     private boolean todayMode;
@@ -21,7 +21,7 @@ public class CasesListActivity extends Activity {
         setTitle(todayMode ? "Today's Schedule" : "Upcoming Cases");
 
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Color.WHITE);
+        sv.setBackgroundColor(AppTheme.bg(this));
         box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         int p = CaseViews.dp(this, 16);

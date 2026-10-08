@@ -9,6 +9,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Typeface;
+import android.graphics.ImageDecoder;
+import android.graphics.drawable.AnimatedImageDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.graphics.drawable.GradientDrawable;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -30,9 +34,10 @@ import android.widget.Toast;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.List;
 
-public class MainActivity extends Activity {
+public class MainActivity extends BaseActivity {
 
     private static final int REQ_CAMERA = 21;
 
@@ -40,13 +45,15 @@ public class MainActivity extends Activity {
     private EditText searchBox;
     private LinearLayout sections;
     private ScrollView scroll;
+    private ImageView timeIcon;
+    private String shownGif = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Color.WHITE);
+        sv.setBackgroundColor(AppTheme.bg(this));
         sv.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);
@@ -67,7 +74,7 @@ public class MainActivity extends Activity {
 
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(Color.WHITE);
+        page.setBackgroundColor(AppTheme.bg(this));
         page.addView(sv, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         page.addView(buildNav(), new LinearLayout.LayoutParams(
@@ -80,10 +87,10 @@ public class MainActivity extends Activity {
     private LinearLayout buildNav() {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setPadding(dp(8), dp(10), dp(8), dp(10));
+        nav.setPadding(dp(4), dp(10), dp(4), dp(10));
         float r = dp(20);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFFF4F5FA);
+        bg.setColor(AppTheme.navBg(this));
         bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
         nav.setBackground(bg);
         nav.setElevation(dp(8));
@@ -96,6 +103,8 @@ public class MainActivity extends Activity {
                 v -> startActivity(new Intent(this, MarkedFilesActivity.class))), navLp());
         nav.addView(navItem(R.drawable.ic_advsearch, "Advanced Search", false,
                 v -> startActivity(new Intent(this, AdvancedSearchActivity.class))), navLp());
+        nav.addView(navItem(R.drawable.ic_settings, "Settings", false,
+                v -> startActivity(new Intent(this, SettingsActivity.class))), navLp());
         return nav;
     }
 
@@ -105,7 +114,7 @@ public class MainActivity extends Activity {
 
     private LinearLayout navItem(int iconRes, String label, boolean active,
                                  android.view.View.OnClickListener click) {
-        int color = active ? CaseViews.NAVY : 0xFF333344;
+        int color = active ? AppTheme.accent(this) : AppTheme.navOff(this);
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -114,7 +123,7 @@ public class MainActivity extends Activity {
         item.addView(ic);
         TextView t = CaseViews.text(this, label, 11, color, active);
         t.setGravity(Gravity.CENTER);
-        t.setSingleLine(true);
+        t.setMaxLines(2);
         t.setPadding(0, dp(4), 0, 0);
         item.addView(t);
         item.setOnClickListener(click);
@@ -134,9 +143,9 @@ public class MainActivity extends Activity {
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
         box.setPadding(dp(14), dp(2), dp(14), dp(2));
-        box.setBackground(CaseViews.box(this, Color.WHITE, 10, 0xFFD9DBE6, 1));
+        box.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
 
-        box.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
+        box.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 22));
 
         searchBox = new EditText(this);
         searchBox.setHint("Search today's cases by case name");
@@ -197,13 +206,13 @@ public class MainActivity extends Activity {
             }
             if (today.size() > n) {
                 sections.addView(CaseViews.text(this, "+" + (today.size() - n) + " more",
-                        13, CaseViews.GREY, false));
+                        13, AppTheme.sub(this), false));
             }
         }
     }
 
     private TextView plainHeader(String title) {
-        TextView t = CaseViews.text(this, title, 18, Color.BLACK, true);
+        TextView t = CaseViews.text(this, title, 18, AppTheme.text(this), true);
         t.setPadding(0, dp(22), 0, dp(10));
         return t;
     }
@@ -234,37 +243,83 @@ public class MainActivity extends Activity {
         avatar.setOnClickListener(v -> onAvatarClick());
         loadAvatar();
 
-        TextView icon = new TextView(this);
-        icon.setTextSize(28);
-        icon.setPadding(dp(8), 0, 0, 0);
-        tickIcon(icon);
+        // right side: date on top, [time + time-of-day gif] below
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setPadding(dp(14), 0, 0, 0);
+
+        TextClock date = new TextClock(this);
+        date.setFormat12Hour("EEE, dd MMM yyyy");
+        date.setFormat24Hour("EEE, dd MMM yyyy");
+        date.setTextSize(14);
+        date.setTypeface(null, Typeface.BOLD);
+        date.setTextColor(AppTheme.sub(this));
+
+        LinearLayout timeRow = new LinearLayout(this);
+        timeRow.setOrientation(LinearLayout.HORIZONTAL);
+        timeRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
         TextClock clock = new TextClock(this);
-        clock.setFormat12Hour("EEE, dd MMM yyyy  hh:mm:ss a");
-        clock.setFormat24Hour("EEE, dd MMM yyyy  hh:mm:ss a");
-        clock.setTextSize(16);
+        clock.setFormat12Hour("hh:mm:ss a");
+        clock.setFormat24Hour("hh:mm:ss a");
+        clock.setTextSize(20);
         clock.setTypeface(null, Typeface.BOLD);
-        clock.setPadding(dp(16), 0, 0, 0);
+        clock.setTextColor(AppTheme.text(this));
+        clock.setSingleLine(true);
+
+        timeIcon = new ImageView(this);
+        timeIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        ilp.leftMargin = dp(6);
+        tickIcon();
+
+        timeRow.addView(clock);
+        timeRow.addView(timeIcon, ilp);
+        right.addView(date);
+        right.addView(timeRow);
 
         row.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
-        row.addView(clock);
-        row.addView(icon);
+        row.addView(right, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         return row;
     }
 
-    // day / noon / evening / night logo
-    private void tickIcon(TextView icon) {
+    // time-of-day animated gif (assets/time_*.gif). Checks again every 30s.
+    private void tickIcon() {
         int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
-        String sym;
-        if (h >= 5 && h < 10) sym = "\uD83C\uDF24\uFE0F";          // morning 5-10
-        else if (h >= 10 && h < 17) sym = "\u2600\uFE0F";           // noon 10-5pm
-        else if (h >= 17 && h < 19) sym = "\uD83C\uDF07";           // evening 5-7pm
-        else if (h >= 19 || h < 2) sym = "\uD83C\uDF19";            // midnight 7pm-2am
-        else sym = "\uD83C\uDF04";                                  // early morning 2-5am
-        icon.setText(sym);
-        icon.postDelayed(() -> {
-            if (icon.isAttachedToWindow()) tickIcon(icon);
+        String file;
+        if (h >= 5 && h < 10) file = "time_morning.gif";          // morning 5-10
+        else if (h >= 10 && h < 17) file = "time_noon.gif";       // noon 10-5pm
+        else if (h >= 17 && h < 19) file = "time_evening.gif";    // evening 5-7pm
+        else if (h >= 19 || h < 2) file = "time_midnight.gif";    // midnight 7pm-2am
+        else file = "time_early.gif";                             // early morning 2-5am
+        if (!file.equals(shownGif)) {
+            shownGif = file;
+            showGif(timeIcon, file);
+        }
+        timeIcon.postDelayed(() -> {
+            if (timeIcon.isAttachedToWindow()) tickIcon();
         }, 30000);
+    }
+
+    private void showGif(ImageView iv, String file) {
+        try {
+            if (Build.VERSION.SDK_INT >= 28) {
+                ImageDecoder.Source src = ImageDecoder.createSource(getAssets(), file);
+                Drawable d = ImageDecoder.decodeDrawable(src);
+                iv.setImageDrawable(d);
+                if (d instanceof AnimatedImageDrawable) {
+                    AnimatedImageDrawable ad = (AnimatedImageDrawable) d;
+                    ad.setRepeatCount(AnimatedImageDrawable.REPEAT_INFINITE);
+                    ad.start();
+                }
+            } else {
+                try (InputStream in = getAssets().open(file)) {
+                    iv.setImageBitmap(BitmapFactory.decodeStream(in));   // first frame only
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private File photoFile() { return new File(getFilesDir(), "profile.jpg"); }
