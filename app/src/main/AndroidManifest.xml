@@ -42,5 +42,11 @@
         <activity android:name=".ClientDetailsActivity" android:exported="false" />
         <activity android:name=".DocumentsActivity" android:exported="false" />
         <activity android:name=".ReminderDetailsActivity" android:exported="false" />
+        <activity android:name=".CasesHomeActivity" android:exported="false" />
+        <activity android:name=".AddCaseActivity" android:exported="false" />
+        <activity android:name=".HearingsActivity" android:exported="false" />
+        <activity android:name=".SarthCaseListActivity" android:exported="false" />
+        <activity android:name=".ManageCourtActivity" android:exported="false" />
+        <activity android:name=".SignInActivity" android:exported="false" />
     </application>
 </manifest>
