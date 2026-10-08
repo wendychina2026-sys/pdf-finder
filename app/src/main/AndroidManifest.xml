@@ -39,5 +39,8 @@
         <activity android:name=".FindPdfsActivity" android:exported="false" />
         <activity android:name=".CasesListActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".ClientDetailsActivity" android:exported="false" />
+        <activity android:name=".DocumentsActivity" android:exported="false" />
+        <activity android:name=".ReminderDetailsActivity" android:exported="false" />
     </application>
 </manifest>
