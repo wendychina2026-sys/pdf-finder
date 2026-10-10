@@ -47,6 +47,9 @@ public class MainActivity extends BaseActivity {
     private ScrollView scroll;
     private ImageView timeIcon;
     private String shownGif = "";
+    private LinearLayout drawer;
+    private android.view.View scrim;
+    private boolean drawerOpen = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +82,120 @@ public class MainActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         page.addView(buildNav(), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        setContentView(page);
+
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        frame.addView(page, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+
+        scrim = new android.view.View(this);
+        scrim.setBackgroundColor(0x99000000);
+        scrim.setVisibility(android.view.View.GONE);
+        scrim.setOnClickListener(v -> closeDrawer(true));
+        frame.addView(scrim, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+
+        drawer = buildDrawer();
+        drawer.setVisibility(android.view.View.GONE);
+        int w = Math.min(dp(320),
+                (int) (getResources().getDisplayMetrics().widthPixels * 0.85f));
+        frame.addView(drawer, new android.widget.FrameLayout.LayoutParams(
+                w, android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(frame);
+    }
+
+    // ---------- left drawer: Legal Diary pages ----------
+
+    private LinearLayout buildDrawer() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackgroundColor(AppTheme.bg(this));
+        panel.setElevation(dp(16));
+        panel.setClickable(true);   // swallow touches so scrim doesn't get them
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(dp(16), dp(16), dp(16), dp(8));
+        TextView title = CaseViews.text(this, "Legal Diary", 20, AppTheme.text(this), true);
+        head.addView(title, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        panel.addView(head);
+
+        ScrollView list = new ScrollView(this);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(12), dp(4), dp(12), dp(24));
+        list.addView(col);
+        panel.addView(list, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        col.addView(drawerRow(R.drawable.ic_person, "Clients",
+                "Contacts, cases and payments", ClientDetailsActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_pdf, "Documents",
+                "Petitions, orders, evidence and files", DocumentsActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_bell, "Reminders",
+                "Hearing reminders sent to clients", ReminderDetailsActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_calendar, "Today & Weekly",
+                "Hearings today / this week, add case", CasesHomeActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_court, "Hearings timeline",
+                "All hearings, bill and payment per case", HearingsActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_pdf, "Case List",
+                "Search cases by court, contact, date", SarthCaseListActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_court, "Manage Court",
+                "Add, rename, delete courts", ManageCourtActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_lock, "Sign In",
+                "Sarth login screen (layout only)", SignInActivity.class), CaseViews.lp(this, 0, 10));
+        return panel;
+    }
+
+    private LinearLayout drawerRow(int icon, String title, String sub, Class<?> target) {
+        LinearLayout row = LegalUi.navRow(this, icon, title, sub, target);
+        row.setOnClickListener(v -> {
+            closeDrawer(false);
+            startActivity(new Intent(this, target));
+        });
+        return row;
+    }
+
+    private void openDrawer() {
+        if (drawerOpen) return;
+        drawerOpen = true;
+        drawer.setVisibility(android.view.View.VISIBLE);
+        scrim.setVisibility(android.view.View.VISIBLE);
+        int w = drawer.getLayoutParams().width;
+        drawer.setTranslationX(-w);
+        scrim.setAlpha(0f);
+        drawer.animate().translationX(0).setDuration(220).setListener(null).start();
+        scrim.animate().alpha(1f).setDuration(220).setListener(null).start();
+    }
+
+    private void closeDrawer(boolean animate) {
+        if (!drawerOpen) return;
+        drawerOpen = false;
+        if (!animate) {
+            drawer.animate().cancel();
+            scrim.animate().cancel();
+            drawer.setVisibility(android.view.View.GONE);
+            scrim.setVisibility(android.view.View.GONE);
+            return;
+        }
+        int w = drawer.getLayoutParams().width;
+        scrim.animate().alpha(0f).setDuration(200).start();
+        drawer.animate().translationX(-w).setDuration(200)
+                .withEndAction(() -> {
+                    if (!drawerOpen) {
+                        drawer.setVisibility(android.view.View.GONE);
+                        scrim.setVisibility(android.view.View.GONE);
+                    }
+                }).start();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (drawerOpen) closeDrawer(true);
+        else super.onBackPressed();
     }
 
     // ---------- bottom nav: Home | Find PDF | Marked PDF | Advanced Search ----------
@@ -209,24 +325,6 @@ public class MainActivity extends BaseActivity {
                         13, AppTheme.sub(this), false));
             }
         }
-        // Legal Diary pages
-        sections.addView(plainHeader("Legal Diary"));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_person, "Clients",
-                "Contacts, cases and payments", ClientDetailsActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_pdf, "Documents",
-                "Petitions, orders, evidence and files", DocumentsActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_bell, "Reminders",
-                "Hearing reminders sent to clients", ReminderDetailsActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_calendar, "Today & Weekly",
-                "Hearings today / this week, add case", CasesHomeActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_court, "Hearings timeline",
-                "All hearings, bill and payment per case", HearingsActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_pdf, "Case List",
-                "Search cases by court, contact, date", SarthCaseListActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_court, "Manage Court",
-                "Add, rename, delete courts", ManageCourtActivity.class), CaseViews.lp(this, 0, 10));
-        sections.addView(LegalUi.navRow(this, R.drawable.ic_lock, "Sign In",
-                "Sarth login screen (layout only)", SignInActivity.class), CaseViews.lp(this, 0, 10));
     }
 
     private TextView plainHeader(String title) {
@@ -295,6 +393,15 @@ public class MainActivity extends BaseActivity {
         timeRow.addView(timeIcon, ilp);
         right.addView(date);
         right.addView(timeRow);
+
+        android.widget.ImageView menu = CaseViews.icon(this, R.drawable.ic_menu,
+                AppTheme.text(this), 28);
+        menu.setPadding(dp(6), dp(6), dp(6), dp(6));
+        menu.setContentDescription("Menu");
+        menu.setOnClickListener(v -> openDrawer());
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        mlp.rightMargin = dp(8);
+        row.addView(menu, mlp);
 
         row.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
         row.addView(right, new LinearLayout.LayoutParams(
