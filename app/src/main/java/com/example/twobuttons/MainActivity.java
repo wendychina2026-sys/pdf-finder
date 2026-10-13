@@ -121,6 +121,12 @@ public class MainActivity extends BaseActivity {
         TextView title = CaseViews.text(this, "Legal Diary", 20, AppTheme.text(this), true);
         head.addView(title, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        android.widget.ImageView close = CaseViews.icon(this, R.drawable.ic_close,
+                AppTheme.text(this), 24);
+        close.setPadding(dp(8), dp(8), dp(8), dp(8));
+        close.setContentDescription("Close menu");
+        close.setOnClickListener(v -> closeDrawer(true));
+        head.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
         panel.addView(head);
 
         ScrollView list = new ScrollView(this);
@@ -306,8 +312,9 @@ public class MainActivity extends BaseActivity {
         }
 
         // Today's Schedule
+        boolean anyToday = !CaseItems.today(this).isEmpty();
         sections.addView(CaseViews.sectionHeader(this, "Today's Schedule",
-                v -> openList("today")));
+                anyToday ? (android.view.View.OnClickListener) (v -> openList("today")) : null));
         String q = searchBox.getText().toString().trim();
         List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
         if (today.isEmpty()) {

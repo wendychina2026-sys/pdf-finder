@@ -60,7 +60,7 @@ public class FindPdfsActivity extends BaseActivity {
         });
 
         status = new TextView(this);
-        status.setText("Scanning...");
+        status.setText("Tap Rescan to search for PDFs");
         status.setPadding(0, 16, 0, 16);
 
         ListView list = new ListView(this);
@@ -81,8 +81,6 @@ public class FindPdfsActivity extends BaseActivity {
         root.addView(list, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
-
-        startScan();   // scan as soon as page opens
     }
 
     @Override

@@ -69,7 +69,7 @@ class CaseViews {
         return p;
     }
 
-    /** "Title ............ View All" */
+    /** "Title ............ View All". Pass null viewAll to show it disabled. */
     static LinearLayout sectionHeader(Context c, String title, View.OnClickListener viewAll) {
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -78,7 +78,13 @@ class CaseViews {
         TextView t = text(c, title, 18, AppTheme.text(c), true);
         TextView all = text(c, "View All", 14, AppTheme.accent(c), true);
         all.setPadding(dp(c, 8), dp(c, 4), 0, dp(c, 4));
-        all.setOnClickListener(viewAll);
+        if (viewAll != null) {
+            all.setOnClickListener(viewAll);
+        } else {
+            all.setEnabled(false);
+            all.setClickable(false);
+            all.setAlpha(0.35f);   // greyed out: nothing to view
+        }
         row.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(all);
         return row;
