@@ -205,8 +205,7 @@ class CaseViews {
     }
 
     static void reschedule(Activity a, CaseItems.Item it, Runnable after) {
-        Calendar min = Calendar.getInstance();
-        min.add(Calendar.DAY_OF_YEAR, 1);
+        Calendar min = Calendar.getInstance();   // today is allowed
         min.set(Calendar.HOUR_OF_DAY, 0);
         min.set(Calendar.MINUTE, 0);
         min.set(Calendar.SECOND, 0);
