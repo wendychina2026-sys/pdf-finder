@@ -24,6 +24,7 @@ import java.util.List;
 public class ClientDetailsActivity extends BaseActivity {
 
     private static final int M_EDIT = 1, M_DELETE = 2, M_SWITCH = 3, M_ADD = 4;
+    private static final int REQ_ADD = 40;
 
     private LinearLayout box;
     private LegalStore store;
@@ -96,7 +97,7 @@ public class ClientDetailsActivity extends BaseActivity {
                 switchClient();
                 return true;
             case M_ADD:
-                addClient();
+                startActivityForResult(new Intent(this, AddClientActivity.class), REQ_ADD);
                 return true;
             default:
                 return super.onOptionsItemSelected(it);
@@ -120,10 +121,13 @@ public class ClientDetailsActivity extends BaseActivity {
                 .show();
     }
 
-    private void addClient() {
-        LegalStore.Client c = new LegalStore.Client();
-        c.code = store.nextClientCode();
-        editClient(c, true);
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == REQ_ADD && res == RESULT_OK && data != null) {
+            String id = data.getStringExtra("client_id");
+            if (id != null) curId = id;   // show the client that was just added
+        }
     }
 
     // ---------- page ----------
@@ -176,7 +180,10 @@ public class ClientDetailsActivity extends BaseActivity {
         box.addView(LegalUi.sectionTitle(this, "Contact & Reference"));
         LinearLayout contact = LegalUi.card(this);
         contact.addView(infoRow("Mobile", c.mobile));
+        if (!c.landline.isEmpty()) contact.addView(infoRow("Landline", c.landline));
+        if (!c.email.isEmpty()) contact.addView(infoRow("Email", c.email));
         contact.addView(infoRow("Address", c.address));
+        if (!c.notes.isEmpty()) contact.addView(infoRow("Notes", c.notes));
         contact.addView(infoRow("Reference", c.reference));
         box.addView(contact);
 

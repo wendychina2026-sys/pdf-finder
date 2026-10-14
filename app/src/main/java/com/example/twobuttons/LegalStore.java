@@ -24,6 +24,7 @@ final class LegalStore {
     static final class Client {
         String id = UUID.randomUUID().toString();
         String code = "", name = "", mobile = "", address = "", reference = "";
+        String email = "", landline = "", notes = "";   // mobile / landline hold the full number with country code, e.g. +918595810571
         String docsNote = "NID, agreements, evidence and other client files";
         long total = 0, paid = 0;
         List<CaseLink> cases = new ArrayList<>();
@@ -68,6 +69,9 @@ final class LegalStore {
                 c.mobile = o.optString("mobile");
                 c.address = o.optString("address");
                 c.reference = o.optString("reference");
+                c.email = o.optString("email");
+                c.landline = o.optString("landline");
+                c.notes = o.optString("notes");
                 c.docsNote = o.optString("docsNote", c.docsNote);
                 c.total = o.optLong("total");
                 c.paid = o.optLong("paid");
@@ -138,6 +142,9 @@ final class LegalStore {
                 o.put("mobile", c.mobile);
                 o.put("address", c.address);
                 o.put("reference", c.reference);
+                o.put("email", c.email);
+                o.put("landline", c.landline);
+                o.put("notes", c.notes);
                 o.put("docsNote", c.docsNote);
                 o.put("total", c.total);
                 o.put("paid", c.paid);
