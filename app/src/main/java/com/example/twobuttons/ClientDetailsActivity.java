@@ -97,7 +97,7 @@ public class ClientDetailsActivity extends BaseActivity {
                 switchClient();
                 return true;
             case M_ADD:
-                startActivityForResult(new Intent(this, AddClientActivity.class), REQ_ADD);
+                addClient();
                 return true;
             default:
                 return super.onOptionsItemSelected(it);
@@ -119,6 +119,10 @@ public class ClientDetailsActivity extends BaseActivity {
                     render();
                 })
                 .show();
+    }
+
+    private void addClient() {
+        startActivityForResult(new Intent(this, AddClientActivity.class), REQ_ADD);
     }
 
     @Override
