@@ -105,6 +105,37 @@ class CaseItems {
         return out;
     }
 
+    static String tomorrowIso() {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.add(java.util.Calendar.DAY_OF_YEAR, 1);
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
+    }
+
+    /** nextDate is tomorrow. */
+    static List<Item> tomorrow(Context c) {
+        String t = tomorrowIso();
+        List<Item> out = new ArrayList<>();
+        for (Item it : all(c)) {
+            if (t.equals(it.nextDate)) out.add(it);
+        }
+        Collections.sort(out, (a, b) -> a.title().compareToIgnoreCase(b.title()));
+        return out;
+    }
+
+    /** Diary cases (New Case page) with a hearing tomorrow. */
+    static List<DiaryStore.HCase> tomorrowDiary(Context c) {
+        String t = DiaryStore.fmt(new Date(DiaryStore.today().getTime() + 36L * 3600 * 1000));
+        // 36h after local midnight is always tomorrow, even across DST shifts
+        List<DiaryStore.HCase> out = new ArrayList<>();
+        for (DiaryStore.HCase h : new DiaryStore(c).cases()) {
+            if (h.completed) continue;
+            boolean hit = t.equals(h.next);
+            for (DiaryStore.Hearing x : h.hearings) if (t.equals(x.date)) hit = true;
+            if (hit) out.add(h);
+        }
+        return out;
+    }
+
     /** Today's cases whose case name contains query. Empty query = all. */
     static List<Item> todayMatching(Context c, String query) {
         String q = query.trim().toLowerCase(Locale.ROOT);

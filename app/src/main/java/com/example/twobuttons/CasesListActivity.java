@@ -13,12 +13,14 @@ public class CasesListActivity extends BaseActivity {
 
     private LinearLayout box;
     private boolean todayMode;
+    private boolean tomorrowMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         todayMode = "today".equals(getIntent().getStringExtra("mode"));
-        setTitle(todayMode ? "Today's Schedule" : "Upcoming Cases");
+        tomorrowMode = "tomorrow".equals(getIntent().getStringExtra("mode"));
+        setTitle(todayMode ? "Today's Schedule" : tomorrowMode ? "Tomorrow's Hearings" : "Upcoming Cases");
 
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(AppTheme.bg(this));
@@ -34,10 +36,12 @@ public class CasesListActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         box.removeAllViews();
-        List<CaseItems.Item> items = todayMode ? CaseItems.today(this) : CaseItems.upcoming(this);
+        List<CaseItems.Item> items = todayMode ? CaseItems.today(this)
+                : tomorrowMode ? CaseItems.tomorrow(this) : CaseItems.upcoming(this);
         if (items.isEmpty()) {
             box.addView(CaseViews.emptyNote(this,
-                    todayMode ? "Nothing scheduled today" : "No upcoming cases"));
+                    todayMode ? "Nothing scheduled today"
+                            : tomorrowMode ? "No hearings tomorrow" : "No upcoming cases"));
             return;
         }
         for (CaseItems.Item it : items) {

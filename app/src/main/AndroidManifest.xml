@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
+        android:name=".App"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
         android:theme="@android:style/Theme.DeviceDefault.Light">
@@ -41,6 +42,7 @@
         <activity android:name=".CasesListActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".ContactUsActivity" android:exported="false" />
+        <activity android:name=".AllCasesActivity" android:exported="false" />
         <activity android:name=".ClientDetailsActivity" android:exported="false" />
         <activity android:name=".NewCaseActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />

@@ -332,6 +332,50 @@ public class MainActivity extends BaseActivity {
                         13, AppTheme.sub(this), false));
             }
         }
+        showTomorrow();
+    }
+
+    private void showTomorrow() {
+        List<CaseItems.Item> pdf = CaseItems.tomorrow(this);
+        List<DiaryStore.HCase> diary = CaseItems.tomorrowDiary(this);
+        boolean any = !pdf.isEmpty() || !diary.isEmpty();
+        sections.addView(CaseViews.sectionHeader(this, "Tomorrow's Hearings",
+                !pdf.isEmpty() ? (android.view.View.OnClickListener) (v -> openList("tomorrow")) : null));
+        if (!any) {
+            sections.addView(CaseViews.emptyNote(this, "No hearings tomorrow"));
+        }
+        int shown = 0;
+        for (CaseItems.Item it : pdf) {
+            if (shown++ >= 3) break;
+            sections.addView(CaseViews.caseRow(this, it,
+                    v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 0, 10));
+        }
+        for (DiaryStore.HCase h : diary) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(14), dp(12), dp(14), dp(12));
+            row.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+            row.addView(CaseViews.text(this, h.title(), 15, AppTheme.text(this), true));
+            String sub = (h.court.isEmpty() ? "" : h.court) + (h.number.isEmpty() ? "" : "  |  " + h.number);
+            if (!sub.isEmpty()) row.addView(CaseViews.text(this, sub, 13, AppTheme.sub(this), false));
+            row.setOnClickListener(v -> {
+                Intent i = new Intent(this, HearingsActivity.class);
+                i.putExtra("id", h.id);
+                startActivity(i);
+            });
+            sections.addView(row, CaseViews.lp(this, 0, 10));
+        }
+        if (pdf.size() > 3) {
+            sections.addView(CaseViews.text(this, "+" + (pdf.size() - 3) + " more",
+                    13, AppTheme.sub(this), false));
+        }
+
+        TextView all = CaseViews.text(this, "View all cases", 15, 0xFFFFFFFF, true);
+        all.setGravity(Gravity.CENTER);
+        all.setPadding(dp(16), dp(14), dp(16), dp(14));
+        all.setBackground(CaseViews.box(this, AppTheme.accent(this), 12, 0, 0));
+        all.setOnClickListener(v -> startActivity(new Intent(this, AllCasesActivity.class)));
+        sections.addView(all, CaseViews.lp(this, 18, 4));
     }
 
     private TextView plainHeader(String title) {

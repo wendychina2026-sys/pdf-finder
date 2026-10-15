@@ -304,11 +304,19 @@ final class PickerDialogs {
                         ImageView x = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 40);
                         x.setPadding(dp(a, 9), dp(a, 9), dp(a, 9), dp(a, 9));
                         x.setContentDescription("Delete " + it);
-                        x.setOnClickListener(v -> LegalUi.confirm(a, "Delete court type?",
-                                "\"" + it + "\" will be removed from your list.", () -> {
-                                    onDelete.accept(it);
-                                    fill[0].run();
-                                }));
+                        x.setOnClickListener(v -> {
+                            android.app.AlertDialog ad = new android.app.AlertDialog.Builder(a)
+                                    .setTitle("Delete court type?")
+                                    .setMessage("\"" + it + "\" will be removed from your list.")
+                                    .setPositiveButton("Delete", (dd, w) -> {
+                                        onDelete.accept(it);
+                                        fill[0].run();
+                                    })
+                                    .setNegativeButton("Cancel", null)
+                                    .create();
+                            ad.setCanceledOnTouchOutside(false);
+                            ad.show();
+                        });
                         r.addView(x);
                     }
                 }
