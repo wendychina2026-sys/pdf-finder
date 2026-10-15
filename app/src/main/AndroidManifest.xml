@@ -41,6 +41,8 @@
         <activity android:name=".CasesListActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".ClientDetailsActivity" android:exported="false" />
+        <activity android:name=".NewCaseActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".AddClientActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ChooseContactActivity" android:exported="false" />

@@ -28,10 +28,14 @@ final class DiaryStore {
         String first = "", second = "", number = "", type = "", subType = "";
         String court = "", judge = "", room = "", proceeding = "", representing = "";
         String prev = "", next = "";           // dd/MM/yyyy
+        // fields from the New Case page
+        String caseTitle = "", regDate = "", courtKind = "", clientId = "", cnr = "";
+        String filingNo = "", diaryNo = "", feeNotes = "", priority = "", notes = "";
+        String firStation = "", firNo = "", firDate = "", acts = "";
         long billTotal = 0, billPaid = 0;
         boolean completed = false;
         List<Hearing> hearings = new ArrayList<>();
-        String title() { return first + " vs. " + second; }
+        String title() { return caseTitle.isEmpty() ? first + " vs. " + second : caseTitle; }
         long pending() { return Math.max(0, billTotal - billPaid); }
     }
 
@@ -100,6 +104,13 @@ final class DiaryStore {
                 c.prev = o.optString("prev"); c.next = o.optString("next");
                 c.billTotal = o.optLong("billTotal"); c.billPaid = o.optLong("billPaid");
                 c.completed = o.optBoolean("completed");
+                c.caseTitle = o.optString("caseTitle"); c.regDate = o.optString("regDate");
+                c.courtKind = o.optString("courtKind"); c.clientId = o.optString("clientId");
+                c.cnr = o.optString("cnr"); c.filingNo = o.optString("filingNo");
+                c.diaryNo = o.optString("diaryNo"); c.feeNotes = o.optString("feeNotes");
+                c.priority = o.optString("priority"); c.notes = o.optString("notes");
+                c.firStation = o.optString("firStation"); c.firNo = o.optString("firNo");
+                c.firDate = o.optString("firDate"); c.acts = o.optString("acts");
                 JSONArray hs = o.optJSONArray("hearings");
                 if (hs != null) for (int j = 0; j < hs.length(); j++) {
                     JSONObject ho = hs.getJSONObject(j);
@@ -146,6 +157,13 @@ final class DiaryStore {
                 o.put("prev", c.prev); o.put("next", c.next);
                 o.put("billTotal", c.billTotal); o.put("billPaid", c.billPaid);
                 o.put("completed", c.completed);
+                o.put("caseTitle", c.caseTitle); o.put("regDate", c.regDate);
+                o.put("courtKind", c.courtKind); o.put("clientId", c.clientId);
+                o.put("cnr", c.cnr); o.put("filingNo", c.filingNo);
+                o.put("diaryNo", c.diaryNo); o.put("feeNotes", c.feeNotes);
+                o.put("priority", c.priority); o.put("notes", c.notes);
+                o.put("firStation", c.firStation); o.put("firNo", c.firNo);
+                o.put("firDate", c.firDate); o.put("acts", c.acts);
                 JSONArray hs = new JSONArray();
                 for (Hearing h : c.hearings) {
                     JSONObject ho = new JSONObject();
