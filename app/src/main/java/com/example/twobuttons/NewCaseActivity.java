@@ -45,9 +45,10 @@ public class NewCaseActivity extends BaseActivity {
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
     private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court",
-            "Tribunal (NCLT)", "Consumer Court"};
+            "Tribunal (NCLT / DRT / DRAT)", "Consumer Court", "Revenue Court"};
     private static final int[] COURT_ICONS = {R.drawable.ic_home, R.drawable.ic_briefcase,
-            R.drawable.ic_shield, R.drawable.ic_award, R.drawable.ic_bag};
+            R.drawable.ic_shield, R.drawable.ic_award, R.drawable.ic_bag, R.drawable.ic_map};
+    private static final String CHOOSE_COURT = "Choose a court";
     /** Court types offered before any the user has added themselves. */
     private static final String[] DEFAULT_COURT_TYPES = {"CJM Court", "Family Court", "Consumer Court",
             "Labour Court", "MACT", "Lok Adalat", "POCSO Court", "Income Tax Tribunal", "Special Court",
@@ -63,7 +64,7 @@ public class NewCaseActivity extends BaseActivity {
     private DiaryStore store;
     private LegalStore legal;
 
-    private String courtKind = COURT_KINDS[0];
+    private String courtKind = "";
     private String courtName = "";
     private String caseType = "";
     private String clientId = "";
@@ -334,7 +335,7 @@ public class NewCaseActivity extends BaseActivity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(tile(R.drawable.ic_search));
-        LinearLayout t = col(courtKind + " CNR Lookup", 15, "Auto-fill case details from CNR number");
+        LinearLayout t = col(cnrHeading(), 15, "Auto-fill case details from CNR number");
         t.setPadding(dp(14), 0, 0, 0);
         cnrTitle = (TextView) t.getChildAt(0);
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -542,21 +543,22 @@ public class NewCaseActivity extends BaseActivity {
                 PickerDialogs.calendar(this, "Select Registration Date", regEdit));
 
         f.addView(lbl("Court"));
-        kindText = dropdown(f, courtKind, v ->
+        kindText = dropdown(f, CHOOSE_COURT, v ->
                 PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, courtKind, s -> {
                     courtKind = s;
-                    setChosen(kindText, s, courtKind);
-                    cnrTitle.setText(s + " CNR Lookup");
+                    setChosen(kindText, s, CHOOSE_COURT);
+                    cnrTitle.setText(cnrHeading());
                 }));
-        setChosen(kindText, courtKind, courtKind);
+        setChosen(kindText, courtKind, CHOOSE_COURT);
 
         f.addView(lbl("Court name / type *"));
         courtNameText = dropdown(f, "Select Court Type", v ->
-                PickerDialogs.courtTypes(this, courtTypes(), courtName, this::addCourtDialog, s -> {
-                    courtName = s;
-                    setChosen(courtNameText, s, "Select Court Type");
-                    refresh();
-                }));
+                PickerDialogs.courtTypes(this, this::courtTypes, courtName, this::addCourtDialog,
+                        this::isCustomCourt, this::deleteCourtType, s -> {
+                            courtName = s;
+                            setChosen(courtNameText, s, "Select Court Type");
+                            refresh();
+                        }));
         f.addView(lbl("Case type*"));
         caseTypeText = dropdown(f, "Select Particular", v ->
                 choose("Case type", Arrays.asList(DiaryStore.CASE_TYPES), s -> {
@@ -574,11 +576,38 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
-    /** Built-in court types first, then the ones already saved in the app (no repeats). */
+    private String cnrHeading() {
+        return courtKind.isEmpty() ? "Case Search & Auto-Fill" : courtKind + " CNR Lookup";
+    }
+
+    private static boolean isDefaultCourt(String name) {
+        for (String t : DEFAULT_COURT_TYPES) if (t.equalsIgnoreCase(name)) return true;
+        return false;
+    }
+
+    private boolean isCustomCourt(String name) {
+        return !isDefaultCourt(name);
+    }
+
+    /** Court types the user added (newest first), then the built-in ones. No repeats. */
     private List<String> courtTypes() {
-        java.util.LinkedHashSet<String> all = new java.util.LinkedHashSet<>(Arrays.asList(DEFAULT_COURT_TYPES));
-        all.addAll(store.courts());
+        List<String> saved = store.courts();
+        java.util.Collections.reverse(saved);
+        java.util.LinkedHashSet<String> all = new java.util.LinkedHashSet<>();
+        for (String s : saved) if (isCustomCourt(s)) all.add(s);
+        all.addAll(Arrays.asList(DEFAULT_COURT_TYPES));
         return new ArrayList<>(all);
+    }
+
+    private void deleteCourtType(String name) {
+        List<String> l = store.courts();
+        l.removeIf(x -> x.equalsIgnoreCase(name));
+        store.saveCourts(l);
+        if (name.equalsIgnoreCase(courtName)) {
+            courtName = "";
+            setChosen(courtNameText, "", "Select Court Type");
+            refresh();
+        }
     }
 
     private void addCourtDialog() {

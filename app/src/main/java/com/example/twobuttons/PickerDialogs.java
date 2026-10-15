@@ -31,6 +31,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Rounded, theme-aware dialogs for the New Case page: the court chooser sheet, the searchable
@@ -172,6 +174,12 @@ final class PickerDialogs {
         root.setBackground(panel(a, 28, 0, true));
         root.addView(titleRow(a, d, "Choose a court", "Choose a court to tailor the form."));
 
+        MaxScroll optsScroll = new MaxScroll(a, 0.62f);
+        LinearLayout opts = new LinearLayout(a);
+        opts.setOrientation(LinearLayout.VERTICAL);
+        optsScroll.addView(opts);
+        root.addView(optsScroll);
+
         for (int i = 0; i < names.length; i++) {
             final String name = names[i];
             boolean on = name.equals(selected);
@@ -191,28 +199,33 @@ final class PickerDialogs {
                 pick.accept(name);
             });
             LinearLayout.LayoutParams lp = topMargin(a, i == 0 ? 18 : 10);
-            root.addView(row, lp);
+            opts.addView(row, lp);
         }
         present(d, a, root, true);
     }
 
     // ---------- searchable list (court types, months, years) ----------
 
-    /** Court types: search box, pinned "Create New Court Type" row, then the list. */
-    static void courtTypes(Activity a, List<String> items, String selected,
-                           Runnable onCreate, Consumer<String> onPick) {
-        listDialog(a, "Select Court Type", items, selected, "Search court types...",
-                "Create New Court Type", onCreate, idx -> onPick.accept(items.get(idx)));
+    /**
+     * Court types: search box, pinned "Create New Court Type" row, then the list. Rows for which
+     * custom says true get a "Custom" badge and a delete button.
+     */
+    static void courtTypes(Activity a, Supplier<List<String>> source, String selected, Runnable onCreate,
+                           Predicate<String> custom, Consumer<String> onDelete, Consumer<String> onPick) {
+        listDialog(a, "Select Court Type", source, selected, "Search court types...",
+                "Create New Court Type", onCreate, custom, onDelete, onPick);
     }
 
     private static void pickFromList(Activity a, String title, List<String> items, int selected,
                                      Consumer<Integer> cb) {
-        listDialog(a, title, items, selected >= 0 ? items.get(selected) : null, null, null, null, cb);
+        listDialog(a, title, () -> items, selected >= 0 ? items.get(selected) : null, null, null, null,
+                null, null, s -> cb.accept(items.indexOf(s)));
     }
 
-    private static void listDialog(Activity a, String title, List<String> items, String selected,
+    private static void listDialog(Activity a, String title, Supplier<List<String>> source, String selected,
                                    String searchHint, String createLabel, Runnable onCreate,
-                                   Consumer<Integer> onPick) {
+                                   Predicate<String> custom, Consumer<String> onDelete,
+                                   Consumer<String> onPick) {
         Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -264,20 +277,44 @@ final class PickerDialogs {
         sv.addView(list);
         root.addView(sv);
 
-        Runnable fill = () -> {
+        final Runnable[] fill = new Runnable[1];
+        fill[0] = () -> {
             list.removeAllViews();
+            List<String> items = source.get();
             String q = search == null ? "" : search.getText().toString().trim().toLowerCase(Locale.ROOT);
             View selRow = null;
             for (int i = 0; i < items.size(); i++) {
-                String it = items.get(i);
+                final String it = items.get(i);
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
-                final int idx = i;
                 boolean on = it.equals(selected);
-                TextView r = CaseViews.text(a, it, 15, on ? BLUE : ink(a), on);
-                r.setPadding(dp(a, 14), dp(a, 16), dp(a, 14), dp(a, 16));
+                LinearLayout r = new LinearLayout(a);
+                r.setOrientation(LinearLayout.HORIZONTAL);
+                r.setGravity(Gravity.CENTER_VERTICAL);
+                r.setMinimumHeight(dp(a, 54));
+                r.setPadding(dp(a, 14), dp(a, 4), dp(a, 8), dp(a, 4));
+                TextView name = CaseViews.text(a, it, 15, on ? BLUE : ink(a), on);
+                r.addView(name, weight());
+                if (custom != null && custom.test(it)) {
+                    TextView badge = CaseViews.text(a, "Custom", 12, dark(a) ? 0xFF121212 : 0xFFFFFFFF, true);
+                    badge.setGravity(Gravity.CENTER);
+                    badge.setPadding(dp(a, 11), dp(a, 4), dp(a, 11), dp(a, 4));
+                    badge.setBackground(CaseViews.box(a, AppTheme.accent(a), 14, 0, 0));
+                    r.addView(badge);
+                    if (onDelete != null) {
+                        ImageView x = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 40);
+                        x.setPadding(dp(a, 9), dp(a, 9), dp(a, 9), dp(a, 9));
+                        x.setContentDescription("Delete " + it);
+                        x.setOnClickListener(v -> LegalUi.confirm(a, "Delete court type?",
+                                "\"" + it + "\" will be removed from your list.", () -> {
+                                    onDelete.accept(it);
+                                    fill[0].run();
+                                }));
+                        r.addView(x);
+                    }
+                }
                 r.setOnClickListener(v -> {
                     d.dismiss();
-                    onPick.accept(idx);
+                    onPick.accept(it);
                 });
                 list.addView(r);
                 list.addView(hairline(a));
@@ -291,12 +328,12 @@ final class PickerDialogs {
             final View sel = selRow;
             if (sel != null) sv.post(() -> sv.scrollTo(0, Math.max(0, sel.getTop() - dp(a, 80))));
         };
-        fill.run();
+        fill[0].run();
         if (search != null) {
             search.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int x, int y, int z) {}
                 @Override public void onTextChanged(CharSequence s, int x, int y, int z) {}
-                @Override public void afterTextChanged(Editable s) { fill.run(); }
+                @Override public void afterTextChanged(Editable s) { fill[0].run(); }
             });
         }
         present(d, a, root, false);
