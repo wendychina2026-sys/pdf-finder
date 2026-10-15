@@ -1,6 +1,7 @@
 package com.example.twobuttons;
 
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.LinearLayout;
@@ -39,6 +40,21 @@ public class SettingsActivity extends BaseActivity {
         row.addView(CaseViews.text(this, NAMES[idx], 14, AppTheme.sub(this), false));
         row.setOnClickListener(v -> showDialog());
         root.addView(row, CaseViews.lp(this, 0, 0));
+
+        TextView support = CaseViews.text(this, "Support", 14, AppTheme.accent(this), true);
+        support.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
+        root.addView(support);
+
+        LinearLayout contact = new LinearLayout(this);
+        contact.setOrientation(LinearLayout.VERTICAL);
+        contact.setGravity(Gravity.CENTER_VERTICAL);
+        contact.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        contact.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        contact.addView(CaseViews.text(this, "Contact us", 16, AppTheme.text(this), true));
+        contact.addView(CaseViews.text(this, "Get in touch with support", 14, AppTheme.sub(this), false));
+        contact.setOnClickListener(v -> startActivity(new Intent(this, ContactUsActivity.class)));
+        root.addView(contact, CaseViews.lp(this, 0, 0));
 
         sv.addView(root);
         setContentView(sv);

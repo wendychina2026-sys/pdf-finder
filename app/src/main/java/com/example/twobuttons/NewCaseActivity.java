@@ -44,7 +44,15 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQUIRED = 5;
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
-    private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court", "Tribunal / Other"};
+    private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court",
+            "Tribunal (NCLT)", "Consumer Court"};
+    private static final int[] COURT_ICONS = {R.drawable.ic_home, R.drawable.ic_briefcase,
+            R.drawable.ic_shield, R.drawable.ic_award, R.drawable.ic_bag};
+    /** Court types offered before any the user has added themselves. */
+    private static final String[] DEFAULT_COURT_TYPES = {"CJM Court", "Family Court", "Consumer Court",
+            "Labour Court", "MACT", "Lok Adalat", "POCSO Court", "Income Tax Tribunal", "Special Court",
+            "ADJ (Additional District Judge)", "District and Session Judge", "Revenue Court",
+            "Addl. District and Session Judge", "Commissioner", "Addl. Commissioner", "SDO Court", "SDJM"};
     private static final String[] PRIORITIES = {"Normal", "High", "Urgent"};
     private static final int YELLOW = 0xFFF9BC24;
     private static final int DARK = 0xFF1C1C1C;
@@ -530,10 +538,12 @@ public class NewCaseActivity extends BaseActivity {
         titleEdit.setMinLines(2);
         regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
         regEdit.setHint("Select Date");
+        regEdit.setOnClickListener(v ->
+                PickerDialogs.calendar(this, "Select Registration Date", regEdit));
 
         f.addView(lbl("Court"));
         kindText = dropdown(f, courtKind, v ->
-                choose("Court", Arrays.asList(COURT_KINDS), s -> {
+                PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, courtKind, s -> {
                     courtKind = s;
                     setChosen(kindText, s, courtKind);
                     cnrTitle.setText(s + " CNR Lookup");
@@ -541,19 +551,12 @@ public class NewCaseActivity extends BaseActivity {
         setChosen(kindText, courtKind, courtKind);
 
         f.addView(lbl("Court name / type *"));
-        courtNameText = dropdown(f, "Select Court Type", v -> {
-            List<String> opts = new ArrayList<>(store.courts());
-            opts.add("+ Add court type");
-            choose("Court name / type", opts, s -> {
-                if (s.equals("+ Add court type")) {
-                    addCourtDialog();
-                } else {
+        courtNameText = dropdown(f, "Select Court Type", v ->
+                PickerDialogs.courtTypes(this, courtTypes(), courtName, this::addCourtDialog, s -> {
                     courtName = s;
                     setChosen(courtNameText, s, "Select Court Type");
                     refresh();
-                }
-            });
-        });
+                }));
         f.addView(lbl("Case type*"));
         caseTypeText = dropdown(f, "Select Particular", v ->
                 choose("Case type", Arrays.asList(DiaryStore.CASE_TYPES), s -> {
@@ -571,20 +574,26 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
+    /** Built-in court types first, then the ones already saved in the app (no repeats). */
+    private List<String> courtTypes() {
+        java.util.LinkedHashSet<String> all = new java.util.LinkedHashSet<>(Arrays.asList(DEFAULT_COURT_TYPES));
+        all.addAll(store.courts());
+        return new ArrayList<>(all);
+    }
+
     private void addCourtDialog() {
-        LinearLayout f = LegalUi.form(this);
-        EditText name = LegalUi.input(this, f, "Court name / type", "", NAME);
-        LegalUi.formDialog(this, "Add court type", f, () -> {
-            String s = LegalUi.str(name);
-            if (!LegalUi.need(this, s, "Name")) return false;
-            List<String> l = store.courts();
-            l.add(s);
-            store.saveCourts(l);
+        PickerDialogs.customCourt(this, s -> {
+            boolean known = false;
+            for (String t : courtTypes()) if (t.equalsIgnoreCase(s)) { s = t; known = true; break; }
+            if (!known) {
+                List<String> l = store.courts();
+                l.add(s);
+                store.saveCourts(l);
+            }
             courtName = s;
             setChosen(courtNameText, s, "Select Court Type");
             refresh();
-            return true;
-        }, null);
+        });
     }
 
     // ---------- additional details ----------
@@ -652,6 +661,7 @@ public class NewCaseActivity extends BaseActivity {
         firNoEdit = LegalUi.text(this, f5, "FIR number", "");
         firDateEdit = LegalUi.dmyInput(this, f5, "FIR date", "");
         firDateEdit.setHint("Select Date");
+        firDateEdit.setOnClickListener(v -> PickerDialogs.calendar(this, "Select FIR Date", firDateEdit));
         extra.addView(section(R.drawable.ic_notes, "FIR Details",
                 "Police station, FIR number and date", f5));
 
