@@ -49,13 +49,13 @@ final class PickerDialogs {
 
     private static int dp(Context c, int v) { return CaseViews.dp(c, v); }
     private static boolean dark(Context c) { return AppTheme.isDark(c); }
-    private static int ink(Context c) { return dark(c) ? 0xFFFFFFFF : 0xFF111827; }
-    private static int soft(Context c) { return dark(c) ? 0xFFC4CAE0 : 0xFF5B6275; }
-    private static int hair(Context c) { return dark(c) ? 0x33FFFFFF : 0x1F000000; }
-    private static int chip(Context c) { return dark(c) ? 0x26FFFFFF : 0xFFEEF1F8; }
+    static int ink(Context c) { return dark(c) ? 0xFFFFFFFF : 0xFF111827; }
+    static int soft(Context c) { return dark(c) ? 0xFFC4CAE0 : 0xFF5B6275; }
+    static int hair(Context c) { return dark(c) ? 0x33FFFFFF : 0x1F000000; }
+    static int chip(Context c) { return dark(c) ? 0x26FFFFFF : 0xFFEEF1F8; }
 
     /** Dark: navy gradient (flat navy for the bottom sheet). Light: white. */
-    private static GradientDrawable panel(Context c, int topDp, int bottomDp, boolean flat) {
+    static GradientDrawable panel(Context c, int topDp, int bottomDp, boolean flat) {
         GradientDrawable g;
         if (dark(c)) {
             if (flat) {

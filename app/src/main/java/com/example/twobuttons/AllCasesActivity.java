@@ -1,6 +1,7 @@
 package com.example.twobuttons;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -448,7 +449,13 @@ public class AllCasesActivity extends BaseActivity {
 
     // ------------------------------------------------------------ bottom sheets
 
-    private int ink() { return AppTheme.text(this); }
+    private static final int BLUE = 0xFF3B82F6;
+
+    private int ink() { return PickerDialogs.ink(this); }
+    private int soft() { return PickerDialogs.soft(this); }
+    private int hair() { return PickerDialogs.hair(this); }
+
+    private static boolean dark(Context c) { return AppTheme.isDark(c); }
 
     /** Bottom sheet: title row, scrollable body, footer with two buttons. Returns the body. */
     private LinearLayout sheet(String title, String leftLabel, Runnable left,
@@ -459,17 +466,13 @@ public class AllCasesActivity extends BaseActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(AppTheme.bg(this));
-        float r = dp(24);
-        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        root.setBackground(bg);
+        root.setBackground(PickerDialogs.panel(this, 28, 0, true));
 
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(20), dp(16), dp(10), dp(8));
-        head.addView(CaseViews.text(this, title, 18, ink(), true),
+        head.setPadding(dp(22), dp(20), dp(14), dp(8));
+        head.addView(CaseViews.text(this, title, 20, ink(), true),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, ink(), 22);
         x.setPadding(dp(8), dp(8), dp(8), dp(8));
@@ -480,25 +483,25 @@ public class AllCasesActivity extends BaseActivity {
         ScrollView sv = new ScrollView(this);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(20), dp(4), dp(20), dp(12));
+        body.setPadding(dp(22), dp(4), dp(22), dp(12));
         sv.addView(body);
         root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout foot = new LinearLayout(this);
         foot.setOrientation(LinearLayout.HORIZONTAL);
-        foot.setPadding(dp(20), dp(10), dp(20), dp(16));
+        foot.setPadding(dp(22), dp(10), dp(22), dp(20));
         TextView l = CaseViews.text(this, leftLabel, 14, ink(), true);
         l.setGravity(Gravity.CENTER);
         l.setPadding(0, dp(13), 0, dp(13));
-        l.setBackground(CaseViews.box(this, AppTheme.bg(this), 12, AppTheme.fieldStroke(this), 1));
+        l.setBackground(CaseViews.box(this, PickerDialogs.chip(this), 26, hair(), 1));
         l.setOnClickListener(v -> left.run());
         LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         llp.rightMargin = dp(10);
         foot.addView(l, llp);
-        TextView rt = CaseViews.text(this, rightLabel, 14, AppTheme.isDark(this) ? 0xFF121212 : 0xFFFFFFFF, true);
+        TextView rt = CaseViews.text(this, rightLabel, 14, 0xFFFFFFFF, true);
         rt.setGravity(Gravity.CENTER);
         rt.setPadding(0, dp(13), 0, dp(13));
-        rt.setBackground(CaseViews.box(this, AppTheme.accent(this), 12, 0, 0));
+        rt.setBackground(CaseViews.box(this, BLUE, 26, 0, 0));
         rt.setOnClickListener(v -> right.run());
         foot.addView(rt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(foot);
@@ -508,7 +511,7 @@ public class AllCasesActivity extends BaseActivity {
         Window w = d.getWindow();
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            w.setDimAmount(0.55f);
+            w.setDimAmount(0.65f);
             DisplayMetrics dm = getResources().getDisplayMetrics();
             w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (int) (dm.heightPixels * 0.9f));
             w.setGravity(Gravity.BOTTOM);
@@ -538,8 +541,8 @@ public class AllCasesActivity extends BaseActivity {
             render();
         }, h);
 
-        body.addView(CaseViews.text(this, "Choose what shows on each case card.", 13,
-                AppTheme.sub(this), false), CaseViews.lp(this, 0, 8));
+        body.addView(CaseViews.text(this, "Choose what shows on each case card.", 14,
+                soft(), false), CaseViews.lp(this, 0, 8));
         for (int i = 0; i < OPTIONS.length; i++) {
             final int idx = i;
             boolean locked = (Boolean) OPTIONS[i][2];
@@ -550,17 +553,25 @@ public class AllCasesActivity extends BaseActivity {
             LinearLayout txt = new LinearLayout(this);
             txt.setOrientation(LinearLayout.VERTICAL);
             txt.addView(CaseViews.text(this, (String) OPTIONS[i][1], 15, ink(), false));
-            if (locked) txt.addView(CaseViews.text(this, "Always shown", 11, AppTheme.sub(this), false));
+            if (locked) txt.addView(CaseViews.text(this, "Always shown", 11, soft(), false));
             row.addView(txt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             Switch sw = new Switch(this);
             sw.setChecked(vals[i]);
             sw.setEnabled(!locked);
+            android.content.res.ColorStateList track = new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{0x883B82F6, dark(this) ? 0x44FFFFFF : 0x33000000});
+            android.content.res.ColorStateList thumb = new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{BLUE, dark(this) ? 0xFFC4CAE0 : 0xFFF1F1F1});
+            sw.setTrackTintList(track);
+            sw.setThumbTintList(thumb);
             sw.setOnCheckedChangeListener((b, on) -> vals[idx] = on);
             switches[i] = sw;
             row.addView(sw);
             body.addView(row);
             View line = new View(this);
-            line.setBackgroundColor(AppTheme.cardStroke(this));
+            line.setBackgroundColor(hair());
             body.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
         }
     }
@@ -575,7 +586,7 @@ public class AllCasesActivity extends BaseActivity {
         head.setPadding(0, dp(14), 0, dp(10));
         head.addView(CaseViews.text(this, title, 16, ink(), true),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        ImageView arrow = CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.sub(this), 22);
+        ImageView arrow = CaseViews.icon(this, R.drawable.ic_expand_more, ink(), 22);
         head.addView(arrow, new LinearLayout.LayoutParams(dp(24), dp(24)));
         parent.addView(head);
         LinearLayout body = new LinearLayout(this);
@@ -589,12 +600,12 @@ public class AllCasesActivity extends BaseActivity {
             arrow.setRotation(show ? 180f : 0f);
         });
         View line = new View(this);
-        line.setBackgroundColor(AppTheme.cardStroke(this));
+        line.setBackgroundColor(hair());
         parent.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
         return body;
     }
 
-    /** Single-choice rows. cur[0] holds the selected index. */
+    /** Single-choice rows with a round selector on the right. cur[0] holds the selected index. */
     private void radios(LinearLayout body, String[] opts, int[] cur) {
         body.removeAllViews();
         for (int i = 0; i < opts.length; i++) {
@@ -603,27 +614,41 @@ public class AllCasesActivity extends BaseActivity {
             LinearLayout r = new LinearLayout(this);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(0, dp(10), 0, dp(10));
-            TextView dot = CaseViews.text(this, sel ? "●" : "○", 18,
-                    sel ? AppTheme.accent(this) : AppTheme.sub(this), false);
-            dot.setMinWidth(dp(30));
-            r.addView(dot);
-            r.addView(CaseViews.text(this, opts[i], 14, sel ? AppTheme.accent(this) : ink(), sel));
+            r.setPadding(dp(16), dp(14), dp(16), dp(14));
+            int fill = sel ? (dark(this) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(this) ? 0xFF0D1428 : 0xFFF4F5FA);
+            r.setBackground(CaseViews.box(this, fill, 16, sel ? BLUE : hair(), 1));
+            r.addView(CaseViews.text(this, opts[i], 15, ink(), sel),
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            if (sel) {
+                r.addView(CaseViews.icon(this, R.drawable.ic_check_circle, BLUE, 26));
+            } else {
+                View ring = new View(this);
+                GradientDrawable g = new GradientDrawable();
+                g.setShape(GradientDrawable.OVAL);
+                g.setStroke(dp(2), dark(this) ? 0x66FFFFFF : 0x55000000);
+                ring.setBackground(g);
+                LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(dp(22), dp(22));
+                rl.rightMargin = dp(2);
+                r.addView(ring, rl);
+            }
             r.setOnClickListener(v -> { cur[0] = idx; radios(body, opts, cur); });
-            body.addView(r);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(8);
+            body.addView(r, lp);
         }
     }
 
     private EditText field(LinearLayout body, String label, String value, int inputType) {
-        body.addView(CaseViews.text(this, label, 12, AppTheme.sub(this), true), CaseViews.lp(this, 8, 4));
+        body.addView(CaseViews.text(this, label, 13, soft(), true), CaseViews.lp(this, 8, 4));
         EditText e = new EditText(this);
         e.setText(value);
         e.setTextSize(14);
         e.setSingleLine(true);
         e.setInputType(inputType);
         e.setTextColor(ink());
-        e.setPadding(dp(12), dp(10), dp(12), dp(10));
-        e.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
+        e.setPadding(dp(16), dp(12), dp(16), dp(12));
+        e.setBackground(CaseViews.box(this, PickerDialogs.chip(this), 14, hair(), 1));
         body.addView(e, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return e;
@@ -667,7 +692,7 @@ public class AllCasesActivity extends BaseActivity {
         f[3] = field(det, "Case number", fNo, InputType.TYPE_CLASS_TEXT);
         f[4] = field(det, "Filing number", fFiling, InputType.TYPE_CLASS_TEXT);
         f[5] = field(det, "Reg. year", fYear, InputType.TYPE_CLASS_NUMBER);
-        det.addView(CaseViews.text(this, "CNR number", 12, AppTheme.sub(this), true), CaseViews.lp(this, 14, 2));
+        det.addView(CaseViews.text(this, "CNR number", 13, soft(), true), CaseViews.lp(this, 14, 6));
         LinearLayout cnrBody = new LinearLayout(this);
         cnrBody.setOrientation(LinearLayout.VERTICAL);
         det.addView(cnrBody);
