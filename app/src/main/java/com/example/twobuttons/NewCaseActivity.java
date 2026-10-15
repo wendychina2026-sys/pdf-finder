@@ -1,14 +1,21 @@
 package com.example.twobuttons;
 
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -26,13 +33,17 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * New Case page: court type, auto-fill (CNR) or manual entry, optional client, the five required
- * case details, and collapsible additional details (identifiers, parties, fee, notes, FIR, acts).
+ * New Case page: auto-fill (CNR) or manual entry tabs, optional client, the case details (including
+ * the court), collapsible additional details (identifiers, parties, fee, notes, FIR, acts) and an
+ * upload box for case files (PDF or image).
  */
 public class NewCaseActivity extends BaseActivity {
 
     private static final int REQ_CLIENT = 51;
+    private static final int REQ_FILE = 52;
     private static final int REQUIRED = 5;
+    /** Everything on this page is drawn a little smaller than the shared default sizes. */
+    private static final float TEXT_SCALE = 0.9f;
     private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court", "Tribunal / Other"};
     private static final String[] PRIORITIES = {"Normal", "High", "Urgent"};
     private static final int YELLOW = 0xFFF9BC24;
@@ -58,6 +69,10 @@ public class NewCaseActivity extends BaseActivity {
     private EditText judgeEdit, subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
     private final List<EditText[]> actRows = new ArrayList<>();
+    private final List<Uri> pickedUris = new ArrayList<>();
+    private final List<String> pickedNames = new ArrayList<>();
+    private LinearLayout filesBox;
+    private boolean scaled = false;
 
     private final TextWatcher watcher = new TextWatcher() {
         @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -85,22 +100,36 @@ public class NewCaseActivity extends BaseActivity {
         root.addView(sv, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        body.addView(courtKindCard(), cardLp());
         body.addView(toggleBar(), cardLp());
         cnrCard = buildCnrCard();
         body.addView(cnrCard, cardLp());
         body.addView(buildClientCard(), cardLp());
         body.addView(buildCaseCard(), cardLp());
         body.addView(buildAdditionalCard(), cardLp());
+        body.addView(buildUploadCard(), cardLp());
 
         root.addView(bottomBar());
         setContentView(root);
         styleToggle();
         renderClient();
         refresh();
+        shrink(root);
+        scaled = true;
     }
 
     // ---------- small helpers ----------
+
+    /** Scales every text on this page down a little; views added later call this for themselves. */
+    private void shrink(View v) {
+        if (v instanceof TextView) {
+            TextView t = (TextView) v;
+            t.setTextSize(TypedValue.COMPLEX_UNIT_PX, t.getTextSize() * TEXT_SCALE);
+        }
+        if (v instanceof ViewGroup && !(v instanceof AdapterView)) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) shrink(g.getChildAt(i));
+        }
+    }
 
     private int dp(int v) { return CaseViews.dp(this, v); }
 
@@ -257,29 +286,6 @@ public class NewCaseActivity extends BaseActivity {
 
     // ---------- court + mode ----------
 
-    private LinearLayout courtKindCard() {
-        LinearLayout c = new LinearLayout(this);
-        c.setOrientation(LinearLayout.HORIZONTAL);
-        c.setGravity(Gravity.CENTER_VERTICAL);
-        c.setPadding(dp(14), dp(14), dp(16), dp(14));
-        c.setBackground(CaseViews.box(this, AppTheme.card(this), 18, AppTheme.cardStroke(this), 1));
-        c.addView(tile(R.drawable.ic_home));
-        LinearLayout t = new LinearLayout(this);
-        t.setOrientation(LinearLayout.VERTICAL);
-        t.setPadding(dp(14), 0, 0, 0);
-        t.addView(CaseViews.text(this, "Court", 12, AppTheme.sub(this), false));
-        kindText = CaseViews.text(this, courtKind, 14, AppTheme.text(this), false);
-        t.addView(kindText);
-        c.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        c.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 24));
-        c.setOnClickListener(v -> choose("Court", Arrays.asList(COURT_KINDS), s -> {
-            courtKind = s;
-            kindText.setText(s);
-            cnrTitle.setText(s + " CNR Lookup");
-        }));
-        return c;
-    }
-
     private LinearLayout toggleBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
@@ -422,6 +428,7 @@ public class NewCaseActivity extends BaseActivity {
             wrap.addView(x, new LinearLayout.LayoutParams(dp(48), dp(48)));
             clientBox.addView(wrap);
         }
+        if (scaled) shrink(clientBox);
     }
 
     private void pickClient() {
@@ -492,6 +499,15 @@ public class NewCaseActivity extends BaseActivity {
                 renderClient();
             }
         }
+        if (req == REQ_FILE && res == RESULT_OK && data != null) {
+            ClipData clip = data.getClipData();
+            if (clip != null) {
+                for (int i = 0; i < clip.getItemCount(); i++) addPicked(clip.getItemAt(i).getUri());
+            } else {
+                addPicked(data.getData());
+            }
+            renderFiles();
+        }
     }
 
     // ---------- case details ----------
@@ -514,6 +530,15 @@ public class NewCaseActivity extends BaseActivity {
         titleEdit.setMinLines(2);
         regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
         regEdit.setHint("Select Date");
+
+        f.addView(lbl("Court"));
+        kindText = dropdown(f, courtKind, v ->
+                choose("Court", Arrays.asList(COURT_KINDS), s -> {
+                    courtKind = s;
+                    setChosen(kindText, s, courtKind);
+                    cnrTitle.setText(s + " CNR Lookup");
+                }));
+        setChosen(kindText, courtKind, courtKind);
 
         f.addView(lbl("Court name / type *"));
         courtNameText = dropdown(f, "Select Court Type", v -> {
@@ -643,6 +668,104 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
+    // ---------- upload file ----------
+
+    private LinearLayout buildUploadCard() {
+        LinearLayout c = card();
+        c.setPadding(0, 0, 0, 0);
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(dp(16), dp(16), dp(16), dp(16));
+        LinearLayout t = col("Upload File", 15, "Upload case file here");
+        head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView plus = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 30);
+        plus.setContentDescription("Choose a PDF or image");
+        head.addView(plus);
+        head.setOnClickListener(v -> pickFile());
+        c.addView(head);
+
+        filesBox = new LinearLayout(this);
+        filesBox.setOrientation(LinearLayout.VERTICAL);
+        filesBox.setPadding(dp(16), 0, dp(16), 0);
+        c.addView(filesBox);
+        return c;
+    }
+
+    private void pickFile() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "image/*"});
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            startActivityForResult(i, REQ_FILE);
+        } catch (Exception e) {
+            Toast.makeText(this, "No file picker available on this device", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void addPicked(Uri uri) {
+        if (uri == null || pickedUris.contains(uri)) return;
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {
+            // not every provider offers a persistable grant; the file still shows in the list
+        }
+        pickedUris.add(uri);
+        pickedNames.add(displayName(uri));
+    }
+
+    private String displayName(Uri uri) {
+        String name = null;
+        try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int col = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (col >= 0) name = c.getString(col);
+            }
+        } catch (Exception ignored) {
+            // fall through to the last path segment
+        }
+        if (name == null || name.isEmpty()) name = uri.getLastPathSegment();
+        return name == null ? "File" : name;
+    }
+
+    private void renderFiles() {
+        filesBox.removeAllViews();
+        for (int i = 0; i < pickedUris.size(); i++) {
+            final int idx = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(8), dp(4), dp(8));
+            row.setBackground(CaseViews.box(this, AppTheme.field(this), 12, AppTheme.fieldStroke(this), 1));
+            boolean pdf = pickedNames.get(i).toLowerCase(Locale.ROOT).endsWith(".pdf");
+            row.addView(CaseViews.icon(this, pdf ? R.drawable.ic_pdf : R.drawable.ic_notes,
+                    AppTheme.accent(this), 22));
+            TextView n = CaseViews.text(this, pickedNames.get(i), 13, AppTheme.text(this), false);
+            n.setSingleLine(true);
+            n.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            n.setPadding(dp(10), 0, 0, 0);
+            row.addView(n, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
+            x.setPadding(dp(10), dp(10), dp(10), dp(10));
+            x.setContentDescription("Remove file");
+            x.setOnClickListener(v -> {
+                pickedUris.remove(idx);
+                pickedNames.remove(idx);
+                renderFiles();
+            });
+            row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            LinearLayout.LayoutParams lp = lpTop(0);
+            lp.bottomMargin = dp(8);
+            filesBox.addView(row, lp);
+        }
+        filesBox.setPadding(dp(16), 0, dp(16), pickedUris.isEmpty() ? 0 : dp(8));
+        if (scaled) shrink(filesBox);
+    }
+
     private LinearLayout subForm() {
         LinearLayout f = LegalUi.form(this);
         f.setPadding(dp(16), 0, dp(16), dp(14));
@@ -706,6 +829,7 @@ public class NewCaseActivity extends BaseActivity {
         row.addView(a, lp1);
         row.addView(s, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        if (scaled) shrink(row);
         actsBox.addView(row);
     }
 
