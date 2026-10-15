@@ -10,11 +10,13 @@ import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -78,13 +80,38 @@ public class MarkedFilesActivity extends BaseActivity {
             startActivity(i);
         });
 
+        Button addCase = LegalUi.outlineButton(this, "+  Add Case");
+        addCase.setOnClickListener(v -> startActivity(new Intent(this, NewCaseActivity.class)));
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        addLp.bottomMargin = CaseViews.dp(this, 8);
+        root.addView(addCase, addLp);
         root.addView(search, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         root.addView(status, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         root.addView(list, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        setContentView(root);
+        list.setClipToPadding(false);
+        list.setPadding(0, 0, 0, CaseViews.dp(this, 84));   // keep the last rows clear of the + button
+
+        TextView fab = new TextView(this);
+        fab.setText("+");
+        fab.setTextSize(30);
+        fab.setTextColor(0xFFFFFFFF);
+        fab.setGravity(Gravity.CENTER);
+        fab.setBackground(CaseViews.box(this, AppTheme.accent(this), 30, 0, 0));
+        fab.setContentDescription("Add case");
+        fab.setOnClickListener(v -> startActivity(new Intent(this, NewCaseActivity.class)));
+
+        FrameLayout frame = new FrameLayout(this);
+        frame.addView(root, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(
+                CaseViews.dp(this, 60), CaseViews.dp(this, 60), Gravity.BOTTOM | Gravity.END);
+        fl.setMargins(0, 0, CaseViews.dp(this, 20), CaseViews.dp(this, 24));
+        frame.addView(fab, fl);
+        setContentView(frame);
     }
 
     @Override

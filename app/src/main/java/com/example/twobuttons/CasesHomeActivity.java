@@ -136,7 +136,7 @@ public class CasesHomeActivity extends BaseActivity {
         TextView plus = CaseViews.text(this, "+", 34, 0xFFFFFFFF, false);
         plus.setGravity(Gravity.CENTER);
         plus.setBackground(CaseViews.box(this, BLACK, 32, 0xFF555555, 3));
-        plus.setOnClickListener(v -> startActivity(new Intent(this, NewCaseActivity.class)));
+        plus.setOnClickListener(v -> startActivity(new Intent(this, AddCaseActivity.class)));
         bar.addView(plus, new LinearLayout.LayoutParams(LegalUi.dp(this, 64), LegalUi.dp(this, 64)));
         bar.addView(navItem(R.drawable.ic_pdf, "All Cases", false,
                 v -> startActivity(new Intent(this, SarthCaseListActivity.class))), LegalUi.weight());
@@ -271,7 +271,7 @@ public class CasesHomeActivity extends BaseActivity {
         add.setGravity(Gravity.CENTER);
         add.setBackground(CaseViews.box(this, BLACK, 16, 0, 0));
         add.setPadding(LegalUi.dp(this, 36), LegalUi.dp(this, 18), LegalUi.dp(this, 36), LegalUi.dp(this, 18));
-        add.setOnClickListener(v -> startActivity(new Intent(this, NewCaseActivity.class)));
+        add.setOnClickListener(v -> startActivity(new Intent(this, AddCaseActivity.class)));
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         alp.topMargin = LegalUi.dp(this, 26);
