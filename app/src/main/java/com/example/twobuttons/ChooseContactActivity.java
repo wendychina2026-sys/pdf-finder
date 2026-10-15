@@ -50,7 +50,7 @@ public class ChooseContactActivity extends BaseActivity {
         x.setContentDescription("Close");
         x.setOnClickListener(v -> finish());
         h.addView(x, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        TextView t = CaseViews.text(this, "Choose Contact", 20, AppTheme.text(this), true);
+        TextView t = CaseViews.text(this, "Choose Contact", 18, AppTheme.text(this), true);
         t.setGravity(Gravity.CENTER);
         h.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         h.addView(new View(this), new LinearLayout.LayoutParams(dp(44), dp(44)));   // keeps title centred
@@ -66,7 +66,7 @@ public class ChooseContactActivity extends BaseActivity {
         search = new EditText(this);
         search.setHint("Search contacts by name...");
         search.setSingleLine(true);
-        search.setTextSize(16);
+        search.setTextSize(15);
         search.setTextColor(AppTheme.text(this));
         search.setHintTextColor(AppTheme.sub(this));
         search.setBackground(null);
@@ -124,7 +124,7 @@ public class ChooseContactActivity extends BaseActivity {
         r.setPadding(dp(20), dp(16), dp(16), dp(16));
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.addView(CaseViews.text(this, c[0], 17, AppTheme.text(this), false));
+        col.addView(CaseViews.text(this, c[0], 15, AppTheme.text(this), false));
         TextView num = CaseViews.text(this, c[1], 15, AppTheme.sub(this), false);
         num.setPadding(0, dp(4), 0, 0);
         col.addView(num);

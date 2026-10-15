@@ -68,7 +68,7 @@ public class AddClientActivity extends BaseActivity {
         dash.setStroke(dp(2), AppTheme.accent(this), dp(8), dp(6));
         pick.setBackground(dash);
         pick.addView(CaseViews.icon(this, R.drawable.ic_contacts, AppTheme.accent(this), 22));
-        TextView pt = CaseViews.text(this, "Choose from Contacts", 16, AppTheme.accent(this), false);
+        TextView pt = CaseViews.text(this, "Choose from Contacts", 15, AppTheme.accent(this), false);
         pt.setPadding(dp(10), 0, 0, 0);
         pick.addView(pt);
         pick.setOnClickListener(v -> chooseFromContacts());
@@ -85,7 +85,7 @@ public class AddClientActivity extends BaseActivity {
         title.setOrientation(LinearLayout.HORIZONTAL);
         title.setGravity(Gravity.CENTER_VERTICAL);
         title.addView(CaseViews.icon(this, R.drawable.ic_person, AppTheme.accent(this), 22));
-        TextView tt = CaseViews.text(this, "Basic Information", 20, AppTheme.text(this), true);
+        TextView tt = CaseViews.text(this, "Basic Information", 17, AppTheme.text(this), true);
         tt.setPadding(dp(10), 0, 0, 0);
         title.addView(tt);
         card.addView(title);
@@ -164,11 +164,11 @@ public class AddClientActivity extends BaseActivity {
         back.setOnClickListener(v -> finish());
         h.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView t = CaseViews.text(this, "Add New Client", 20, AppTheme.text(this), true);
+        TextView t = CaseViews.text(this, "Add New Client", 18, AppTheme.text(this), true);
         t.setGravity(Gravity.CENTER);
         h.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        saveBtn = CaseViews.text(this, "Save", 16, 0xFFFFFFFF, true);
+        saveBtn = CaseViews.text(this, "Save", 14, 0xFFFFFFFF, true);
         saveBtn.setGravity(Gravity.CENTER);
         saveBtn.setPadding(dp(22), dp(10), dp(22), dp(10));
         saveBtn.setBackground(CaseViews.box(this, 0xFF2F6FE4, 12, 0, 0));
@@ -194,7 +194,7 @@ public class AddClientActivity extends BaseActivity {
         EditText e = new EditText(this);
         e.setHint(hint);
         e.setInputType(inputType);
-        e.setTextSize(16);
+        e.setTextSize(15);
         e.setTextColor(AppTheme.text(this));
         e.setHintTextColor(AppTheme.sub(this));
         e.setBackground(null);
@@ -238,7 +238,7 @@ public class AddClientActivity extends BaseActivity {
 
     private TextView codeChip(boolean mobile) {
         TextView t = CaseViews.text(this, CountryCodes.label(CountryCodes.DEFAULT_DIAL) + " \u25BE",
-                16, AppTheme.text(this), true);
+                15, AppTheme.text(this), true);
         t.setPadding(0, dp(14), 0, dp(14));
         t.setOnClickListener(v -> CountryCodes.pick(this, mobile ? mobileDial : landDial, dial -> {
             if (mobile) mobileDial = dial; else landDial = dial;

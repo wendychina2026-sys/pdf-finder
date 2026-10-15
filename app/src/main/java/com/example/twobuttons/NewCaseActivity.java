@@ -136,8 +136,8 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private TextView lbl(String s) {
-        TextView t = CaseViews.text(this, s, 14, AppTheme.text(this), false);
-        t.setPadding(0, dp(14), 0, dp(6));
+        TextView t = CaseViews.text(this, s, 12, AppTheme.sub(this), true);
+        t.setPadding(0, dp(10), 0, dp(4));
         return t;
     }
 
@@ -146,7 +146,7 @@ public class NewCaseActivity extends BaseActivity {
         c.setOrientation(LinearLayout.VERTICAL);
         c.addView(CaseViews.text(this, title, titleSp, AppTheme.text(this), false));
         if (sub != null) {
-            TextView s = CaseViews.text(this, sub, 14, AppTheme.sub(this), false);
+            TextView s = CaseViews.text(this, sub, 12, AppTheme.sub(this), false);
             s.setPadding(0, dp(2), 0, 0);
             c.addView(s);
         }
@@ -164,9 +164,9 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(dp(14), dp(14), dp(14), dp(14));
+        box.setPadding(dp(14), dp(12), dp(14), dp(12));
         box.setBackground(CaseViews.box(this, AppTheme.field(this), 12, AppTheme.fieldStroke(this), 1));
-        TextView t = CaseViews.text(this, placeholder, 16, AppTheme.sub(this), false);
+        TextView t = CaseViews.text(this, placeholder, 14, AppTheme.sub(this), false);
         box.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 22));
         box.setOnClickListener(click);
@@ -195,7 +195,7 @@ public class NewCaseActivity extends BaseActivity {
         back.setContentDescription("Back");
         back.setOnClickListener(v -> finish());
         top.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        TextView t = CaseViews.text(this, "New Case", 24, AppTheme.text(this), true);
+        TextView t = CaseViews.text(this, "New Case", 19, AppTheme.text(this), true);
         t.setPadding(dp(8), 0, 0, 0);
         top.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -205,14 +205,14 @@ public class NewCaseActivity extends BaseActivity {
         prev.setPadding(dp(16), dp(10), dp(18), dp(10));
         prev.setBackground(CaseViews.box(this, 0x00000000, 24, AppTheme.accent(this), 1));
         prev.addView(CaseViews.icon(this, R.drawable.ic_eye, AppTheme.accent(this), 20));
-        TextView pt = CaseViews.text(this, "Preview", 16, AppTheme.accent(this), true);
+        TextView pt = CaseViews.text(this, "Preview", 14, AppTheme.accent(this), true);
         pt.setPadding(dp(8), 0, 0, 0);
         prev.addView(pt);
         prev.setOnClickListener(v -> preview());
         top.addView(prev);
         h.addView(top);
 
-        progressText = CaseViews.text(this, "", 14, AppTheme.sub(this), false);
+        progressText = CaseViews.text(this, "", 12, AppTheme.sub(this), false);
         progressText.setPadding(dp(8), dp(10), 0, dp(8));
         h.addView(progressText);
 
@@ -267,8 +267,8 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout t = new LinearLayout(this);
         t.setOrientation(LinearLayout.VERTICAL);
         t.setPadding(dp(14), 0, 0, 0);
-        t.addView(CaseViews.text(this, "Court", 14, AppTheme.sub(this), false));
-        kindText = CaseViews.text(this, courtKind, 19, AppTheme.text(this), false);
+        t.addView(CaseViews.text(this, "Court", 12, AppTheme.sub(this), false));
+        kindText = CaseViews.text(this, courtKind, 14, AppTheme.text(this), false);
         t.addView(kindText);
         c.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         c.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 24));
@@ -300,7 +300,7 @@ public class NewCaseActivity extends BaseActivity {
         s.setGravity(Gravity.CENTER);
         s.setPadding(dp(8), dp(14), dp(8), dp(14));
         s.addView(CaseViews.icon(this, icon, AppTheme.text(this), 20));
-        TextView t = CaseViews.text(this, text, 15, AppTheme.text(this), false);
+        TextView t = CaseViews.text(this, text, 13, AppTheme.text(this), false);
         t.setPadding(dp(8), 0, 0, 0);
         s.addView(t);
         return s;
@@ -320,7 +320,7 @@ public class NewCaseActivity extends BaseActivity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(tile(R.drawable.ic_search));
-        LinearLayout t = col(courtKind + " CNR Lookup", 20, "Auto-fill case details from CNR number");
+        LinearLayout t = col(courtKind + " CNR Lookup", 15, "Auto-fill case details from CNR number");
         t.setPadding(dp(14), 0, 0, 0);
         cnrTitle = (TextView) t.getChildAt(0);
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -334,7 +334,7 @@ public class NewCaseActivity extends BaseActivity {
         cnrLookup.setInputType(CAPS);
         cnrLookup.setSingleLine(true);
         cnrLookup.setFilters(new InputFilter[]{new InputFilter.LengthFilter(16)});
-        cnrLookup.setTextSize(16);
+        cnrLookup.setTextSize(14);
         cnrLookup.setTextColor(AppTheme.text(this));
         cnrLookup.setHintTextColor(AppTheme.sub(this));
         cnrLookup.setBackground(CaseViews.box(this, AppTheme.field(this), 28, AppTheme.fieldStroke(this), 1));
@@ -379,9 +379,9 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(CaseViews.text(this, "Client", 18, AppTheme.text(this), false),
+        head.addView(CaseViews.text(this, "Client", 15, AppTheme.text(this), false),
                 new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        head.addView(CaseViews.text(this, "Optional", 14, AppTheme.sub(this), false));
+        head.addView(CaseViews.text(this, "Optional", 12, AppTheme.sub(this), false));
         c.addView(head);
         clientBox = new LinearLayout(this);
         clientBox.setOrientation(LinearLayout.VERTICAL);
@@ -401,7 +401,7 @@ public class NewCaseActivity extends BaseActivity {
         row.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
         row.addView(CaseViews.icon(this, cl == null ? R.drawable.ic_person_add : R.drawable.ic_person,
                 AppTheme.accent(this), 24));
-        LinearLayout t = col(cl == null ? "Select Client" : cl.name, 17,
+        LinearLayout t = col(cl == null ? "Select Client" : cl.name, 14,
                 cl == null ? "Search your diary or create a client" : cl.mobile);
         t.setPadding(dp(12), 0, 0, 0);
         row.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -502,7 +502,7 @@ public class NewCaseActivity extends BaseActivity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(tile(R.drawable.ic_check_circle));
-        LinearLayout t = col("Case details", 20, "Fields marked * are required.");
+        LinearLayout t = col("Case details", 15, "Fields marked * are required.");
         t.setPadding(dp(14), 0, 0, 0);
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         c.addView(head);
@@ -572,7 +572,7 @@ public class NewCaseActivity extends BaseActivity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(16), dp(16), dp(16), dp(16));
-        LinearLayout t = col("Additional details", 20, "Parties, fees, notes, FIR and acts");
+        LinearLayout t = col("Additional details", 15, "Parties, fees, notes, FIR and acts");
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         ImageView toggle = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 30);
         head.addView(toggle);
@@ -663,7 +663,7 @@ public class NewCaseActivity extends BaseActivity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(16), dp(14), dp(16), dp(14));
         head.addView(tile(icon));
-        LinearLayout t = col(title, 18, sub);
+        LinearLayout t = col(title, 14, sub);
         t.setPadding(dp(14), 0, 0, 0);
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         ImageView chev = CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 24);
@@ -687,11 +687,11 @@ public class NewCaseActivity extends BaseActivity {
         EditText a = new EditText(this);
         a.setHint("Act (e.g. IPC)");
         a.setSingleLine(true);
-        a.setTextSize(15);
+        a.setTextSize(14);
         EditText s = new EditText(this);
         s.setHint("Sections");
         s.setSingleLine(true);
-        s.setTextSize(15);
+        s.setTextSize(14);
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
         x.setContentDescription("Remove act");
@@ -729,13 +729,13 @@ public class NewCaseActivity extends BaseActivity {
         b.setOrientation(LinearLayout.VERTICAL);
         b.setPadding(dp(16), dp(10), dp(16), dp(16));
         b.setBackgroundColor(AppTheme.card(this));
-        remainText = CaseViews.text(this, "", 15, AppTheme.text(this), false);
+        remainText = CaseViews.text(this, "", 12, AppTheme.text(this), false);
         remainText.setGravity(Gravity.CENTER);
         b.addView(remainText);
 
-        TextView create = CaseViews.text(this, "+  Create Case", 19, DARK, true);
+        TextView create = CaseViews.text(this, "+  Create Case", 15, DARK, true);
         create.setGravity(Gravity.CENTER);
-        create.setPadding(dp(16), dp(16), dp(16), dp(16));
+        create.setPadding(dp(16), dp(13), dp(16), dp(13));
         create.setBackground(CaseViews.box(this, YELLOW, 30, 0, 0));
         create.setOnClickListener(v -> create());
         b.addView(create, lpTop(10));
