@@ -404,65 +404,68 @@ public class MainActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 0, 0, dp(12));
+        row.setPadding(0, dp(4), 0, dp(14));
+
+        int tile = AppTheme.isDark(this) ? 0xFF1E1F2B : 0xFFFFFFFF;
+        int tileStroke = AppTheme.cardStroke(this);
+
+        // left: rounded menu tile + greeting
+        android.widget.ImageView menu = CaseViews.icon(this, R.drawable.ic_menu,
+                AppTheme.text(this), 22);
+        menu.setPadding(dp(11), dp(11), dp(11), dp(11));
+        menu.setBackground(CaseViews.box(this, tile, 16, tileStroke, 1));
+        menu.setElevation(dp(2));
+        menu.setContentDescription("Menu");
+        menu.setOnClickListener(v -> openDrawer());
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        mlp.rightMargin = dp(14);
+        row.addView(menu, mlp);
+
+        TextView hello = CaseViews.text(this, "Hello, Shaifali", 18, AppTheme.text(this), true);
+        hello.setSingleLine(true);
+        hello.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        row.addView(hello, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        // right: rounded pill holding the bell (with red dot) and the profile photo
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        pill.setPadding(dp(8), dp(4), dp(4), dp(4));
+        pill.setBackground(CaseViews.box(this, tile, 18, tileStroke, 1));
+        pill.setElevation(dp(2));
+
+        android.widget.FrameLayout bellBox = new android.widget.FrameLayout(this);
+        android.widget.ImageView bell = CaseViews.icon(this, R.drawable.ic_bell,
+                AppTheme.text(this), 22);
+        bell.setContentDescription("Notifications");
+        bellBox.addView(bell, new android.widget.FrameLayout.LayoutParams(
+                dp(22), dp(22), Gravity.CENTER));
+        android.view.View dot = new android.view.View(this);
+        GradientDrawable dotBg = new GradientDrawable();
+        dotBg.setShape(GradientDrawable.OVAL);
+        dotBg.setColor(0xFFE53935);
+        dotBg.setStroke(dp(1), tile);
+        dot.setBackground(dotBg);
+        android.widget.FrameLayout.LayoutParams dlp = new android.widget.FrameLayout.LayoutParams(
+                dp(9), dp(9), Gravity.TOP | Gravity.END);
+        dlp.topMargin = dp(4);
+        dlp.rightMargin = dp(4);
+        bellBox.addView(dot, dlp);
+        pill.addView(bellBox, new LinearLayout.LayoutParams(dp(34), dp(36)));
 
         avatar = new ImageView(this);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0xFFE0E0E0);
-        avatar.setBackground(bg);
+        avatar.setBackground(CaseViews.box(this, 0xFFE0E0E0, 12, 0, 0));
         avatar.setClipToOutline(true);
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setOnClickListener(v -> onAvatarClick());
         loadAvatar();
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        alp.leftMargin = dp(4);
+        pill.addView(avatar, alp);
 
-        // right side: date on top, [time + time-of-day gif] below
-        LinearLayout right = new LinearLayout(this);
-        right.setOrientation(LinearLayout.VERTICAL);
-        right.setPadding(dp(14), 0, 0, 0);
-
-        TextClock date = new TextClock(this);
-        date.setFormat12Hour("EEE, dd MMM yyyy");
-        date.setFormat24Hour("EEE, dd MMM yyyy");
-        date.setTextSize(14);
-        date.setTypeface(null, Typeface.BOLD);
-        date.setTextColor(AppTheme.sub(this));
-
-        LinearLayout timeRow = new LinearLayout(this);
-        timeRow.setOrientation(LinearLayout.HORIZONTAL);
-        timeRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
-        TextClock clock = new TextClock(this);
-        clock.setFormat12Hour("hh:mm:ss a");
-        clock.setFormat24Hour("hh:mm:ss a");
-        clock.setTextSize(20);
-        clock.setTypeface(null, Typeface.BOLD);
-        clock.setTextColor(AppTheme.text(this));
-        clock.setSingleLine(true);
-
-        timeIcon = new ImageView(this);
-        timeIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(44), dp(44));
-        ilp.leftMargin = dp(6);
-        tickIcon();
-
-        timeRow.addView(clock);
-        timeRow.addView(timeIcon, ilp);
-        right.addView(date);
-        right.addView(timeRow);
-
-        android.widget.ImageView menu = CaseViews.icon(this, R.drawable.ic_menu,
-                AppTheme.text(this), 28);
-        menu.setPadding(dp(6), dp(6), dp(6), dp(6));
-        menu.setContentDescription("Menu");
-        menu.setOnClickListener(v -> openDrawer());
-        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(dp(44), dp(44));
-        mlp.rightMargin = dp(8);
-        row.addView(menu, mlp);
-
-        row.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
-        row.addView(right, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(pill, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return row;
     }
 
