@@ -531,7 +531,7 @@ public class AllCasesActivity extends BaseActivity {
         LinearLayout body = sheet("Customize case cards", "Restore defaults", () -> {
             for (int i = 0; i < OPTIONS.length; i++) {
                 vals[i] = (Boolean) OPTIONS[i][3];
-                switches[i].setChecked(vals[i]);
+                if (switches[i] != null) switches[i].setChecked(vals[i]);
             }
         }, "Save", () -> {
             SharedPreferences.Editor e = prefs.edit();
@@ -555,6 +555,16 @@ public class AllCasesActivity extends BaseActivity {
             txt.addView(CaseViews.text(this, (String) OPTIONS[i][1], 15, ink(), false));
             if (locked) txt.addView(CaseViews.text(this, "Always shown", 11, soft(), false));
             row.addView(txt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            if (locked) {
+                ImageView lock = CaseViews.icon(this, R.drawable.ic_lock, soft(), 20);
+                row.addView(lock, new LinearLayout.LayoutParams(dp(20), dp(20)));
+                row.setPadding(0, dp(10), dp(4), dp(10));
+                View lockLine = new View(this);
+                lockLine.setBackgroundColor(hair());
+                body.addView(row);
+                body.addView(lockLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+                continue;
+            }
             Switch sw = new Switch(this);
             sw.setChecked(vals[i]);
             sw.setEnabled(!locked);

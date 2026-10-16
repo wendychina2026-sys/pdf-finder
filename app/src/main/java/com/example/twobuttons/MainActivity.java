@@ -370,10 +370,16 @@ public class MainActivity extends BaseActivity {
                     13, AppTheme.sub(this), false));
         }
 
-        TextView all = CaseViews.text(this, "View all cases", 15, 0xFFFFFFFF, true);
+        LinearLayout all = new LinearLayout(this);
+        all.setOrientation(LinearLayout.HORIZONTAL);
         all.setGravity(Gravity.CENTER);
         all.setPadding(dp(16), dp(14), dp(16), dp(14));
-        all.setBackground(CaseViews.box(this, AppTheme.accent(this), 12, 0, 0));
+        all.setBackground(CaseViews.box(this, AppTheme.accent(this), 20, 0, 0));
+        all.addView(CaseViews.text(this, "View all cases", 15, 0xFFFFFFFF, true));
+        ImageView allArrow = CaseViews.icon(this, R.drawable.ic_arrow_outward, 0xFFFFFFFF, 18);
+        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(dp(18), dp(18));
+        arrowLp.leftMargin = dp(8);
+        all.addView(allArrow, arrowLp);
         all.setOnClickListener(v -> startActivity(new Intent(this, AllCasesActivity.class)));
         sections.addView(all, CaseViews.lp(this, 18, 4));
     }

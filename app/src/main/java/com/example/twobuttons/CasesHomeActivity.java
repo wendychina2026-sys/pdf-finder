@@ -276,8 +276,16 @@ public class CasesHomeActivity extends BaseActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         alp.topMargin = LegalUi.dp(this, 26);
         card.addView(add, alp);
-        TextView all = CaseViews.text(this, "View all cases  >", 18, AppTheme.text(this), false);
+        LinearLayout all = new LinearLayout(this);
+        all.setOrientation(LinearLayout.HORIZONTAL);
+        all.setGravity(Gravity.CENTER_VERTICAL);
         all.setPadding(0, LegalUi.dp(this, 22), 0, 0);
+        all.addView(CaseViews.text(this, "View all cases", 18, AppTheme.text(this), false));
+        ImageView allArrow = CaseViews.icon(this, R.drawable.ic_arrow_outward, AppTheme.text(this), 20);
+        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
+                LegalUi.dp(this, 20), LegalUi.dp(this, 20));
+        arrowLp.leftMargin = LegalUi.dp(this, 8);
+        all.addView(allArrow, arrowLp);
         all.setOnClickListener(v -> startActivity(new Intent(this, SarthCaseListActivity.class)));
         card.addView(all);
         return card;
