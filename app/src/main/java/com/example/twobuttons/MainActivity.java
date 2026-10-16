@@ -44,6 +44,8 @@ public class MainActivity extends BaseActivity {
     private ImageView avatar;
     private EditText searchBox;
     private LinearLayout sections;
+    private LinearLayout todayHead;
+    private LinearLayout todayList;
     private ScrollView scroll;
     private ImageView timeIcon;
     private String shownGif = "";
@@ -66,7 +68,14 @@ public class MainActivity extends BaseActivity {
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(buildHeader(), wide);
+
+        todayHead = new LinearLayout(this);
+        todayHead.setOrientation(LinearLayout.VERTICAL);
+        root.addView(todayHead, wide);
         root.addView(buildSearch());
+        todayList = new LinearLayout(this);
+        todayList.setOrientation(LinearLayout.VERTICAL);
+        root.addView(todayList, wide);
 
         sections = new LinearLayout(this);
         sections.setOrientation(LinearLayout.VERTICAL);
@@ -300,8 +309,35 @@ public class MainActivity extends BaseActivity {
     private void showSections() {
         sections.setVisibility(android.view.View.VISIBLE);
         sections.removeAllViews();
+        todayHead.removeAllViews();
+        todayList.removeAllViews();
 
-        // Upcoming Cases
+        // 1. Today's Schedule (search bar sits right under this heading)
+        boolean anyToday = !CaseItems.today(this).isEmpty();
+        todayHead.addView(CaseViews.sectionHeader(this, "Today's Schedule",
+                anyToday ? (android.view.View.OnClickListener) (v -> openList("today")) : null));
+        String q = searchBox.getText().toString().trim();
+        List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
+        if (today.isEmpty()) {
+            todayList.addView(CaseViews.emptyNote(this,
+                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"));
+        } else {
+            int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
+            for (int i = 0; i < n; i++) {
+                CaseItems.Item it = today.get(i);
+                todayList.addView(CaseViews.caseRow(this, it,
+                        v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 8, 2));
+            }
+            if (today.size() > n) {
+                todayList.addView(CaseViews.text(this, "+" + (today.size() - n) + " more",
+                        13, AppTheme.sub(this), false));
+            }
+        }
+
+        // 2. Tomorrow's Hearings
+        showTomorrow();
+
+        // 3. Upcoming Cases
         sections.addView(CaseViews.sectionHeader(this, "Upcoming Cases",
                 v -> openList("upcoming")));
         List<CaseItems.Item> up = CaseItems.upcoming(this);
@@ -311,28 +347,7 @@ public class MainActivity extends BaseActivity {
             sections.addView(CaseViews.upcomingCard(this, up.get(0), this::refresh));
         }
 
-        // Today's Schedule
-        boolean anyToday = !CaseItems.today(this).isEmpty();
-        sections.addView(CaseViews.sectionHeader(this, "Today's Schedule",
-                anyToday ? (android.view.View.OnClickListener) (v -> openList("today")) : null));
-        String q = searchBox.getText().toString().trim();
-        List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
-        if (today.isEmpty()) {
-            sections.addView(CaseViews.emptyNote(this,
-                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"));
-        } else {
-            int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
-            for (int i = 0; i < n; i++) {
-                CaseItems.Item it = today.get(i);
-                sections.addView(CaseViews.caseRow(this, it,
-                        v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 0, 10));
-            }
-            if (today.size() > n) {
-                sections.addView(CaseViews.text(this, "+" + (today.size() - n) + " more",
-                        13, AppTheme.sub(this), false));
-            }
-        }
-        showTomorrow();
+        showViewAll();
     }
 
     private void showTomorrow() {
@@ -370,6 +385,9 @@ public class MainActivity extends BaseActivity {
                     13, AppTheme.sub(this), false));
         }
 
+    }
+
+    private void showViewAll() {
         LinearLayout all = new LinearLayout(this);
         all.setOrientation(LinearLayout.HORIZONTAL);
         all.setGravity(Gravity.CENTER);
@@ -424,7 +442,18 @@ public class MainActivity extends BaseActivity {
         TextView hello = CaseViews.text(this, "Hello, Shaifali", 18, AppTheme.text(this), true);
         hello.setSingleLine(true);
         hello.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        row.addView(hello, new LinearLayout.LayoutParams(
+
+        TextClock date = new TextClock(this);
+        date.setFormat12Hour("EEE, dd MMM yyyy");
+        date.setFormat24Hour("EEE, dd MMM yyyy");
+        date.setTextSize(13);
+        date.setTextColor(AppTheme.sub(this));
+
+        LinearLayout greet = new LinearLayout(this);
+        greet.setOrientation(LinearLayout.VERTICAL);
+        greet.addView(hello);
+        greet.addView(date);
+        row.addView(greet, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         // right: rounded pill holding the bell (with red dot) and the profile photo
