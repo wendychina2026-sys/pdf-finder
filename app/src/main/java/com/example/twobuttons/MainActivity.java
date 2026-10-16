@@ -90,8 +90,7 @@ public class MainActivity extends BaseActivity {
         page.setBackgroundColor(AppTheme.bg(this));
         page.addView(sv, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        page.addView(buildNav(), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        page.addView(buildNav());
 
         android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
         frame.addView(page, new android.widget.FrameLayout.LayoutParams(
@@ -216,50 +215,18 @@ public class MainActivity extends BaseActivity {
 
     // ---------- bottom nav: Home | Find PDF | Marked PDF | Advanced Search ----------
 
-    private LinearLayout buildNav() {
-        LinearLayout nav = new LinearLayout(this);
-        nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setPadding(dp(4), dp(10), dp(4), dp(10));
-        float r = dp(20);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(AppTheme.navBg(this));
-        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        nav.setBackground(bg);
-        nav.setElevation(dp(8));
-
-        nav.addView(navItem(R.drawable.ic_home, "Home", true,
-                v -> scroll.smoothScrollTo(0, 0)), navLp());
-        nav.addView(navItem(R.drawable.ic_pdf, "Find PDF", false,
-                v -> startActivity(new Intent(this, FindPdfsActivity.class))), navLp());
-        nav.addView(navItem(R.drawable.ic_marked, "Marked PDF", false,
-                v -> startActivity(new Intent(this, MarkedFilesActivity.class))), navLp());
-        nav.addView(navItem(R.drawable.ic_advsearch, "Advanced Search", false,
-                v -> startActivity(new Intent(this, AdvancedSearchActivity.class))), navLp());
-        nav.addView(navItem(R.drawable.ic_settings, "Settings", false,
-                v -> startActivity(new Intent(this, SettingsActivity.class))), navLp());
-        return nav;
-    }
-
-    private LinearLayout.LayoutParams navLp() {
-        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-    }
-
-    private LinearLayout navItem(int iconRes, String label, boolean active,
-                                 android.view.View.OnClickListener click) {
-        int color = active ? AppTheme.accent(this) : AppTheme.navOff(this);
-        LinearLayout item = new LinearLayout(this);
-        item.setOrientation(LinearLayout.VERTICAL);
-        item.setGravity(Gravity.CENTER_HORIZONTAL);
-        item.setPadding(0, dp(4), 0, dp(4));
-        ImageView ic = CaseViews.icon(this, iconRes, color, 24);
-        item.addView(ic);
-        TextView t = CaseViews.text(this, label, 11, color, active);
-        t.setGravity(Gravity.CENTER);
-        t.setMaxLines(2);
-        t.setPadding(0, dp(4), 0, 0);
-        item.addView(t);
-        item.setOnClickListener(click);
-        return item;
+    private View buildNav() {
+        return new BottomBar(this)
+                .item(R.drawable.ic_home, "Home", v -> scroll.smoothScrollTo(0, 0))
+                .item(R.drawable.ic_pdf, "Find PDF",
+                        v -> startActivity(new Intent(this, FindPdfsActivity.class)))
+                .item(R.drawable.ic_marked, "Marked",
+                        v -> startActivity(new Intent(this, MarkedFilesActivity.class)))
+                .item(R.drawable.ic_advsearch, "Search",
+                        v -> startActivity(new Intent(this, AdvancedSearchActivity.class)))
+                .item(R.drawable.ic_settings, "Settings",
+                        v -> startActivity(new Intent(this, SettingsActivity.class)))
+                .build(0);
     }
 
     @Override
