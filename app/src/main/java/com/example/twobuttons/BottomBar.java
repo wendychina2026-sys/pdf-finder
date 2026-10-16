@@ -1,6 +1,8 @@
 package com.example.twobuttons;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -27,8 +29,8 @@ import java.util.List;
 final class BottomBar {
 
     private static final int BAR_H = 60;      // dp, the black bar itself
-    private static final int CIRCLE = 76;     // dp, diameter of the raised circle
-    private static final int TOP_EXTRA = 24;  // dp, how far the circle rises above the bar
+    private static final int CIRCLE = 66;     // dp, diameter of the raised circle
+    private static final int TOP_EXTRA = 20;  // dp, how far the circle rises above the bar
     private static final int BLACK = 0xFF000000;
     private static final int RING = 0xFF2B2B2B;
 
@@ -45,6 +47,40 @@ final class BottomBar {
     private final List<Entry> items = new ArrayList<>();
 
     BottomBar(Context c) { this.c = c; }
+
+    /**
+     * The app's five tabs. selected: 0 Home, 1 Find PDF, 2 Marked, 3 Search, 4 Settings.
+     * Tapping another tab opens it; tab pages close themselves so Back returns to Home.
+     */
+    static View tabs(Activity a, int selected, View.OnClickListener onHome) {
+        Class<?>[] pages = {MainActivity.class, FindPdfsActivity.class, MarkedFilesActivity.class,
+                AdvancedSearchActivity.class, SettingsActivity.class};
+        String[] labels = {"Home", "Find PDF", "Marked", "Search", "Settings"};
+        int[] icons = {R.drawable.ic_home, R.drawable.ic_pdf, R.drawable.ic_marked,
+                R.drawable.ic_advsearch, R.drawable.ic_settings};
+        BottomBar b = new BottomBar(a);
+        for (int i = 0; i < pages.length; i++) {
+            final int idx = i;
+            View.OnClickListener click;
+            if (i == selected) {
+                click = i == 0 && onHome != null ? onHome : v -> { };
+            } else if (i == 0) {
+                click = v -> {
+                    Intent in = new Intent(a, MainActivity.class);
+                    in.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    a.startActivity(in);
+                    if (!(a instanceof MainActivity)) a.finish();
+                };
+            } else {
+                click = v -> {
+                    a.startActivity(new Intent(a, pages[idx]));
+                    if (!(a instanceof MainActivity)) a.finish();
+                };
+            }
+            b.item(icons[i], labels[i], click);
+        }
+        return b.build(selected);
+    }
 
     BottomBar item(int iconRes, String label, View.OnClickListener click) {
         items.add(new Entry(iconRes, label, click));
@@ -112,12 +148,13 @@ final class BottomBar {
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         g.setColor(0xFFFFFFFF);
-        g.setStroke(dp(5), RING);
+        g.setStroke(dp(4), RING);
         circle.setBackground(g);
         circle.setElevation(dp(4));
-        circle.addView(CaseViews.icon(c, e.icon, BLACK, 26));
+        circle.addView(CaseViews.icon(c, e.icon, BLACK, 24));
         TextView t = CaseViews.text(c, e.label, 10, BLACK, true);
         t.setSingleLine(true);
+        t.setGravity(Gravity.CENTER);
         t.setPadding(0, dp(2), 0, 0);
         circle.addView(t);
 

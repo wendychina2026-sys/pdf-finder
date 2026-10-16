@@ -216,17 +216,7 @@ public class MainActivity extends BaseActivity {
     // ---------- bottom nav: Home | Find PDF | Marked PDF | Advanced Search ----------
 
     private View buildNav() {
-        return new BottomBar(this)
-                .item(R.drawable.ic_home, "Home", v -> scroll.smoothScrollTo(0, 0))
-                .item(R.drawable.ic_pdf, "Find PDF",
-                        v -> startActivity(new Intent(this, FindPdfsActivity.class)))
-                .item(R.drawable.ic_marked, "Marked",
-                        v -> startActivity(new Intent(this, MarkedFilesActivity.class)))
-                .item(R.drawable.ic_advsearch, "Search",
-                        v -> startActivity(new Intent(this, AdvancedSearchActivity.class)))
-                .item(R.drawable.ic_settings, "Settings",
-                        v -> startActivity(new Intent(this, SettingsActivity.class)))
-                .build(0);
+        return BottomBar.tabs(this, 0, v -> scroll.smoothScrollTo(0, 0));
     }
 
     @Override
@@ -288,7 +278,8 @@ public class MainActivity extends BaseActivity {
         List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
         if (today.isEmpty()) {
             todayList.addView(CaseViews.emptyNote(this,
-                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"));
+                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"),
+                    CaseViews.lp(this, 10, 0));
         } else {
             int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
             for (int i = 0; i < n; i++) {

@@ -35,6 +35,9 @@ import java.util.TreeSet;
 
 public class AdvancedSearchActivity extends BaseActivity {
 
+    @Override
+    protected int navIndex() { return 3; }
+
     private static final String ALL = "All";
 
     static class Item {

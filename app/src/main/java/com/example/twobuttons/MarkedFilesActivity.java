@@ -32,6 +32,9 @@ import java.util.TreeSet;
 
 public class MarkedFilesActivity extends BaseActivity {
 
+    @Override
+    protected int navIndex() { return 2; }
+
     static class Item {
         final String path;
         final Map<Integer, String> marks;

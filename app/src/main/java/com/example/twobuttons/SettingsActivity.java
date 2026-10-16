@@ -10,6 +10,9 @@ import android.widget.TextView;
 
 public class SettingsActivity extends BaseActivity {
 
+    @Override
+    protected int navIndex() { return 4; }
+
     private static final String[] NAMES = {"Light", "Dark", "System default"};
     private static final String[] VALUES = {AppTheme.LIGHT, AppTheme.DARK, AppTheme.SYSTEM};
 
