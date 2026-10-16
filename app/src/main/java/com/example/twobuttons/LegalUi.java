@@ -36,11 +36,7 @@ final class LegalUi {
     static int dp(Context c, int v) { return CaseViews.dp(c, v); }
 
     static LinearLayout card(Context c) {
-        LinearLayout l = new LinearLayout(c);
-        l.setOrientation(LinearLayout.VERTICAL);
-        l.setPadding(dp(c, 16), dp(c, 14), dp(c, 16), dp(c, 14));
-        l.setBackground(CaseViews.box(c, AppTheme.card(c), 12, AppTheme.cardStroke(c), 1));
-        return l;
+        return AppCard.surface(c);
     }
 
     static TextView sectionTitle(Context c, String s) {

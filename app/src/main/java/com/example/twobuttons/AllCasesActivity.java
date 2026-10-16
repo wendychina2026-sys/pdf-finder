@@ -350,36 +350,33 @@ public class AllCasesActivity extends BaseActivity {
 
     private View card(DiaryStore.HCase h) {
         String st = status(h);
-        LinearLayout wrap = new LinearLayout(this);
-        wrap.setOrientation(LinearLayout.HORIZONTAL);
-        wrap.setBackground(CaseViews.box(this, AppTheme.card(this), 14, AppTheme.cardStroke(this), 1));
+        String t = h.title().trim();
+        AppCard c = new AppCard(this)
+                .avatarText(t.isEmpty() ? "?" : t.substring(0, 1).toUpperCase(Locale.ROOT));
+        c.title(h.title());
+        if (on("number") && !h.number.isEmpty()) c.subtitle(h.number);
+        if (on("court") && !h.court.isEmpty()) c.line(h.court);
+        if (on("judge") && !h.judge.isEmpty()) c.line("Judge: " + h.judge);
+        String cn = clientName(h);
+        if (on("client") && !cn.isEmpty()) c.line("Client: " + cn);
+        if (on("station") && !h.firStation.isEmpty()) c.line("Police station: " + h.firStation);
+        if (on("fir") && !h.firNo.isEmpty()) c.line("FIR No: " + h.firNo);
+        if (on("firdate") && !h.firDate.isEmpty()) c.line("FIR date: " + h.firDate);
+        if (on("acts") && !h.acts.isEmpty()) c.line("Acts: " + h.acts);
+        if (on("category") && !h.courtKind.isEmpty()) c.chip(h.courtKind, AppCard.Tone.ACCENT);
 
-        View stripe = new View(this);
-        GradientDrawable sg = new GradientDrawable();
-        sg.setColor(statusColor(st));
-        sg.setCornerRadii(new float[]{dp(14), dp(14), 0, 0, 0, 0, dp(14), dp(14)});
-        stripe.setBackground(sg);
-        wrap.addView(stripe, new LinearLayout.LayoutParams(dp(6), ViewGroup.LayoutParams.MATCH_PARENT));
+        switch (st) {
+            case "needs": c.chip("Needs update", AppCard.Tone.WARN); break;
+            case "disposed": c.chip("Disposed", AppCard.Tone.GOOD); break;
+            case "today": c.chip("Today", AppCard.Tone.BAD); break;
+            case "upcoming": c.chip("Upcoming", AppCard.Tone.NEUTRAL); break;
+            default: break;
+        }
 
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(14), dp(12), dp(12), dp(12));
-        wrap.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        // title row
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(CaseViews.text(this, h.title(), 16, AppTheme.text(this), true),
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        ImageView info = CaseViews.icon(this, R.drawable.ic_info, AppTheme.sub(this), 20);
-        info.setPadding(dp(5), dp(5), dp(5), dp(5));
-        info.setOnClickListener(v -> openCase(h));
-        top.addView(info, new LinearLayout.LayoutParams(dp(30), dp(30)));
         if (on("star")) {
             Set<String> s = stars();
             boolean starred = s.contains(h.id);
-            ImageView star = CaseViews.icon(this, R.drawable.ic_star, starred ? GOLD : AppTheme.cardStroke(this), 22);
+            ImageView star = CaseViews.icon(this, R.drawable.ic_star, starred ? GOLD : AppTheme.cardStroke(this), 24);
             star.setPadding(dp(4), dp(4), dp(4), dp(4));
             star.setContentDescription("Mark important");
             star.setOnClickListener(v -> {
@@ -388,63 +385,21 @@ public class AllCasesActivity extends BaseActivity {
                 prefs.edit().putStringSet("stars", n).apply();
                 render();
             });
-            top.addView(star, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            c.topRightView(star);
         }
-        col.addView(top);
 
-        // case number + category chip
-        boolean showNo = on("number") && !h.number.isEmpty();
-        boolean showCat = on("category") && !h.courtKind.isEmpty();
-        if (showNo || showCat) {
-            LinearLayout r = new LinearLayout(this);
-            r.setOrientation(LinearLayout.HORIZONTAL);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(0, dp(4), 0, 0);
-            if (showNo) r.addView(CaseViews.text(this, h.number, 13, AppTheme.text(this), false));
-            if (showCat) {
-                TextView chip = CaseViews.text(this, h.courtKind, 11, AppTheme.accent(this), true);
-                chip.setPadding(dp(8), dp(2), dp(8), dp(2));
-                chip.setBackground(CaseViews.box(this, AppTheme.bg(this), 10, AppTheme.accent(this), 1));
-                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                clp.leftMargin = showNo ? dp(8) : 0;
-                r.addView(chip, clp);
-            }
-            col.addView(r);
-        }
-        if (on("court") && !h.court.isEmpty()) col.addView(line(h.court));
-        if (on("judge") && !h.judge.isEmpty()) col.addView(line("Judge: " + h.judge));
-        String cn = clientName(h);
-        if (on("client") && !cn.isEmpty()) col.addView(line("Client: " + cn));
-        if (on("station") && !h.firStation.isEmpty()) col.addView(line("Police station: " + h.firStation));
-        if (on("fir") && !h.firNo.isEmpty()) col.addView(line("FIR No: " + h.firNo));
-        if (on("firdate") && !h.firDate.isEmpty()) col.addView(line("FIR date: " + h.firDate));
-        if (on("acts") && !h.acts.isEmpty()) col.addView(line("Acts: " + h.acts));
-
-        // hearing status row
         Date nh = nextHearing(h);
         String hs;
         if (st.equals("disposed")) hs = "Disposed";
         else if (nh == null) hs = "No hearing scheduled";
-        else hs = (st.equals("needs") ? "Needs update • last " : "Next hearing: ") + DiaryStore.fmt(nh);
-        LinearLayout hr = new LinearLayout(this);
-        hr.setOrientation(LinearLayout.HORIZONTAL);
-        hr.setGravity(Gravity.CENTER_VERTICAL);
-        hr.setPadding(0, dp(10), 0, 0);
-        TextView ht = CaseViews.text(this, hs, 13, statusColor(st), true);
-        hr.addView(ht, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        if (!st.equals("disposed")) {
-            TextView ah = CaseViews.text(this, "Add hearing", 12, AppTheme.accent(this), true);
-            ah.setGravity(Gravity.CENTER);
-            ah.setPadding(dp(12), dp(6), dp(12), dp(6));
-            ah.setBackground(CaseViews.box(this, AppTheme.bg(this), 16, AppTheme.accent(this), 1));
-            ah.setOnClickListener(v -> openCase(h));
-            hr.addView(ah);
-        }
-        col.addView(hr);
-
-        wrap.setOnClickListener(v -> openCase(h));
-        return wrap;
+        else hs = DiaryStore.fmt(nh);
+        String cap = st.equals("disposed") || nh == null ? ""
+                : (st.equals("needs") ? "Needs update, last hearing" : "Next hearing");
+        c.footer(hs, cap, statusColor(st));
+        if (!st.equals("disposed")) c.secondary("Add hearing", v -> openCase(h));
+        c.primary("Details", v -> openCase(h));
+        c.onClick(v -> openCase(h));
+        return c.build();
     }
 
     // ------------------------------------------------------------ bottom sheets

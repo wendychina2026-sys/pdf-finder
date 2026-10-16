@@ -268,25 +268,16 @@ public class ClientDetailsActivity extends BaseActivity {
         return col;
     }
 
-    private LinearLayout caseRow(LegalStore.Client c, LegalStore.CaseLink cl) {
-        LinearLayout row = LegalUi.card(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(CaseViews.icon(this, R.drawable.ic_court, AppTheme.accent(this), 26));
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(LegalUi.dp(this, 14), 0, LegalUi.dp(this, 8), 0);
-        col.addView(CaseViews.text(this, cl.title, 15, AppTheme.text(this), true));
-        col.addView(CaseViews.text(this, cl.subtitle, 13, AppTheme.sub(this), false));
-        col.addView(CaseViews.text(this, cl.date, 13, AppTheme.sub(this), false));
-        row.addView(col, LegalUi.weight());
+    private View caseRow(LegalStore.Client c, LegalStore.CaseLink cl) {
         boolean active = "Active".equalsIgnoreCase(cl.status);
-        boolean dark = AppTheme.isDark(this);
-        int fill = active ? (dark ? 0xFF1F3A25 : 0xFFD8F3DC) : (dark ? 0xFF2A2C44 : 0xFFDCEBFA);
-        int txt = active ? (dark ? 0xFF81C784 : 0xFF2E7D32) : AppTheme.accent(this);
-        row.addView(LegalUi.chip(this, cl.status, fill, txt));
-        row.setOnClickListener(v -> editCase(c, cl));
-        return row;
+        return new AppCard(this)
+                .avatarIcon(R.drawable.ic_court)
+                .title(cl.title)
+                .subtitle(cl.subtitle)
+                .line(cl.date)
+                .chip(cl.status, active ? AppCard.Tone.GOOD : AppCard.Tone.ACCENT)
+                .onClick(v -> editCase(c, cl))
+                .build();
     }
 
     // ---------- dialogs ----------

@@ -11,6 +11,7 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -128,50 +129,32 @@ public class SarthCaseListActivity extends BaseActivity {
         if (n == 0) list.addView(CaseViews.emptyNote(this, "No cases"));
     }
 
-    private LinearLayout card(DiaryStore.LCase c) {
-        LinearLayout card = LegalUi.card(this);
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(CaseViews.text(this, c.title, 20, AppTheme.text(this), true), LegalUi.weight());
-        top.addView(CaseViews.text(this, ">", 22, AppTheme.text(this), true));
-        card.addView(top);
-
-        LinearLayout cols = new LinearLayout(this);
-        cols.setOrientation(LinearLayout.HORIZONTAL);
-        cols.setPadding(0, LegalUi.dp(this, 6), 0, LegalUi.dp(this, 10));
-        cols.addView(col("Court", c.court), LegalUi.weight());
-        cols.addView(col("Case Type", c.caseType), LegalUi.weight());
-        LinearLayout last = col("Case#", c.caseNo);
-        last.setGravity(Gravity.END);
-        cols.addView(last, LegalUi.weight());
-        card.addView(cols);
-
-        LinearLayout who = new LinearLayout(this);
-        who.setOrientation(LinearLayout.HORIZONTAL);
-        who.setGravity(Gravity.CENTER_VERTICAL);
-        who.addView(CaseViews.icon(this, R.drawable.ic_person, AppTheme.sub(this), 26));
-        TextView nm = CaseViews.text(this, c.contact, 16, AppTheme.text(this), true);
-        nm.setPadding(LegalUi.dp(this, 10), 0, LegalUi.dp(this, 10), 0);
-        who.addView(nm);
-        TextView ph = CaseViews.text(this, c.phone, 16, 0xFF1E88E5, false);
-        ph.setOnClickListener(v -> {
-            try {
-                startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + c.phone)));
-            } catch (ActivityNotFoundException e) {
-                Toast.makeText(this, "No dialer", Toast.LENGTH_SHORT).show();
-            }
-        });
-        who.addView(ph);
-        card.addView(who);
-
-        card.addView(kv("On Behalf Of", c.onBehalf), CaseViews.lp(this, 10, 0));
-        card.addView(kv("Respondent Name", c.respondent), CaseViews.lp(this, 6, 0));
-        card.addView(kv("Previous Date", c.prev.isEmpty() ? "-" : c.prev), CaseViews.lp(this, 6, 0));
-        card.addView(kv("Adjourn Date", c.adjourn.isEmpty() ? "-" : c.adjourn), CaseViews.lp(this, 6, 0));
-        card.addView(kv("Steps", String.valueOf(c.steps)), CaseViews.lp(this, 6, 0));
-        card.setOnClickListener(v -> edit(c));
-        return card;
+    private View card(DiaryStore.LCase c) {
+        String ini = c.title.trim().isEmpty() ? "?" : c.title.trim().substring(0, 1).toUpperCase();
+        AppCard card = new AppCard(this)
+                .avatarText(ini)
+                .title(c.title)
+                .subtitle(c.court)
+                .line(c.caseType.isEmpty() ? "" : "Case type: " + c.caseType)
+                .line(c.caseNo.isEmpty() ? "" : "Case #: " + c.caseNo)
+                .line(c.onBehalf.isEmpty() ? "" : "On behalf of: " + c.onBehalf)
+                .line(c.respondent.isEmpty() ? "" : "Respondent: " + c.respondent)
+                .line("Previous: " + (c.prev.isEmpty() ? "-" : c.prev)
+                        + "   Adjourn: " + (c.adjourn.isEmpty() ? "-" : c.adjourn))
+                .chip("Steps: " + c.steps, AppCard.Tone.NEUTRAL);
+        if (!c.contact.isEmpty()) card.chip(c.contact, AppCard.Tone.ACCENT);
+        if (!c.phone.isEmpty()) {
+            card.chip(c.phone, AppCard.Tone.GOOD, v -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + c.phone)));
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(this, "No dialer", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        card.primary("Edit", v -> edit(c));
+        card.onClick(v -> edit(c));
+        return card.build();
     }
 
     private LinearLayout col(String label, String value) {

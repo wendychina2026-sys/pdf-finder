@@ -97,111 +97,32 @@ class CaseViews {
         return t;
     }
 
-    /** Big navy card: initial, name, sub type, date, court, Re-Schedule, View Details. */
-    static LinearLayout upcomingCard(Activity a, CaseItems.Item it, Runnable changed) {
-        LinearLayout card = new LinearLayout(a);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(a, 16), dp(a, 16), dp(a, 16), dp(a, 16));
-        card.setBackground(box(a, NAVY, 14, 0, 0));
-
-        // top: circle initial + title + subtitle
-        LinearLayout top = new LinearLayout(a);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView circle = text(a, it.initial(), 20, NAVY, true);
-        circle.setGravity(Gravity.CENTER);
-        circle.setBackground(box(a, Color.WHITE, 24, 0, 0));
-        top.addView(circle, new LinearLayout.LayoutParams(dp(a, 48), dp(a, 48)));
-        LinearLayout names = new LinearLayout(a);
-        names.setOrientation(LinearLayout.VERTICAL);
-        names.setPadding(dp(a, 12), 0, 0, 0);
-        names.addView(text(a, it.title(), 16, Color.WHITE, true));
-        if (!it.caseType.isEmpty()) names.addView(text(a, it.caseType, 13, 0xFFD0D3F5, false));
-        if (!it.subType.isEmpty()) names.addView(text(a, it.subType, 13, 0xFFD0D3F5, false));
-        top.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        card.addView(top);
-
-        // divider
-        View line = new View(a);
-        line.setBackgroundColor(0x55FFFFFF);
-        LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(a, 1));
-        lineLp.topMargin = dp(a, 14);
-        lineLp.bottomMargin = dp(a, 14);
-        card.addView(line, lineLp);
-
-        // Date | Court
-        LinearLayout info = new LinearLayout(a);
-        info.setOrientation(LinearLayout.HORIZONTAL);
-        info.addView(infoBlock(a, R.drawable.ic_calendar, "Date", CaseItems.pretty(it.nextDate)),
-                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        info.addView(infoBlock(a, R.drawable.ic_court, "Court", it.court.isEmpty() ? "-" : it.court),
-                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        card.addView(info);
-
-        // buttons
-        LinearLayout btns = new LinearLayout(a);
-        btns.setOrientation(LinearLayout.HORIZONTAL);
-        Button re = pill(a, "Re-Schedule", Color.TRANSPARENT, Color.WHITE, true);
-        re.setOnClickListener(v -> reschedule(a, it, changed));
-        Button det = pill(a, "View Details", Color.WHITE, NAVY, false);
-        det.setOnClickListener(v -> openDetails(a, it.path));
-        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, dp(a, 44), 1f);
-        l1.rightMargin = dp(a, 6);
-        LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(0, dp(a, 44), 1f);
-        l2.leftMargin = dp(a, 6);
-        btns.addView(re, l1);
-        btns.addView(det, l2);
-        card.addView(btns, lp(a, 16, 0));
-        return card;
+    /** Upcoming case card: avatar, name, chips, next date and Re-Schedule / View Details. */
+    static View upcomingCard(Activity a, CaseItems.Item it, Runnable changed) {
+        return new AppCard(a)
+                .avatarText(it.initial())
+                .title(it.title())
+                .subtitle(it.subtitle())
+                .line(it.court)
+                .chip("Upcoming", AppCard.Tone.ACCENT)
+                .footer(CaseItems.pretty(it.nextDate), "Next hearing")
+                .secondary("Re-Schedule", v -> reschedule(a, it, changed))
+                .primary("View Details", v -> openDetails(a, it.path))
+                .onClick(v -> openDetails(a, it.path))
+                .build();
     }
 
-    private static LinearLayout infoBlock(Context c, int iconRes, String label, String value) {
-        LinearLayout row = new LinearLayout(c);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView ic = icon(c, iconRes, Color.WHITE, 24);
-        row.addView(ic);
-        LinearLayout col = new LinearLayout(c);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(dp(c, 10), 0, dp(c, 6), 0);
-        col.addView(text(c, label, 12, 0xFFD0D3F5, false));
-        col.addView(text(c, value, 14, Color.WHITE, true));
-        row.addView(col, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        return row;
-    }
-
-    private static Button pill(Context c, String label, int fill, int textColor, boolean outline) {
-        Button b = new Button(c);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextColor(textColor);
-        b.setTextSize(14);
-        b.setMinHeight(0);
-        b.setMinimumHeight(0);
-        b.setPadding(0, 0, 0, 0);
-        b.setBackground(box(c, fill, 8, Color.WHITE, outline ? 1 : 0));
-        return b;
-    }
-
-    /** Light row: title, sub type, date + court. */
-    static LinearLayout caseRow(Activity a, CaseItems.Item it, View.OnClickListener click) {
-        LinearLayout row = new LinearLayout(a);
-        row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(dp(a, 14), dp(a, 12), dp(a, 14), dp(a, 12));
-        row.setBackground(box(a, AppTheme.card(a), 12, AppTheme.cardStroke(a), 1));
-        row.addView(text(a, it.title(), 16, AppTheme.text(a), true));
-        String sub = it.subtitle();
-        if (!sub.isEmpty()) row.addView(text(a, sub, 13, AppTheme.sub(a), false));
-        StringBuilder info = new StringBuilder();
-        if (!it.nextDate.isEmpty()) info.append(CaseItems.pretty(it.nextDate));
-        if (!it.court.isEmpty()) {
-            if (info.length() > 0) info.append("  |  ");
-            info.append(it.court);
-        }
-        if (info.length() > 0) row.addView(text(a, info.toString(), 13, AppTheme.accent(a), false));
-        row.setOnClickListener(click);
-        return row;
+    /** Standard case card used in every list. */
+    static View caseRow(Activity a, CaseItems.Item it, View.OnClickListener click) {
+        return new AppCard(a)
+                .avatarText(it.initial())
+                .title(it.title())
+                .subtitle(it.subtitle())
+                .line(it.court)
+                .footer(CaseItems.pretty(it.nextDate), it.nextDate.isEmpty() ? "" : "Next hearing")
+                .primary("Details", click)
+                .onClick(click)
+                .build();
     }
 
     static void reschedule(Activity a, CaseItems.Item it, Runnable after) {

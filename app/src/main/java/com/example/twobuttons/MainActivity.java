@@ -21,6 +21,7 @@ import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.Button;
 import android.widget.EditText;
@@ -366,18 +367,20 @@ public class MainActivity extends BaseActivity {
                     v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 0, 10));
         }
         for (DiaryStore.HCase h : diary) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(14), dp(12), dp(14), dp(12));
-            row.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
-            row.addView(CaseViews.text(this, h.title(), 15, AppTheme.text(this), true));
-            String sub = (h.court.isEmpty() ? "" : h.court) + (h.number.isEmpty() ? "" : "  |  " + h.number);
-            if (!sub.isEmpty()) row.addView(CaseViews.text(this, sub, 13, AppTheme.sub(this), false));
-            row.setOnClickListener(v -> {
+            String ini = h.title().trim().isEmpty() ? "?" : h.title().trim().substring(0, 1).toUpperCase();
+            View.OnClickListener open = v -> {
                 Intent i = new Intent(this, HearingsActivity.class);
                 i.putExtra("id", h.id);
                 startActivity(i);
-            });
+            };
+            android.view.View row = new AppCard(this)
+                    .avatarText(ini)
+                    .title(h.title())
+                    .subtitle(h.court)
+                    .line(h.number)
+                    .primary("Details", open)
+                    .onClick(open)
+                    .build();
             sections.addView(row, CaseViews.lp(this, 0, 10));
         }
         if (pdf.size() > 3) {
