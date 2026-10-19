@@ -326,6 +326,10 @@ public class AdvancedSearchActivity extends BaseActivity {
         boolean detailFilter = !ct.isEmpty() || !sub.isEmpty() || !subSub.isEmpty() || !court.isEmpty()
                 || year != 0 || !lawyerQ.isEmpty();
 
+        // Disk/prefs work runs off the UI thread so the page appears immediately;
+        // gen drops results from a refresh that was superseded while it ran.
+        final int gen = ++refreshGen;
+        new Thread(() -> {
         Map<String, Map<Integer, String>> allMarks = marks.everything();
         Map<String, DetailsStore.Details> allDetails = details.everything();
 
@@ -348,7 +352,7 @@ public class AdvancedSearchActivity extends BaseActivity {
         Collections.sort(sorted, (a, b) ->
                 new File(a).getName().compareToIgnoreCase(new File(b).getName()));
 
-        items.clear();
+        final List<Item> out = new ArrayList<>();
         for (String p : sorted) {
             // details filters
             DetailsStore.Details d = allDetails.get(p);
@@ -382,12 +386,19 @@ public class AdvancedSearchActivity extends BaseActivity {
                 tb.append(e.getKey()).append(": pages ").append(ranges(e.getValue()));
             }
             String dt = d == null ? "" : DetailsStore.summary(d);
-            items.add(new Item(p, tb.toString(), dt, topic));
+            out.add(new Item(p, tb.toString(), dt, topic));
         }
-        String st = items.size() + (items.size() == 1 ? " marked file" : " marked files");
-        status.setText(st);
-        adapter.notifyDataSetChanged();
+        runOnUiThread(() -> {
+            if (gen != refreshGen || isFinishing()) return;
+            items.clear();
+            items.addAll(out);
+            status.setText(items.size() + (items.size() == 1 ? " marked file" : " marked files"));
+            adapter.notifyDataSetChanged();
+        });
+        }).start();
     }
+
+    private volatile int refreshGen = 0;
 
     private class ItemAdapter extends BaseAdapter {
         @Override public int getCount() { return items.size(); }

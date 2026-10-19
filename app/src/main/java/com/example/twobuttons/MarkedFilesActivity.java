@@ -120,12 +120,25 @@ public class MarkedFilesActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        loadAll();
-        applyFilter();
+        // File.exists() per marked PDF is disk work; keep it off the UI thread so the tab opens instantly.
+        new Thread(() -> {
+            final List<Item> loaded = readAll();
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                all.clear();
+                all.addAll(loaded);
+                applyFilter();
+            });
+        }).start();
     }
 
     private void loadAll() {
         all.clear();
+        all.addAll(readAll());
+    }
+
+    private List<Item> readAll() {
+        List<Item> out = new ArrayList<>();
         Map<String, Map<Integer, String>> everything = store.everything();
         List<String> paths = new ArrayList<>();
         for (String p : everything.keySet()) {
@@ -134,7 +147,8 @@ public class MarkedFilesActivity extends BaseActivity {
         }
         Collections.sort(paths, (a, b) ->
                 new File(a).getName().compareToIgnoreCase(new File(b).getName()));
-        for (String p : paths) all.add(new Item(p, everything.get(p)));
+        for (String p : paths) out.add(new Item(p, everything.get(p)));
+        return out;
     }
 
     private void applyFilter() {
