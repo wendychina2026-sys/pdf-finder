@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -68,7 +69,7 @@ public class NewCaseActivity extends BaseActivity {
     private String courtName = "";
     private String caseType = "";
     private String clientId = "";
-    private boolean autoMode = true;
+    private boolean autoMode = false;   // opens on "Enter manually"
 
     private TextView kindText, courtNameText, caseTypeText, cnrTitle, progressText, remainText;
     private LinearLayout cnrCard, clientBox, actsBox, segAuto, segManual;
@@ -440,8 +441,13 @@ public class NewCaseActivity extends BaseActivity {
         if (scaled) shrink(clientBox);
     }
 
+    /** The one client the app ships with; every other client was added by the user. */
+    private static boolean isCustomClient(LegalStore.Client c) {
+        return !("Mohammad Sajib".equals(c.name) && "CL-0008".equals(c.code));
+    }
+
     private void pickClient() {
-        List<LegalStore.Client> all = legal.clients();
+        final List<LegalStore.Client> all = new ArrayList<>(legal.clients());
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(8), dp(16), 0);
@@ -451,31 +457,77 @@ public class NewCaseActivity extends BaseActivity {
         search.setSingleLine(true);
         box.addView(search);
 
-        List<LegalStore.Client> shown = new ArrayList<>();
-        List<String> rows = new ArrayList<>();
-        ArrayAdapter<String> ad = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, rows);
+        final List<LegalStore.Client> shown = new ArrayList<>();
+        final AlertDialog[] dlgRef = new AlertDialog[1];
+        final Runnable[] fill = new Runnable[1];
+
+        BaseAdapter ad = new BaseAdapter() {
+            @Override public int getCount() { return shown.size(); }
+            @Override public Object getItem(int i) { return shown.get(i); }
+            @Override public long getItemId(int i) { return i; }
+
+            @Override
+            public View getView(int i, View convert, ViewGroup parent) {
+                final LegalStore.Client c = shown.get(i);
+                LinearLayout r = new LinearLayout(NewCaseActivity.this);
+                r.setOrientation(LinearLayout.HORIZONTAL);
+                r.setGravity(Gravity.CENTER_VERTICAL);
+                r.setMinimumHeight(dp(54));
+                r.setPadding(dp(4), dp(4), dp(0), dp(4));
+                LinearLayout t = new LinearLayout(NewCaseActivity.this);
+                t.setOrientation(LinearLayout.VERTICAL);
+                t.addView(CaseViews.text(NewCaseActivity.this, c.name, 16, AppTheme.text(NewCaseActivity.this), false));
+                t.addView(CaseViews.text(NewCaseActivity.this, c.mobile, 14, AppTheme.sub(NewCaseActivity.this), false));
+                r.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+                if (isCustomClient(c)) {
+                    TextView badge = CaseViews.text(NewCaseActivity.this, "Custom", 12,
+                            AppTheme.isDark(NewCaseActivity.this) ? 0xFF121212 : 0xFFFFFFFF, true);
+                    badge.setGravity(Gravity.CENTER);
+                    badge.setPadding(dp(11), dp(4), dp(11), dp(4));
+                    badge.setBackground(CaseViews.box(NewCaseActivity.this, AppTheme.accent(NewCaseActivity.this), 14, 0, 0));
+                    r.addView(badge);
+                }
+                ImageView x = CaseViews.icon(NewCaseActivity.this, R.drawable.ic_delete, LegalUi.RED, 40);
+                x.setPadding(dp(9), dp(9), dp(9), dp(9));
+                x.setContentDescription("Delete " + c.name);
+                x.setFocusable(false);
+                x.setOnClickListener(v -> new AlertDialog.Builder(NewCaseActivity.this)
+                        .setTitle("Delete client?")
+                        .setMessage("\"" + c.name + "\" will be removed from your clients.")
+                        .setPositiveButton("Delete", (dd, w) -> {
+                            legal.deleteClient(c.id);
+                            all.removeIf(o -> o.id.equals(c.id));
+                            if (c.id.equals(clientId)) { clientId = ""; renderClient(); }
+                            fill[0].run();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show());
+                r.addView(x);
+                return r;
+            }
+        };
+
         ListView lv = new ListView(this);
         lv.setAdapter(ad);
         box.addView(lv, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(280)));
 
-        Runnable fill = () -> {
+        fill[0] = () -> {
             String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
             shown.clear();
-            rows.clear();
             for (LegalStore.Client c : all) {
                 if (q.isEmpty() || c.name.toLowerCase(Locale.ROOT).contains(q) || c.mobile.contains(q)) {
                     shown.add(c);
-                    rows.add(c.name + "\n" + c.mobile);
                 }
             }
             ad.notifyDataSetChanged();
         };
-        fill.run();
+        fill[0].run();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) { fill.run(); }
+            @Override public void afterTextChanged(Editable s) { fill[0].run(); }
         });
 
         android.widget.Button create = LegalUi.outlineButton(this, "+ Create New Client");
@@ -486,6 +538,7 @@ public class NewCaseActivity extends BaseActivity {
                 .setView(box)
                 .setNegativeButton("Close", null)
                 .create();
+        dlgRef[0] = dlg;
         lv.setOnItemClickListener((p, v, pos, id) -> {
             clientId = shown.get(pos).id;
             renderClient();

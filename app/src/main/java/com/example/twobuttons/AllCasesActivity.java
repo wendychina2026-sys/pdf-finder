@@ -643,7 +643,7 @@ public class AllCasesActivity extends BaseActivity {
             render();
         }, h);
 
-        LinearLayout sortBody = section(body, "Sort cases", true);
+        LinearLayout sortBody = section(body, "Sort cases", false);
         radios(sortBody, SORTS, sort);
         LinearLayout kindBody = section(body, "Court type", false);
         radios(kindBody, KINDS, kind);
