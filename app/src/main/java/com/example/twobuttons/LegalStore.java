@@ -27,6 +27,7 @@ final class LegalStore {
         String email = "", landline = "", notes = "";   // mobile / landline hold the full number with country code, e.g. +918595810571
         String docsNote = "NID, agreements, evidence and other client files";
         long total = 0, paid = 0;
+        boolean fromContacts = false;   // name + number came from the phone's contacts (false = typed in, i.e. custom)
         List<CaseLink> cases = new ArrayList<>();
         long due() { return Math.max(0, total - paid); }
     }
@@ -75,6 +76,7 @@ final class LegalStore {
                 c.docsNote = o.optString("docsNote", c.docsNote);
                 c.total = o.optLong("total");
                 c.paid = o.optLong("paid");
+                c.fromContacts = o.optBoolean("fromContacts", false);
                 JSONArray cs = o.optJSONArray("cases");
                 if (cs != null) {
                     for (int j = 0; j < cs.length(); j++) {
@@ -148,6 +150,7 @@ final class LegalStore {
                 o.put("docsNote", c.docsNote);
                 o.put("total", c.total);
                 o.put("paid", c.paid);
+                o.put("fromContacts", c.fromContacts);
                 JSONArray cs = new JSONArray();
                 for (CaseLink l : c.cases) {
                     JSONObject co = new JSONObject();

@@ -32,6 +32,8 @@ public class AddClientActivity extends BaseActivity {
     private EditText nameEdit, emailEdit, mobileEdit, landEdit, addrEdit, notesEdit;
     private TextView mobileCode, landCode, mobileErr, landErr, emailErr, saveBtn;
     private String mobileDial = CountryCodes.DEFAULT_DIAL;
+    // what "Choose from Contacts" filled in; if the user edits either, the client counts as custom
+    private String pickedName = null, pickedMobile = null;
     private String landDial = CountryCodes.DEFAULT_DIAL;
     private boolean canSave = false;
     private LegalStore store;
@@ -292,6 +294,7 @@ public class AddClientActivity extends BaseActivity {
         c.code = store.nextClientCode();
         c.name = nameEdit.getText().toString().trim();
         c.mobile = mobileDial + mobileEdit.getText().toString().trim();
+        c.fromContacts = pickedName != null && c.name.equals(pickedName) && c.mobile.equals(pickedMobile);
         c.landline = land.isEmpty() ? "" : landDial + land;
         c.email = emailEdit.getText().toString().trim();
         c.address = addrEdit.getText().toString().trim();
@@ -345,6 +348,9 @@ public class AddClientActivity extends BaseActivity {
         mobileDial = p[0];
         mobileCode.setText(CountryCodes.label(mobileDial) + " \u25BE");
         mobileEdit.setText(p[1]);
+        // read back from the fields, so input filters can't make the saved value differ from what was picked
+        pickedName = nameEdit.getText().toString().trim();
+        pickedMobile = mobileDial + mobileEdit.getText().toString().trim();
         validate();
         Toast.makeText(this, "Contact Selected\n" + (name == null ? "" : name)
                 + "'s details have been filled", Toast.LENGTH_SHORT).show();

@@ -441,9 +441,13 @@ public class NewCaseActivity extends BaseActivity {
         if (scaled) shrink(clientBox);
     }
 
-    /** The one client the app ships with; every other client was added by the user. */
+    /**
+     * Custom = typed in by hand. Clients picked from the phone's contacts and the sample client
+     * the app ships with are not custom.
+     */
     private static boolean isCustomClient(LegalStore.Client c) {
-        return !("Mohammad Sajib".equals(c.name) && "CL-0008".equals(c.code));
+        boolean sample = "Mohammad Sajib".equals(c.name) && "CL-0008".equals(c.code);
+        return !sample && !c.fromContacts;
     }
 
     private void pickClient() {
