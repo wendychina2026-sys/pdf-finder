@@ -51,7 +51,7 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQ_CLIENT = 51;
     private static final int REQ_FILE = 52;
     private static final int REQ_CAMERA = 53;
-    private static final int REQUIRED = 5;
+    private static final int REQUIRED = 6;
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
     private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court",
@@ -315,6 +315,7 @@ public class NewCaseActivity extends BaseActivity {
         if (!courtName.isEmpty()) done++;
         if (!caseType.isEmpty()) done++;
         if (!LegalUi.str(caseNoEdit).isEmpty()) done++;
+        if (!clientRole.isEmpty()) done++;
         return done;
     }
 
@@ -637,8 +638,7 @@ public class NewCaseActivity extends BaseActivity {
 
         LinearLayout f = LegalUi.form(this);
         f.setPadding(0, 0, 0, 0);
-        f.addView(lbl("My client is"));      // first option in Case details
-        f.addView(clientSideRow(), lpTop(10));
+        f.addView(clientSideRow(), lpTop(10));   // "My client is": first option in Case details, mandatory
         f.addView(buildClientCard(), lpTop(16));
         f.addView(lbl("Current Stage"));
         curStatusText = dropdown(f, "Select Current Stage", v -> openStages(true));
@@ -1092,13 +1092,37 @@ public class NewCaseActivity extends BaseActivity {
             R.drawable.ic_info, R.drawable.ic_shield, R.drawable.ic_notes,
             R.drawable.ic_person_add, R.drawable.ic_briefcase, R.drawable.ic_edit};
 
+    private LinearLayout clientSideCard;
+
+    /** Red border on the whole "My client is" card while nothing is chosen after a failed Create. */
+    private void clientSideInvalid(boolean bad) {
+        if (clientSideCard == null) return;
+        clientSideCard.setBackground(CaseViews.box(this, AppTheme.card(this), 16,
+                bad ? RoundEdit.RED : AppTheme.cardStroke(this), bad ? 2 : 1));
+    }
+
     /**
-     * "My client is": all options as single-select chips, three per row. Icon on top, full name
-     * below, chosen one gets an outline and a check. Tap the chosen one again to clear.
+     * "My client is" (mandatory): bordered card like the Client card, all options as single-select
+     * chips inside it, three per row, each with its own border. Icon on top, full name below,
+     * chosen one gets a thick outline and a check. Tap the chosen one again to clear.
      */
     private View clientSideRow() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        clientSideCard = card;
+        clientSideInvalid(false);
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(CaseViews.text(this, "My client is *", 15, AppTheme.text(this), false),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        head.addView(CaseViews.text(this, "Required", 12, AppTheme.sub(this), false));
+        card.addView(head);
+
         final LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
+        card.addView(grid, lpTop(12));
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
             grid.removeAllViews();
@@ -1121,8 +1145,8 @@ public class NewCaseActivity extends BaseActivity {
                     chip.setOrientation(LinearLayout.VERTICAL);
                     chip.setGravity(Gravity.CENTER);
                     chip.setPadding(dp(4), dp(10), dp(4), dp(10));
-                    chip.setBackground(CaseViews.box(this, AppTheme.card(this), 18,
-                            on ? AppTheme.text(this) : 0, on ? 2 : 0));
+                    chip.setBackground(CaseViews.box(this, AppTheme.field(this), 14,
+                            on ? AppTheme.text(this) : AppTheme.fieldStroke(this), on ? 2 : 1));
                     int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
                     chip.addView(CaseViews.icon(this, on ? R.drawable.ic_check_circle : CLIENT_ICONS[i], fg, 20));
                     TextView t = CaseViews.text(this, side, 12, fg, on);
@@ -1134,7 +1158,9 @@ public class NewCaseActivity extends BaseActivity {
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     chip.setOnClickListener(v -> {
                         clientRole = side.equals(clientRole) ? "" : side;
+                        if (!clientRole.isEmpty()) clientSideInvalid(false);
                         draw[0].run();
+                        refresh();
                     });
                     row.addView(chip, lp);
                 }
@@ -1143,9 +1169,10 @@ public class NewCaseActivity extends BaseActivity {
                 if (start > 0) rl.topMargin = dp(8);
                 grid.addView(row, rl);
             }
+            if (scaled) shrink(grid);
         };
         draw[0].run();
-        return grid;
+        return card;
     }
 
     // ---------- several names: petitioners, respondents, opposing advocates ----------
@@ -1453,6 +1480,8 @@ public class NewCaseActivity extends BaseActivity {
         ((RoundEdit) caseNoEdit).setInvalid(noNo);
         dropInvalid(courtNameText, courtName.isEmpty());
         dropInvalid(caseTypeText, caseType.isEmpty());
+        clientSideInvalid(clientRole.isEmpty());
+        if (clientRole.isEmpty()) m.add("My client is");
         if (noTitle) m.add("Case Title");
         if (noReg) m.add("Registration Date");
         if (courtName.isEmpty()) m.add("Court name / type");

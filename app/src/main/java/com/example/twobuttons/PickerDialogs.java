@@ -231,7 +231,7 @@ final class PickerDialogs {
     }
 
     /** Every option card in the app: same height and text size. */
-    private static final int OPT_H = 44;
+    private static final int OPT_H = RoundEdit.HEIGHT_DP;   // same as the text boxes
 
     /** Round "+ Add New ..." card shown on top of editable option lists. */
     private static LinearLayout addCard(Activity a, String label, Runnable onClick) {
@@ -239,7 +239,7 @@ final class PickerDialogs {
         add.setOrientation(LinearLayout.HORIZONTAL);
         add.setGravity(Gravity.CENTER_VERTICAL);
         add.setMinimumHeight(dp(a, OPT_H));
-        add.setPadding(dp(a, 16), dp(a, 8), dp(a, 16), dp(a, 8));
+        add.setPadding(dp(a, 16), dp(a, 4), dp(a, 16), dp(a, 4));
         add.setBackground(CaseViews.box(a, dark(a) ? 0x1AFFFFFF : 0xFFEEF3FF, 16, BLUE, 1));
         add.addView(CaseViews.text(a, "+", 20, BLUE, false));
         TextView lbl = CaseViews.text(a, label, 14, ink(a), true);
@@ -254,7 +254,7 @@ final class PickerDialogs {
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setMinimumHeight(dp(a, OPT_H));
-        r.setPadding(dp(a, 16), dp(a, 6), dp(a, 12), dp(a, 6));
+        r.setPadding(dp(a, 16), dp(a, 4), dp(a, 12), dp(a, 4));
         int fill = sel ? (dark(a) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(a) ? 0xFF0D1428 : 0xFFF4F5FA);
         r.setBackground(CaseViews.box(a, fill, 16, sel ? BLUE : hair(a), 1));
         r.addView(CaseViews.text(a, text, 14, ink(a), sel), weight());
@@ -343,6 +343,69 @@ final class PickerDialogs {
 
         final int[] dragCur = {-1};
         final float[] dragY = {0, 0};      // {finger down y, accumulated shift}
+        final float[] lastY = {0};         // finger y now
+        final View[] dragView = {null};
+        final boolean[] scrolling = {false};
+        final Runnable[] dragStep = new Runnable[1];
+        final Runnable[] auto = new Runnable[1];
+
+        // move the dragged row past its neighbours (as many as the finger has crossed)
+        dragStep[0] = () -> {
+            View v = dragView[0];
+            if (v == null || dragCur[0] < 0 || list.indexOfChild(v) != dragCur[0]) return;
+            float step = v.getHeight() + dp(a, 8);
+            float ty = lastY[0] - dragY[0] + dragY[1];
+            boolean moved = true;
+            while (moved) {
+                moved = false;
+                int cur = dragCur[0];
+                if (ty > step * 0.55f && cur < list.getChildCount() - 1) {
+                    View other = list.getChildAt(cur + 1);
+                    onMove.accept(cur, cur + 1);
+                    list.removeView(other);
+                    list.addView(other, cur);
+                    dragCur[0] = cur + 1;
+                    dragY[1] -= step;
+                    ty -= step;
+                    moved = true;
+                } else if (ty < -step * 0.55f && cur > 0) {
+                    View other = list.getChildAt(cur - 1);
+                    onMove.accept(cur, cur - 1);
+                    list.removeView(other);
+                    list.addView(other, cur);
+                    dragCur[0] = cur - 1;
+                    dragY[1] += step;
+                    ty += step;
+                    moved = true;
+                }
+                if (moved) v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            }
+            v.setTranslationY(ty);
+        };
+
+        // while dragging, keep scrolling when the finger sits near the top or bottom edge
+        auto[0] = () -> {
+            if (dragView[0] == null || dragCur[0] < 0) {
+                scrolling[0] = false;
+                return;
+            }
+            int[] loc = new int[2];
+            sc.getLocationOnScreen(loc);
+            int zone = dp(a, 64);
+            int dy = 0;
+            if (lastY[0] < loc[1] + zone) dy = -dp(a, 12);
+            else if (lastY[0] > loc[1] + sc.getHeight() - zone) dy = dp(a, 12);
+            if (dy != 0) {
+                int before = sc.getScrollY();
+                sc.scrollBy(0, dy);
+                int did = sc.getScrollY() - before;
+                if (did != 0) {
+                    dragY[1] += did;          // keep the row under the finger
+                    dragStep[0].run();
+                }
+            }
+            sc.postDelayed(auto[0], 16);
+        };
 
         fill[0] = () -> {
             list.removeAllViews();
@@ -392,48 +455,36 @@ final class PickerDialogs {
                     onPick.accept(name);
                 });
 
-                // press and hold -> drag up / down
+                // press and hold -> drag up / down; near the top / bottom edge the list scrolls itself
                 r.setOnLongClickListener(v -> {
                     dragCur[0] = list.indexOfChild(v);
+                    dragView[0] = v;
                     dragY[1] = 0;
                     v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
                     v.setAlpha(0.92f);
                     v.setElevation(dp(a, 8));
                     sc.requestDisallowInterceptTouchEvent(true);
+                    if (!scrolling[0]) {
+                        scrolling[0] = true;
+                        sc.post(auto[0]);
+                    }
                     return true;
                 });
                 r.setOnTouchListener((v, e) -> {
-                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) dragY[0] = e.getRawY();
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                        dragY[0] = e.getRawY();
+                        lastY[0] = e.getRawY();
+                    }
                     if (dragCur[0] < 0 || list.indexOfChild(v) != dragCur[0]) return false;
                     switch (e.getActionMasked()) {
-                        case android.view.MotionEvent.ACTION_MOVE: {
-                            float ty = e.getRawY() - dragY[0] + dragY[1];
-                            float step = v.getHeight() + dp(a, 8);
-                            int cur = dragCur[0];
-                            if (ty > step * 0.55f && cur < list.getChildCount() - 1) {
-                                View other = list.getChildAt(cur + 1);
-                                onMove.accept(cur, cur + 1);
-                                list.removeView(other);
-                                list.addView(other, cur);
-                                dragCur[0] = cur + 1;
-                                dragY[1] -= step;
-                                ty -= step;
-                                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-                            } else if (ty < -step * 0.55f && cur > 0) {
-                                View other = list.getChildAt(cur - 1);
-                                onMove.accept(cur, cur - 1);
-                                list.removeView(other);
-                                list.addView(other, cur);
-                                dragCur[0] = cur - 1;
-                                dragY[1] += step;
-                                ty += step;
-                                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-                            }
-                            v.setTranslationY(ty);
+                        case android.view.MotionEvent.ACTION_MOVE:
+                            lastY[0] = e.getRawY();
+                            dragStep[0].run();
                             return true;
-                        }
                         case android.view.MotionEvent.ACTION_UP:
                         case android.view.MotionEvent.ACTION_CANCEL:
+                            dragView[0] = null;
+                            scrolling[0] = false;
                             sc.requestDisallowInterceptTouchEvent(false);
                             fill[0].run();
                             return true;
@@ -817,8 +868,17 @@ final class PickerDialogs {
                         t.setAlpha(0.3f);
                     } else {
                         t.setOnClickListener(v -> {
-                            onPick.accept(day);
-                            d.dismiss();
+                            if (sunday) {
+                                // Sunday = court holiday: OK picks it, Cancel just closes the warning
+                                confirm(a, "Sunday selected",
+                                        "Sunday is a court holiday. Select this date anyway?", "OK", () -> {
+                                            onPick.accept(day);
+                                            d.dismiss();
+                                        });
+                            } else {
+                                onPick.accept(day);
+                                d.dismiss();
+                            }
                         });
                     }
                     FrameLayout cell = new FrameLayout(a);
