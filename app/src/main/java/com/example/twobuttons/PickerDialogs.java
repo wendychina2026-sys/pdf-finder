@@ -216,6 +216,13 @@ final class PickerDialogs {
                 "Create New Court Type", onCreate, custom, onDelete, onPick);
     }
 
+    /** Judges: same look as court types. Search, pinned "Add New Judge", custom badge and delete. */
+    static void judges(Activity a, Supplier<List<String>> source, String selected, Runnable onCreate,
+                       Predicate<String> custom, Consumer<String> onDelete, Consumer<String> onPick) {
+        listDialog(a, "Select Judge", source, selected, "Search judges...",
+                "Add New Judge", onCreate, custom, onDelete, onPick);
+    }
+
     private static void pickFromList(Activity a, String title, List<String> items, int selected,
                                      Consumer<Integer> cb) {
         listDialog(a, title, () -> items, selected >= 0 ? items.get(selected) : null, null, null, null,
@@ -350,19 +357,25 @@ final class PickerDialogs {
     // ---------- custom court type ----------
 
     static void customCourt(Activity a, Consumer<String> onAdd) {
+        customName(a, "Create Custom Court Type", "Court Type Name*", "Enter court type name",
+                "Court type name is required", onAdd);
+    }
+
+    static void customName(Activity a, String title, String labelText, String hint, String emptyMsg,
+                           Consumer<String> onAdd) {
         Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a, 22), dp(a, 20), dp(a, 22), dp(a, 22));
         root.setBackground(panel(a, 28, 28, false));
-        root.addView(titleRow(a, d, "Create Custom Court Type", null));
+        root.addView(titleRow(a, d, title, null));
         root.addView(hairline(a, 4));
 
-        TextView label = CaseViews.text(a, "Court Type Name*", 14, ink(a), false);
+        TextView label = CaseViews.text(a, labelText, 14, ink(a), false);
         root.addView(label, topMargin(a, 18));
 
         EditText name = new EditText(a);
-        name.setHint("Enter court type name");
+        name.setHint(hint);
         name.setHintTextColor(soft(a));
         name.setTextColor(ink(a));
         name.setTextSize(15);
@@ -385,7 +398,7 @@ final class PickerDialogs {
         add.setOnClickListener(v -> {
             String s = name.getText().toString().trim();
             if (s.isEmpty()) {
-                Toast.makeText(a, "Court type name is required", Toast.LENGTH_SHORT).show();
+                Toast.makeText(a, emptyMsg, Toast.LENGTH_SHORT).show();
                 return;
             }
             d.dismiss();

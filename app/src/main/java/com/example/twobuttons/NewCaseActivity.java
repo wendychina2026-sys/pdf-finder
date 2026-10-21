@@ -77,7 +77,10 @@ public class NewCaseActivity extends BaseActivity {
     private EditText cnrLookup, titleEdit, caseNoEdit, regEdit;
     private EditText cnrId, filingEdit, diaryEdit, petEdit, resEdit, oppAdvEdit, feeEdit, feeNotesEdit;
     private String appearingFor = "Petitioner";   // chip selection in Parties & representation
-    private EditText judgeEdit, subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
+    private String judgeName = "", curStatus = "", nextStatus = "", clientRole = "";
+    private TextView judgeText, curStatusText, nextStatusText;
+    private EditText roomEdit, nextHearingEdit;
+    private EditText subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
     private final List<EditText[]> actRows = new ArrayList<>();
     private final List<EditText> firSecRows = new ArrayList<>();
@@ -629,6 +632,8 @@ public class NewCaseActivity extends BaseActivity {
                 }));
         caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
         caseNoEdit.setHint("Case No.");
+        f.addView(lbl("My client is"));
+        f.addView(clientRoleRadios());
         c.addView(f, lpTop(4));
 
         titleEdit.addTextChangedListener(watcher);
@@ -738,14 +743,40 @@ public class NewCaseActivity extends BaseActivity {
                 "Record the fee and payment notes", f3));
 
         // notes & other
+        LinearLayout fj = subForm();
+        fj.addView(lbl("Judge"));
+        judgeText = dropdown(fj, "Select Judge", v ->
+                PickerDialogs.judges(this, this::judgeNames, judgeName, this::addJudgeDialog,
+                        n -> true, this::deleteJudge, this::pickJudge));
+        roomEdit = LegalUi.multiline(this, fj, "Court room / address", "");
+        roomEdit.setMinLines(2);
+        roomEdit.setHint("Court room no. and address");
+        nextHearingEdit = LegalUi.dmyInput(this, fj, "Next hearing date", "");
+        nextHearingEdit.setHint("Select Date");
+        nextHearingEdit.setOnClickListener(v ->
+                PickerDialogs.calendar(this, "Select Next Hearing Date", nextHearingEdit));
+        fj.addView(lbl("Current status"));
+        curStatusText = dropdown(fj, "Select Status", v ->
+                choose("Current status", statusList(), s -> {
+                    curStatus = s;
+                    setChosen(curStatusText, s, "Select Status");
+                }));
+        fj.addView(lbl("Next status"));
+        nextStatusText = dropdown(fj, "Select Status", v ->
+                choose("Next status", statusList(), s -> {
+                    nextStatus = s;
+                    setChosen(nextStatusText, s, "Select Status");
+                }));
+        extra.addView(section(R.drawable.ic_court, "Judge & hearing",
+                "Judge, court room, next hearing date and status", fj));
+
         LinearLayout f4 = subForm();
-        judgeEdit = LegalUi.input(this, f4, "Judge", "", NAME);
         priority = LegalUi.spinner(this, f4, "Priority", PRIORITIES, PRIORITIES[0]);
         subTypeEdit = LegalUi.text(this, f4, "Case sub type", "");
         notesEdit = LegalUi.multiline(this, f4, "Notes", "");
         notesEdit.setMinLines(3);
         extra.addView(section(R.drawable.ic_edit, "Notes & other details",
-                "Judge, priority, notes and sub type", f4));
+                "Priority, notes and sub type", f4));
 
         // FIR
         LinearLayout f5 = subForm();
@@ -1015,6 +1046,90 @@ public class NewCaseActivity extends BaseActivity {
         actsBox.addView(row);
     }
 
+    // ---------- judge picker, status list, client role ----------
+
+    private List<String> judgeNames() {
+        List<String> out = new ArrayList<>();
+        List<DiaryStore.Judge> all = store.judges();
+        java.util.Collections.reverse(all);
+        for (DiaryStore.Judge j : all) {
+            if (j.name.isEmpty()) continue;
+            boolean dup = false;
+            for (String s : out) if (s.equalsIgnoreCase(j.name)) { dup = true; break; }
+            if (!dup) out.add(j.name);
+        }
+        return out;
+    }
+
+    private void pickJudge(String name) {
+        judgeName = name;
+        setChosen(judgeText, name, "Select Judge");
+        for (DiaryStore.Judge j : store.judges()) {
+            if (j.name.equalsIgnoreCase(name) && !j.room.isEmpty() && LegalUi.str(roomEdit).isEmpty()) {
+                roomEdit.setText(j.room);   // saved room for this judge
+                break;
+            }
+        }
+    }
+
+    private void addJudgeDialog() {
+        PickerDialogs.customName(this, "Add New Judge", "Judge Name*", "Enter judge name",
+                "Judge name is required", s -> {
+                    String name = s;
+                    for (String t : judgeNames()) if (t.equalsIgnoreCase(s)) { name = t; break; }
+                    saveJudge(name, "");
+                    pickJudge(name);
+                });
+    }
+
+    private void deleteJudge(String name) {
+        List<DiaryStore.Judge> l = store.judges();
+        l.removeIf(j -> j.name.equalsIgnoreCase(name));
+        store.saveJudges(l);
+        if (name.equalsIgnoreCase(judgeName)) {
+            judgeName = "";
+            setChosen(judgeText, "", "Select Judge");
+        }
+    }
+
+    /** Add the judge if new; remember the room / court if given. */
+    private void saveJudge(String name, String room) {
+        if (name.isEmpty()) return;
+        List<DiaryStore.Judge> l = store.judges();
+        DiaryStore.Judge hit = null;
+        for (DiaryStore.Judge j : l) if (j.name.equalsIgnoreCase(name)) { hit = j; break; }
+        if (hit == null) {
+            hit = new DiaryStore.Judge();
+            hit.name = name;
+            l.add(hit);
+        }
+        if (!room.isEmpty()) hit.room = room;
+        if (!courtName.isEmpty()) hit.court = courtName;
+        store.saveJudges(l);
+    }
+
+    private List<String> statusList() {
+        return new ArrayList<>(Arrays.asList(AllCasesActivity.STAGES).subList(1, AllCasesActivity.STAGES.length));
+    }
+
+    /** "My client is": Appellant or Respondent, one radio each. */
+    private View clientRoleRadios() {
+        android.widget.RadioGroup g = new android.widget.RadioGroup(this);
+        g.setOrientation(android.widget.RadioGroup.HORIZONTAL);
+        String[] roles = {"Appellant", "Respondent"};
+        for (String r : roles) {
+            android.widget.RadioButton b = new android.widget.RadioButton(this);
+            b.setText(r);
+            b.setTextSize(14);
+            b.setTextColor(AppTheme.text(this));
+            b.setId(View.generateViewId());
+            b.setOnClickListener(v -> clientRole = r);
+            g.addView(b, new android.widget.RadioGroup.LayoutParams(0,
+                    android.widget.RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        return g;
+    }
+
     private void addFirSectionRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -1111,7 +1226,12 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "Opposing advocate", LegalUi.str(oppAdvEdit));
         line(sb, "Appearing for", appearingFor);
         line(sb, "Agreed fee", LegalUi.str(feeEdit));
-        line(sb, "Judge", LegalUi.str(judgeEdit));
+        line(sb, "My client is", clientRole);
+        line(sb, "Judge", judgeName);
+        line(sb, "Court room / address", LegalUi.str(roomEdit));
+        line(sb, "Next hearing", LegalUi.str(nextHearingEdit));
+        line(sb, "Current status", curStatus);
+        line(sb, "Next status", nextStatus);
         String fn = LegalUi.str(firNoEdit), fy = LegalUi.str(firYearEdit);
         line(sb, "FIR", (LegalUi.str(stationEdit) + " " + fn + (fy.isEmpty() ? "" : "/" + fy) + " "
                 + LegalUi.str(firDateEdit)).trim());
@@ -1163,7 +1283,13 @@ public class NewCaseActivity extends BaseActivity {
         c.diaryNo = LegalUi.str(diaryEdit);
         c.billTotal = LegalUi.num(feeEdit);
         c.feeNotes = LegalUi.str(feeNotesEdit);
-        c.judge = LegalUi.str(judgeEdit);
+        c.judge = judgeName;
+        c.room = LegalUi.str(roomEdit);
+        c.next = LegalUi.str(nextHearingEdit);
+        c.proceeding = curStatus;
+        c.nextStatus = nextStatus;
+        c.clientRole = clientRole;
+        saveJudge(judgeName, c.room);
         c.priority = String.valueOf(priority.getSelectedItem());
         c.subType = LegalUi.str(subTypeEdit);
         c.notes = LegalUi.str(notesEdit);

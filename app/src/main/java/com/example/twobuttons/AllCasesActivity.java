@@ -48,7 +48,7 @@ public class AllCasesActivity extends BaseActivity {
     private static final String[] KINDS = {
             "All courts", "District Court", "High Court", "Supreme Court",
             "Tribunal (NCLT)", "Consumer Court", "Revenue Court"};
-    private static final String[] STAGES = {
+    static final String[] STAGES = {
             "All stages", "Filing", "Registration", "Notice", "Appearance", "Summons / Service",
             "Written Statement", "Replication", "Admission / Denial of Documents", "Framing of Issues",
             "Plaintiff Evidence", "Defendant Evidence", "Cross Examination", "Arguments",
@@ -357,6 +357,9 @@ public class AllCasesActivity extends BaseActivity {
         if (on("number") && !h.number.isEmpty()) c.subtitle(h.number);
         if (on("court") && !h.court.isEmpty()) c.line(h.court);
         if (on("judge") && !h.judge.isEmpty()) c.line("Judge: " + h.judge);
+        if (on("judge") && !h.room.isEmpty()) c.line("Court room: " + h.room);
+        if (!h.clientRole.isEmpty()) c.line("My client: " + h.clientRole);
+        if (!h.nextStatus.isEmpty()) c.line("Next status: " + h.nextStatus);
         String cn = clientName(h);
         if (on("client") && !cn.isEmpty()) c.line("Client: " + cn);
         if (on("station") && !h.firStation.isEmpty()) c.line("Police station: " + h.firStation);

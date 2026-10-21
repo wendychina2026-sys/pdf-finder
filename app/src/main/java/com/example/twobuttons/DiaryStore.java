@@ -32,6 +32,7 @@ final class DiaryStore {
         String caseTitle = "", regDate = "", courtKind = "", clientId = "", cnr = "";
         String filingNo = "", diaryNo = "", feeNotes = "", priority = "", notes = "";
         String firStation = "", firNo = "", firYear = "", firSections = "", firDate = "", acts = "";
+        String nextStatus = "", clientRole = "";   // status expected at next hearing; my client: Appellant / Respondent
         String appearingFor = "", opposingAdvocate = "";   // side we appear for, and the other side's advocate
         long billTotal = 0, billPaid = 0;
         boolean completed = false;
@@ -114,6 +115,7 @@ final class DiaryStore {
                 c.firStation = o.optString("firStation"); c.firNo = o.optString("firNo");
                 c.firDate = o.optString("firDate"); c.acts = o.optString("acts");
                 c.firYear = o.optString("firYear"); c.firSections = o.optString("firSections");
+                c.nextStatus = o.optString("nextStatus"); c.clientRole = o.optString("clientRole");
                 JSONArray hs = o.optJSONArray("hearings");
                 if (hs != null) for (int j = 0; j < hs.length(); j++) {
                     JSONObject ho = hs.getJSONObject(j);
@@ -169,6 +171,7 @@ final class DiaryStore {
                 o.put("firStation", c.firStation); o.put("firNo", c.firNo);
                 o.put("firDate", c.firDate); o.put("acts", c.acts);
                 o.put("firYear", c.firYear); o.put("firSections", c.firSections);
+                o.put("nextStatus", c.nextStatus); o.put("clientRole", c.clientRole);
                 JSONArray hs = new JSONArray();
                 for (Hearing h : c.hearings) {
                     JSONObject ho = new JSONObject();
