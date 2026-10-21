@@ -298,7 +298,7 @@ final class AppCard {
     }
 
     /** Minimal wrapping row so chips move to a new line instead of running off the card. */
-    private static final class Flow extends ViewGroup {
+    static final class Flow extends ViewGroup {
         private final int hGap;
         private final int vGap;
 

@@ -32,6 +32,7 @@ final class DiaryStore {
         String caseTitle = "", regDate = "", courtKind = "", clientId = "", cnr = "";
         String filingNo = "", diaryNo = "", feeNotes = "", priority = "", notes = "";
         String firStation = "", firNo = "", firDate = "", acts = "";
+        String appearingFor = "", opposingAdvocate = "";   // side we appear for, and the other side's advocate
         long billTotal = 0, billPaid = 0;
         boolean completed = false;
         List<Hearing> hearings = new ArrayList<>();
@@ -106,6 +107,7 @@ final class DiaryStore {
                 c.completed = o.optBoolean("completed");
                 c.caseTitle = o.optString("caseTitle"); c.regDate = o.optString("regDate");
                 c.courtKind = o.optString("courtKind"); c.clientId = o.optString("clientId");
+                c.appearingFor = o.optString("appearingFor"); c.opposingAdvocate = o.optString("opposingAdvocate");
                 c.cnr = o.optString("cnr"); c.filingNo = o.optString("filingNo");
                 c.diaryNo = o.optString("diaryNo"); c.feeNotes = o.optString("feeNotes");
                 c.priority = o.optString("priority"); c.notes = o.optString("notes");
@@ -159,6 +161,7 @@ final class DiaryStore {
                 o.put("completed", c.completed);
                 o.put("caseTitle", c.caseTitle); o.put("regDate", c.regDate);
                 o.put("courtKind", c.courtKind); o.put("clientId", c.clientId);
+                o.put("appearingFor", c.appearingFor); o.put("opposingAdvocate", c.opposingAdvocate);
                 o.put("cnr", c.cnr); o.put("filingNo", c.filingNo);
                 o.put("diaryNo", c.diaryNo); o.put("feeNotes", c.feeNotes);
                 o.put("priority", c.priority); o.put("notes", c.notes);

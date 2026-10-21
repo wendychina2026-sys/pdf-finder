@@ -75,7 +75,8 @@ public class NewCaseActivity extends BaseActivity {
     private LinearLayout cnrCard, clientBox, actsBox, segAuto, segManual;
     private View progFill, progRest;
     private EditText cnrLookup, titleEdit, caseNoEdit, regEdit;
-    private EditText cnrId, filingEdit, diaryEdit, petEdit, resEdit, appearEdit, feeEdit, feeNotesEdit;
+    private EditText cnrId, filingEdit, diaryEdit, petEdit, resEdit, oppAdvEdit, feeEdit, feeNotesEdit;
+    private String appearingFor = "Petitioner";   // chip selection in Parties & representation
     private EditText judgeEdit, subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
     private final List<EditText[]> actRows = new ArrayList<>();
@@ -718,11 +719,13 @@ public class NewCaseActivity extends BaseActivity {
 
         // parties
         LinearLayout f2 = subForm();
-        petEdit = LegalUi.input(this, f2, "Petitioner / Plaintiff", "", NAME);
-        resEdit = LegalUi.input(this, f2, "Respondent / Defendant", "", NAME);
-        appearEdit = LegalUi.input(this, f2, "Appearing for", "", NAME);
+        petEdit = partyField(f2, "Petitioner / Plaintiff / First Party", "Enter Petitioner / First Party", 2);
+        resEdit = partyField(f2, "Respondent / Defendant / Opposite Party", "Enter Respondent / Opposite Party", 2);
+        oppAdvEdit = partyField(f2, "Opposing Advocate", "Enter Opposing Advocate Name", 1);
+        f2.addView(partyLabel("Appearing For"));
+        f2.addView(appearingChips(), lpTop(10));
         extra.addView(section(R.drawable.ic_contacts, "Parties & representation",
-                "Petitioner, respondent and appearing for", f2));
+                "Petitioner, respondent, opposing advocate and appearing for", f2));
 
         // fee
         LinearLayout f3 = subForm();
@@ -862,6 +865,73 @@ public class NewCaseActivity extends BaseActivity {
         if (scaled) shrink(filesBox);
     }
 
+    // ---------- parties: field + chip look ----------
+
+    private TextView partyLabel(String s) {
+        TextView t = CaseViews.text(this, s, 14, AppTheme.text(this), false);
+        t.setPadding(0, dp(16), 0, 0);
+        return t;
+    }
+
+    /** Label above a soft filled, rounded text box with an "Enter ..." hint. */
+    private EditText partyField(LinearLayout f, String label, String hint, int lines) {
+        f.addView(partyLabel(label));
+        EditText e = new EditText(this);
+        e.setInputType(NAME | (lines > 1 ? InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
+        e.setHint(hint);
+        e.setHintTextColor(AppTheme.sub(this));
+        e.setTextColor(AppTheme.text(this));
+        e.setTextSize(15);
+        e.setMinLines(lines);
+        e.setGravity(lines > 1 ? Gravity.TOP : Gravity.CENTER_VERTICAL);
+        e.setPadding(dp(16), dp(14), dp(16), dp(14));
+        e.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
+        f.addView(e, lpTop(8));
+        return e;
+    }
+
+    private static final String[] SIDES = {"Petitioner", "Respondent", "Complainant", "Accused",
+            "Appellant", "Plaintiff", "Defendant", "Applicant"};
+    private static final int[] SIDE_ICONS = {R.drawable.ic_person, R.drawable.ic_contacts,
+            R.drawable.ic_info, R.drawable.ic_shield, R.drawable.ic_notes,
+            R.drawable.ic_person_add, R.drawable.ic_briefcase, R.drawable.ic_edit};
+
+    /** Wrapping single-select chips: icon + name, the chosen one gets an outline and a check. */
+    private View appearingChips() {
+        final AppCard.Flow flow = new AppCard.Flow(this, dp(10), dp(10));
+        final Runnable[] draw = new Runnable[1];
+        draw[0] = () -> {
+            flow.removeAllViews();
+            for (int i = 0; i < SIDES.length; i++) {
+                final String side = SIDES[i];
+                boolean on = side.equals(appearingFor);
+                LinearLayout chip = new LinearLayout(this);
+                chip.setOrientation(LinearLayout.HORIZONTAL);
+                chip.setGravity(Gravity.CENTER_VERTICAL);
+                chip.setPadding(dp(14), dp(10), dp(14), dp(10));
+                chip.setBackground(CaseViews.box(this, AppTheme.card(this), 22,
+                        on ? AppTheme.text(this) : 0, on ? 2 : 0));
+                int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
+                chip.addView(CaseViews.icon(this, SIDE_ICONS[i], fg, 18));
+                TextView t = CaseViews.text(this, side, 14, fg, false);
+                t.setPadding(dp(8), 0, 0, 0);
+                chip.addView(t);
+                if (on) {
+                    ImageView ck = CaseViews.icon(this, R.drawable.ic_check, fg, 16);
+                    ((LinearLayout.LayoutParams) ck.getLayoutParams()).leftMargin = dp(8);
+                    chip.addView(ck);
+                }
+                chip.setOnClickListener(v -> {
+                    appearingFor = side.equals(appearingFor) ? "" : side;
+                    draw[0].run();
+                });
+                flow.addView(chip);
+            }
+        };
+        draw[0].run();
+        return flow;
+    }
+
     private LinearLayout subForm() {
         LinearLayout f = LegalUi.form(this);
         f.setPadding(dp(16), 0, dp(16), dp(14));
@@ -985,9 +1055,10 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "CNR", cnrValue());
         line(sb, "Filing no.", LegalUi.str(filingEdit));
         line(sb, "Diary no.", LegalUi.str(diaryEdit));
-        line(sb, "Petitioner", LegalUi.str(petEdit));
-        line(sb, "Respondent", LegalUi.str(resEdit));
-        line(sb, "Appearing for", LegalUi.str(appearEdit));
+        line(sb, "Petitioner / Plaintiff / First Party", LegalUi.str(petEdit));
+        line(sb, "Respondent / Defendant / Opposite Party", LegalUi.str(resEdit));
+        line(sb, "Opposing advocate", LegalUi.str(oppAdvEdit));
+        line(sb, "Appearing for", appearingFor);
         line(sb, "Agreed fee", LegalUi.str(feeEdit));
         line(sb, "Judge", LegalUi.str(judgeEdit));
         line(sb, "FIR", (LegalUi.str(stationEdit) + " " + LegalUi.str(firNoEdit) + " "
@@ -1030,8 +1101,9 @@ public class NewCaseActivity extends BaseActivity {
         String pet = LegalUi.str(petEdit);
         c.first = pet.isEmpty() ? c.caseTitle : pet;
         c.second = LegalUi.str(resEdit);
-        String appear = LegalUi.str(appearEdit);
-        c.representing = !appear.isEmpty() ? appear : (cl != null ? cl.name : "");
+        c.appearingFor = appearingFor;
+        c.opposingAdvocate = LegalUi.str(oppAdvEdit);
+        c.representing = cl != null ? cl.name : appearingFor;
 
         c.cnr = cnrValue();
         c.filingNo = LegalUi.str(filingEdit);
