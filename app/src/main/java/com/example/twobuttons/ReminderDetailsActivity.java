@@ -232,7 +232,7 @@ public class ReminderDetailsActivity extends BaseActivity {
         EditText msg = LegalUi.multiline(this, f, "Message content", r.message);
 
         LegalUi.formDialog(this, isNew ? "Add reminder" : "Edit reminder", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(title), "Title")) return false;
+            if (!LegalUi.need(this, title, "Title")) return false;
             r.title = LegalUi.str(title);
             r.caseName = LegalUi.str(cs);
             r.channel = (String) channel.getSelectedItem();

@@ -136,7 +136,7 @@ public class AllCasesActivity extends BaseActivity {
         pill.setPadding(dp(14), 0, dp(6), 0);
         pill.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
         pill.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 20));
-        search = new EditText(this);
+        search = new RoundEdit(this);
         search.setHint("Search cases, CNR, client…");
         search.setHintTextColor(AppTheme.sub(this));
         search.setTextColor(AppTheme.text(this));
@@ -610,7 +610,7 @@ public class AllCasesActivity extends BaseActivity {
 
     private EditText field(LinearLayout body, String label, String value, int inputType) {
         body.addView(CaseViews.text(this, label, 13, soft(), true), CaseViews.lp(this, 8, 4));
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setText(value);
         e.setTextSize(14);
         e.setSingleLine(true);

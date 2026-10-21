@@ -63,7 +63,7 @@ public class ChooseContactActivity extends BaseActivity {
         sr.setPadding(dp(16), 0, dp(16), 0);
         sr.setBackground(CaseViews.box(this, AppTheme.field(this), 26, AppTheme.fieldStroke(this), 1));
         sr.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 22));
-        search = new EditText(this);
+        search = new RoundEdit(this);
         search.setHint("Search contacts by name...");
         search.setSingleLine(true);
         search.setTextSize(15);

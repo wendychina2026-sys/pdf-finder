@@ -52,7 +52,7 @@ public class DocumentsActivity extends BaseActivity {
         sub.setPadding(0, LegalUi.dp(this, 2), 0, LegalUi.dp(this, 12));
         root.addView(sub);
 
-        search = new EditText(this);
+        search = new RoundEdit(this);
         search.setHint("Search file, case or client");
         search.setSingleLine(true);
         search.setTextSize(15);
@@ -198,7 +198,7 @@ public class DocumentsActivity extends BaseActivity {
         Spinner cat = LegalUi.spinner(this, f, "Category", LegalStore.DOC_CATEGORIES, d.category);
 
         LegalUi.formDialog(this, existing == null ? "Add document" : "Edit document", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(name), "File name")) return false;
+            if (!LegalUi.need(this, name, "File name")) return false;
             d.name = LegalUi.str(name);
             d.caseName = LegalUi.str(cs);
             d.size = LegalUi.str(size);

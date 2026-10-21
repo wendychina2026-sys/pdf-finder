@@ -211,8 +211,9 @@ public class NewCaseActivity extends BaseActivity {
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
         box.setPadding(dp(14), dp(12), dp(14), dp(12));
-        box.setBackground(CaseViews.box(this, AppTheme.field(this), 12, AppTheme.fieldStroke(this), 1));
+        box.setBackground(dropBg(false));
         TextView t = CaseViews.text(this, placeholder, 14, AppTheme.sub(this), false);
+        t.setTag(box);
         box.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 22));
         box.setOnClickListener(click);
@@ -220,8 +221,19 @@ public class NewCaseActivity extends BaseActivity {
         return t;
     }
 
+    /** Same round outline as RoundEdit: black normally, red when a mandatory pick is missing. */
+    private android.graphics.drawable.GradientDrawable dropBg(boolean invalid) {
+        return CaseViews.box(this, AppTheme.field(this), 14,
+                invalid ? RoundEdit.RED : AppTheme.text(this), invalid ? 2 : 1);
+    }
+
+    private void dropInvalid(TextView t, boolean invalid) {
+        if (t != null && t.getTag() instanceof View) ((View) t.getTag()).setBackground(dropBg(invalid));
+    }
+
     private void setChosen(TextView t, String value, String placeholder) {
         boolean has = value != null && !value.isEmpty();
+        if (has) dropInvalid(t, false);
         t.setText(has ? value : placeholder);
         t.setTextColor(has ? AppTheme.text(this) : AppTheme.sub(this));
     }
@@ -352,7 +364,7 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        cnrLookup = new EditText(this);
+        cnrLookup = new RoundEdit(this);
         cnrLookup.setHint("Enter CNR Number");
         cnrLookup.setInputType(CAPS);
         cnrLookup.setSingleLine(true);
@@ -463,7 +475,7 @@ public class NewCaseActivity extends BaseActivity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(8), dp(16), 0);
 
-        EditText search = new EditText(this);
+        EditText search = new RoundEdit(this);
         search.setHint("Search clients...");
         search.setSingleLine(true);
         box.addView(search);
@@ -599,6 +611,7 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout f = LegalUi.form(this);
         f.setPadding(0, 0, 0, 0);
         titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
+        ((RoundEdit) titleEdit).setRequired(true);
         titleEdit.setHint("Enter Case Title");
         titleEdit.setMinLines(2);
         regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
@@ -631,6 +644,7 @@ public class NewCaseActivity extends BaseActivity {
                     refresh();
                 }));
         caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
+        ((RoundEdit) caseNoEdit).setRequired(true);
         caseNoEdit.setHint("Case No.");
         f.addView(lbl("My client is"));
         f.addView(clientRoleRadios());
@@ -923,7 +937,7 @@ public class NewCaseActivity extends BaseActivity {
     /** Label above a soft filled, rounded text box with an "Enter ..." hint. */
     private EditText partyField(LinearLayout f, String label, String hint, int lines) {
         f.addView(partyLabel(label));
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setInputType(NAME | (lines > 1 ? InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
         e.setHint(hint);
         e.setHintTextColor(AppTheme.sub(this));
@@ -1020,11 +1034,11 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        EditText a = new EditText(this);
+        EditText a = new RoundEdit(this);
         a.setHint("Act (e.g. IPC)");
         a.setSingleLine(true);
         a.setTextSize(14);
-        EditText s = new EditText(this);
+        EditText s = new RoundEdit(this);
         s.setHint("Sections");
         s.setSingleLine(true);
         s.setTextSize(14);
@@ -1134,7 +1148,7 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        EditText s = new EditText(this);
+        EditText s = new RoundEdit(this);
         s.setHint("Section (e.g. 420 IPC)");
         s.setSingleLine(true);
         s.setTextSize(14);
@@ -1200,11 +1214,19 @@ public class NewCaseActivity extends BaseActivity {
 
     private List<String> missing() {
         List<String> m = new ArrayList<>();
-        if (LegalUi.str(titleEdit).isEmpty()) m.add("Case Title");
-        if (LegalUi.str(regEdit).isEmpty()) m.add("Registration Date");
+        boolean noTitle = LegalUi.str(titleEdit).isEmpty();
+        boolean noReg = LegalUi.str(regEdit).isEmpty();
+        boolean noNo = LegalUi.str(caseNoEdit).isEmpty();
+        ((RoundEdit) titleEdit).setInvalid(noTitle);
+        ((RoundEdit) regEdit).setInvalid(noReg);
+        ((RoundEdit) caseNoEdit).setInvalid(noNo);
+        dropInvalid(courtNameText, courtName.isEmpty());
+        dropInvalid(caseTypeText, caseType.isEmpty());
+        if (noTitle) m.add("Case Title");
+        if (noReg) m.add("Registration Date");
         if (courtName.isEmpty()) m.add("Court name / type");
         if (caseType.isEmpty()) m.add("Case type");
-        if (LegalUi.str(caseNoEdit).isEmpty()) m.add("Case No.");
+        if (noNo) m.add("Case No.");
         return m;
     }
 

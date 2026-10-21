@@ -99,7 +99,7 @@ public class AdvancedSearchActivity extends BaseActivity {
         lawyerEdit.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, details.lawyers()));
 
-        fileEdit = new EditText(this);
+        fileEdit = new RoundEdit(this);
         fileEdit.setHint("Search file name or case name");
         fileEdit.setSingleLine(true);
         fileEdit.setTextSize(15);

@@ -241,7 +241,7 @@ final class PickerDialogs {
         root.addView(titleRow(a, d, title, null));
         root.addView(hairline(a, 4));
 
-        final EditText search = searchHint == null ? null : new EditText(a);
+        final EditText search = searchHint == null ? null : new RoundEdit(a);
         if (search != null) {
             LinearLayout pill = new LinearLayout(a);
             pill.setOrientation(LinearLayout.HORIZONTAL);
@@ -374,7 +374,7 @@ final class PickerDialogs {
         TextView label = CaseViews.text(a, labelText, 14, ink(a), false);
         root.addView(label, topMargin(a, 18));
 
-        EditText name = new EditText(a);
+        EditText name = new RoundEdit(a);
         name.setHint(hint);
         name.setHintTextColor(soft(a));
         name.setTextColor(ink(a));

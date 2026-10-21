@@ -96,6 +96,7 @@ public class AddClientActivity extends BaseActivity {
         card.addView(label(R.drawable.ic_person, "Full Name *"));
         nameEdit = edit("Enter client's full name",
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS, 0);
+        ((RoundEdit) nameEdit).setRequired(true);
         card.addView(wrap(nameEdit, null), CaseViews.lp(this, 6, 0));
 
         // email
@@ -110,6 +111,7 @@ public class AddClientActivity extends BaseActivity {
         card.addView(label(R.drawable.ic_phone, "Phone Number *"));
         mobileCode = codeChip(true);
         mobileEdit = edit("Enter phone number", InputType.TYPE_CLASS_NUMBER, 0);
+        ((RoundEdit) mobileEdit).setRequired(true);
         mobileEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
         card.addView(wrap(mobileEdit, mobileCode), CaseViews.lp(this, 6, 0));
         mobileErr = errorText();
@@ -193,7 +195,7 @@ public class AddClientActivity extends BaseActivity {
     }
 
     private EditText edit(String hint, int inputType, int minLines) {
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setHint(hint);
         e.setInputType(inputType);
         e.setTextSize(15);
@@ -234,7 +236,6 @@ public class AddClientActivity extends BaseActivity {
             c.addView(div, dl);
         }
         c.addView(e, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        e.setOnFocusChangeListener((v, focus) -> c.setBackground(fieldBg(focus)));
         return c;
     }
 
@@ -281,6 +282,9 @@ public class AddClientActivity extends BaseActivity {
         show(mobileErr, me);
         show(landErr, le);
         show(emailErr, ee);
+        ((RoundEdit) mobileEdit).setInvalid(me != null);
+        ((RoundEdit) landEdit).setInvalid(le != null);
+        ((RoundEdit) emailEdit).setInvalid(ee != null);
 
         canSave = !name.isEmpty() && !mob.isEmpty() && me == null && le == null && ee == null;
         saveBtn.setEnabled(canSave);

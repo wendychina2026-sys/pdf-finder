@@ -157,7 +157,7 @@ public class AddCaseActivity extends BaseActivity {
     }
 
     private EditText field(String hint, String value, int type) {
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setHint(hint);
         e.setText(value);
         e.setInputType(type);
@@ -176,11 +176,13 @@ public class AddCaseActivity extends BaseActivity {
     private void buildStep1() {
         stepBox.addView(label("First Party Name *"));
         first = field("Enter First and Last Name", c.first, NAME);
+        ((RoundEdit) first).setRequired(true);
         stepBox.addView(first);
         stepBox.addView(helper("Add First Party's full name"));
 
         stepBox.addView(label("Second Party Name *"));
         second = field("Enter First and Last Name", c.second, NAME);
+        ((RoundEdit) second).setRequired(true);
         stepBox.addView(second);
         stepBox.addView(helper("Add Second Party's full name"));
 
@@ -419,8 +421,8 @@ public class AddCaseActivity extends BaseActivity {
         if (step == 1) {
             collectStep1();
             if (!validate) return true;
-            if (!LegalUi.need(this, c.first, "First party name")) return false;
-            if (!LegalUi.need(this, c.second, "Second party name")) return false;
+            if (!LegalUi.need(this, first, "First party name")) return false;
+            if (!LegalUi.need(this, second, "Second party name")) return false;
             if (!LegalUi.need(this, c.type, "Case type")) return false;
         } else if (step == 2) {
             c.room = LegalUi.str(room);

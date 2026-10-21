@@ -236,7 +236,7 @@ public class MainActivity extends BaseActivity {
 
         box.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 18));
 
-        searchBox = new EditText(this);
+        searchBox = new RoundEdit(this);
         searchBox.setHint("Search today's cases by case name");
         searchBox.setSingleLine(true);
         searchBox.setTextSize(13);

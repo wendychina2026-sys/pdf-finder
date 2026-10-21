@@ -212,7 +212,7 @@ public class OptionsEditorActivity extends BaseActivity {
     }
 
     private void ask(String title, String initial, Consumer<String> done) {
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setText(initial);
         e.setSelection(initial.length());
         new AlertDialog.Builder(this)

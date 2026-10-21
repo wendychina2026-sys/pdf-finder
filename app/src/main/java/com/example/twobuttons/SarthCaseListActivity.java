@@ -48,7 +48,7 @@ public class SarthCaseListActivity extends BaseActivity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setBackgroundColor(0xFF0D47A1);
         bar.setPadding(LegalUi.dp(this, 12), LegalUi.dp(this, 10), LegalUi.dp(this, 12), LegalUi.dp(this, 12));
-        search = new EditText(this);
+        search = new RoundEdit(this);
         search.setHint("Search");
         search.setSingleLine(true);
         search.setTextColor(0xFF000000);
@@ -194,7 +194,7 @@ public class SarthCaseListActivity extends BaseActivity {
         adj.setOnClickListener(v -> pick(adj));
 
         LegalUi.formDialog(this, existing == null ? "Add case" : "Edit case", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(title), "Title")) return false;
+            if (!LegalUi.need(this, title, "Title")) return false;
             c.title = LegalUi.str(title);
             c.court = LegalUi.str(court);
             c.caseType = LegalUi.str(type);

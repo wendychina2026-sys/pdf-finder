@@ -62,7 +62,7 @@ public class MarkedFilesActivity extends BaseActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(16, 16, 16, 16);
 
-        search = new EditText(this);
+        search = new RoundEdit(this);
         search.setHint("Search file name, path or category");
         search.setSingleLine(true);
         search.addTextChangedListener(new TextWatcher() {

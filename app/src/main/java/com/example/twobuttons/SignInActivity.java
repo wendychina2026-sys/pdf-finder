@@ -86,6 +86,8 @@ public class SignInActivity extends BaseActivity {
         login.setBackground(CaseViews.box(this, 0xFF58595B, 14, 0, 0));
         login.setOnClickListener(v -> {
             if (!agree.isChecked()) { toast("Accept Terms of Use & Privacy Policy first"); return; }
+            ((RoundEdit) id).setInvalid(id.getText().toString().trim().isEmpty());
+            ((RoundEdit) pass).setInvalid(pass.getText().length() == 0);
             if (id.getText().toString().trim().isEmpty() || pass.getText().length() == 0) {
                 toast("Enter mobile / email and password");
                 return;
@@ -139,7 +141,7 @@ public class SignInActivity extends BaseActivity {
         row.setPadding(LegalUi.dp(this, 16), LegalUi.dp(this, 4), LegalUi.dp(this, 16), LegalUi.dp(this, 4));
         row.setBackground(CaseViews.box(this, AppTheme.card(this), 14, AppTheme.fieldStroke(this), 1));
         row.addView(CaseViews.icon(this, iconRes, AppTheme.text(this), 26));
-        EditText e = new EditText(this);
+        EditText e = new RoundEdit(this);
         e.setHint(hint);
         e.setSingleLine(true);
         e.setBackground(null);

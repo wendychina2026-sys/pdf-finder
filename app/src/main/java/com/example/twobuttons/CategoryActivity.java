@@ -45,13 +45,13 @@ public class CategoryActivity extends BaseActivity {
         root.addView(label("Type of case"));
         root.addView(typeSpinner);
 
-        titleEdit = new EditText(this);
+        titleEdit = new RoundEdit(this);
         titleEdit.setHint("Title of case");
         titleEdit.setSingleLine(true);
         root.addView(label("Title of case"));
         root.addView(titleEdit);
 
-        numberEdit = new EditText(this);
+        numberEdit = new RoundEdit(this);
         numberEdit.setHint("Case number");
         numberEdit.setSingleLine(true);
         root.addView(label("Case number"));
@@ -141,6 +141,7 @@ public class CategoryActivity extends BaseActivity {
 
     private boolean titleOk() {
         if (titleEdit.getText().toString().trim().isEmpty()) {
+            ((RoundEdit) titleEdit).setInvalid(true);
             Toast.makeText(this, "Enter title of case", Toast.LENGTH_SHORT).show();
             return false;
         }

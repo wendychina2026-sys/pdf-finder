@@ -252,7 +252,7 @@ public class HearingsActivity extends BaseActivity {
         EditText total = LegalUi.input(this, f, "Total bill", String.valueOf(c.billTotal), InputType.TYPE_CLASS_NUMBER);
         EditText paid = LegalUi.input(this, f, "Paid", String.valueOf(c.billPaid), InputType.TYPE_CLASS_NUMBER);
         LegalUi.formDialog(this, "Edit case details", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(first), "First party")) return false;
+            if (!LegalUi.need(this, first, "First party")) return false;
             c.first = LegalUi.str(first);
             c.second = LegalUi.str(second);
             c.representing = LegalUi.str(rep);
@@ -274,7 +274,7 @@ public class HearingsActivity extends BaseActivity {
         EditText note = LegalUi.multiline(this, f, "What happened", h.note);
         note.setMinLines(3);
         LegalUi.formDialog(this, existing == null ? "Add hearing" : "Edit hearing", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(date), "Date")) return false;
+            if (!LegalUi.need(this, date, "Date")) return false;
             h.date = LegalUi.str(date);
             h.note = note.getText().toString().trim();
             if (existing == null) c.hearings.add(0, h);

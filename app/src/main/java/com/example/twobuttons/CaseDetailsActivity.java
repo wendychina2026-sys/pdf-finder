@@ -65,7 +65,7 @@ public class CaseDetailsActivity extends BaseActivity {
         file.setTypeface(null, Typeface.BOLD);
         root.addView(file);
 
-        caseNameEdit = new android.widget.EditText(this);
+        caseNameEdit = new RoundEdit(this);
         caseNameEdit.setHint("Case name");
         caseNameEdit.setSingleLine(true);
         root.addView(label("Case name"));

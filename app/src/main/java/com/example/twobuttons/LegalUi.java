@@ -104,7 +104,7 @@ final class LegalUi {
 
     static EditText input(Context c, LinearLayout f, String label, String value, int type) {
         label(c, f, label);
-        EditText e = new EditText(c);
+        EditText e = new RoundEdit(c);
         e.setInputType(type);
         e.setText(value);
         e.setTextSize(15);
@@ -185,6 +185,15 @@ final class LegalUi {
                 .setPositiveButton("Delete", (d, w) -> yes.run())
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** Same as the String version, but also turns the box red (and focuses it) when empty. */
+    static boolean need(Activity a, EditText e, String what) {
+        if (!e.getText().toString().trim().isEmpty()) return true;
+        if (e instanceof RoundEdit) ((RoundEdit) e).setInvalid(true);
+        e.requestFocus();
+        Toast.makeText(a, what + " is required", Toast.LENGTH_SHORT).show();
+        return false;
     }
 
     static boolean need(Activity a, String value, String what) {

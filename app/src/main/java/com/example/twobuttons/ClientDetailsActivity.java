@@ -294,7 +294,7 @@ public class ClientDetailsActivity extends BaseActivity {
         EditText docs = LegalUi.text(this, f, "Documents note", c.docsNote);
 
         LegalUi.formDialog(this, isNew ? "Add client" : "Edit client", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(name), "Name")) return false;
+            if (!LegalUi.need(this, name, "Name")) return false;
             c.code = LegalUi.str(code);
             c.name = LegalUi.str(name);
             c.mobile = LegalUi.str(mobile);
@@ -319,7 +319,7 @@ public class ClientDetailsActivity extends BaseActivity {
         Spinner status = LegalUi.spinner(this, f, "Status", LegalStore.CASE_STATUS, cl.status);
 
         LegalUi.formDialog(this, existing == null ? "Add case" : "Edit case", f, () -> {
-            if (!LegalUi.need(this, LegalUi.str(title), "Case title")) return false;
+            if (!LegalUi.need(this, title, "Case title")) return false;
             cl.title = LegalUi.str(title);
             cl.subtitle = LegalUi.str(sub);
             cl.date = LegalUi.str(date);
