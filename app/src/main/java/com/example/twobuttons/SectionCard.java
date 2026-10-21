@@ -5,7 +5,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -33,6 +32,8 @@ final class SectionCard {
     private boolean[] openState;                 // null = fixed (always open)
     private View.OnClickListener viewAll;
     private final List<View> rows = new ArrayList<>();
+    private View belowHeader;                    // e.g. the search bar, shown under the title
+    SectionCard belowHeader(View v) { belowHeader = v; return this; }
 
     SectionCard(Activity a) { this.a = a; }
 
@@ -52,34 +53,34 @@ final class SectionCard {
 
         LinearLayout card = new LinearLayout(a);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(CaseViews.box(a, AppTheme.bg(a), 24, AppTheme.cardStroke(a), 1));
-        card.setClipToOutline(true);
-        card.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
-        card.setElevation(dp(2));
+        card.setBackground(CaseViews.box(a, AppTheme.bg(a), 16, AppTheme.cardStroke(a), 1));
+        card.setElevation(dp(1));
 
         // ---- header band ----
         LinearLayout head = new LinearLayout(a);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(22), dp(20), dp(22), dp(20));
+        head.setPadding(dp(14), dp(12), dp(14), dp(12));
         GradientDrawable band = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{AppTheme.card(a), AppTheme.bg(a)});
+        float rad = dp(16);
+        band.setCornerRadii(new float[]{rad, rad, rad, rad, 0, 0, 0, 0});
         head.setBackground(band);
 
         if (fixed) {
             View bar = new View(a);
             bar.setBackground(CaseViews.box(a, accent, 2, 0, 0));
-            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(4), dp(26));
-            blp.rightMargin = dp(12);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(3), dp(18));
+            blp.rightMargin = dp(8);
             blp.gravity = Gravity.TOP;
             head.addView(bar, blp);
         }
 
         LinearLayout left = new LinearLayout(a);
         left.setOrientation(LinearLayout.VERTICAL);
-        left.addView(CaseViews.text(a, title, 20, AppTheme.text(a), true));
-        TextView sub = CaseViews.text(a, subtitle, 14, AppTheme.sub(a), false);
-        sub.setPadding(0, dp(8), 0, 0);
+        left.addView(CaseViews.text(a, title, 15, AppTheme.text(a), true));
+        TextView sub = CaseViews.text(a, subtitle, 12, AppTheme.sub(a), false);
+        sub.setPadding(0, dp(2), 0, 0);
         left.addView(sub);
         head.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -88,22 +89,34 @@ final class SectionCard {
             LinearLayout right = new LinearLayout(a);
             right.setOrientation(LinearLayout.VERTICAL);
             right.setGravity(Gravity.CENTER_HORIZONTAL);
-            right.addView(CaseViews.text(a, String.valueOf(count), 30, AppTheme.text(a), true));
-            right.addView(CaseViews.text(a, countLabel, 14, AppTheme.sub(a), false));
-            head.addView(right);
+            right.addView(CaseViews.text(a, String.valueOf(count), 20, AppTheme.text(a), true));
+            right.addView(CaseViews.text(a, countLabel, 11, AppTheme.sub(a), false));
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rlp.leftMargin = dp(10);
+            rlp.rightMargin = dp(4);      // keep clear of the card border
+            head.addView(right, rlp);
             chevron = null;
         } else {
-            TextView pill = CaseViews.text(a, String.valueOf(count), 18, AppTheme.text(a), true);
+            TextView pill = CaseViews.text(a, String.valueOf(count), 13, AppTheme.text(a), true);
             pill.setGravity(Gravity.CENTER);
-            pill.setBackground(CaseViews.box(a, AppTheme.cardStroke(a), 14, 0, 0));
-            head.addView(pill, new LinearLayout.LayoutParams(dp(40), dp(40)));
-            chevron = CaseViews.icon(a, R.drawable.ic_expand_more, AppTheme.text(a), 24);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(24), dp(24));
-            clp.leftMargin = dp(14);
+            pill.setBackground(CaseViews.box(a, AppTheme.cardStroke(a), 10, 0, 0));
+            head.addView(pill, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            chevron = CaseViews.icon(a, R.drawable.ic_expand_more, AppTheme.text(a), 20);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(20), dp(20));
+            clp.leftMargin = dp(8);
+            clp.rightMargin = dp(2);
             head.addView(chevron, clp);
         }
         card.addView(head, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (belowHeader != null) {
+            LinearLayout.LayoutParams blp2 = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            blp2.setMargins(dp(12), dp(8), dp(12), dp(4));
+            card.addView(belowHeader, blp2);
+        }
 
         // ---- body ----
         final LinearLayout body = new LinearLayout(a);
@@ -113,13 +126,13 @@ final class SectionCard {
         } else {
             LinearLayout list = new LinearLayout(a);
             list.setOrientation(LinearLayout.VERTICAL);
-            list.setPadding(dp(14), dp(14), dp(14), dp(6));
-            for (View r : rows) list.addView(r, CaseViews.lp(a, 0, 10));
+            list.setPadding(dp(10), dp(8), dp(10), dp(2));
+            for (View r : rows) list.addView(r, CaseViews.lp(a, 0, 8));
             body.addView(list);
             if (viewAll != null) {
-                TextView all = CaseViews.text(a, "View All", 14, accent, true);
+                TextView all = CaseViews.text(a, "View All", 12, accent, true);
                 all.setGravity(Gravity.CENTER);
-                all.setPadding(dp(16), dp(10), dp(16), dp(16));
+                all.setPadding(dp(16), dp(6), dp(16), dp(10));
                 all.setOnClickListener(viewAll);
                 body.addView(all, new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -143,21 +156,21 @@ final class SectionCard {
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER_HORIZONTAL);
-        box.setPadding(dp(20), dp(34), dp(20), dp(34));
+        box.setPadding(dp(16), dp(18), dp(16), dp(18));
 
         LinearLayout tile = new LinearLayout(a);
         tile.setGravity(Gravity.CENTER);
-        tile.setBackground(CaseViews.box(a, AppTheme.cardStroke(a), 20, 0, 0));
-        tile.addView(CaseViews.icon(a, R.drawable.ic_calendar, AppTheme.accent(a), 26));
-        box.addView(tile, new LinearLayout.LayoutParams(dp(56), dp(56)));
+        tile.setBackground(CaseViews.box(a, AppTheme.cardStroke(a), 14, 0, 0));
+        tile.addView(CaseViews.icon(a, R.drawable.ic_calendar, AppTheme.accent(a), 20));
+        box.addView(tile, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
-        TextView t = CaseViews.text(a, emptyTitle, 18, AppTheme.text(a), true);
+        TextView t = CaseViews.text(a, emptyTitle, 14, AppTheme.text(a), true);
         t.setGravity(Gravity.CENTER);
-        t.setPadding(0, dp(20), 0, 0);
+        t.setPadding(0, dp(10), 0, 0);
         box.addView(t);
-        TextView s = CaseViews.text(a, emptySub, 14, AppTheme.sub(a), false);
+        TextView s = CaseViews.text(a, emptySub, 12, AppTheme.sub(a), false);
         s.setGravity(Gravity.CENTER);
-        s.setPadding(0, dp(10), 0, 0);
+        s.setPadding(0, dp(4), 0, 0);
         box.addView(s);
         return box;
     }

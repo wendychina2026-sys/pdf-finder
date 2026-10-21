@@ -44,6 +44,7 @@ public class MainActivity extends BaseActivity {
 
     private ImageView avatar;
     private EditText searchBox;
+    private View searchRow;
     private LinearLayout sections;
     private LinearLayout todayList;
     private ScrollView scroll;
@@ -72,7 +73,7 @@ public class MainActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(buildHeader(), wide);
 
-        root.addView(buildSearch());
+        searchRow = buildSearch();   // lives inside the Today card; built once so typing keeps focus
         todayList = new LinearLayout(this);
         todayList.setOrientation(LinearLayout.VERTICAL);
         root.addView(todayList, wide);
@@ -230,17 +231,17 @@ public class MainActivity extends BaseActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(dp(14), dp(2), dp(14), dp(2));
+        box.setPadding(dp(10), 0, dp(10), 0);
         box.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
 
-        box.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 22));
+        box.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 18));
 
         searchBox = new EditText(this);
         searchBox.setHint("Search today's cases by case name");
         searchBox.setSingleLine(true);
-        searchBox.setTextSize(15);
+        searchBox.setTextSize(13);
         searchBox.setBackground(null);
-        searchBox.setPadding(dp(12), dp(12), 0, dp(12));
+        searchBox.setPadding(dp(8), dp(8), 0, dp(8));
         searchBox.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refresh(); }
@@ -249,10 +250,6 @@ public class MainActivity extends BaseActivity {
         box.addView(searchBox, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(8);
-        box.setLayoutParams(lp);
         return box;
     }
 
@@ -272,7 +269,11 @@ public class MainActivity extends BaseActivity {
         sections.removeAllViews();
         todayList.removeAllViews();
 
-        // 1. Today: always open. Search box above it filters this card.
+        // 1. Today: always open. The search box sits inside this card under the title.
+        boolean hadFocus = searchBox.hasFocus();
+        if (searchRow.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) searchRow.getParent()).removeView(searchRow);
+        }
         String q = searchBox.getText().toString().trim();
         List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
         java.util.Set<String> courts = new java.util.HashSet<>();
@@ -282,15 +283,20 @@ public class MainActivity extends BaseActivity {
                 .subtitle(dmy(new java.util.Date()) + " \u00B7 " + courts.size()
                         + (courts.size() == 1 ? " court" : " courts"))
                 .count(today.size(), today.size() == 1 ? "Hearing" : "Hearings")
+                .belowHeader(searchRow)
                 .empty(q.isEmpty() ? "No hearings scheduled" : "No matching case today",
                         q.isEmpty() ? "Your agenda is clear for this date." : "Try a different case name.");
         int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
         for (int i = 0; i < n; i++) {
             CaseItems.Item it = today.get(i);
-            todayCard.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path)));
+            todayCard.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path), true));
         }
         if (!today.isEmpty()) todayCard.viewAll(v -> openList("today"));
-        todayList.addView(todayCard.build(), CaseViews.lp(this, 10, 0));
+        todayList.addView(todayCard.build(), CaseViews.lp(this, 4, 0));
+        if (hadFocus) {
+            searchBox.requestFocus();
+            searchBox.setSelection(searchBox.getText().length());
+        }
 
         // 2. Tomorrow: collapsible
         showTomorrow();
@@ -304,7 +310,7 @@ public class MainActivity extends BaseActivity {
                 .empty("No upcoming cases", "Nothing is scheduled ahead.")
                 .collapsible(upcomingOpen);
         for (int i = 0; i < Math.min(3, up.size()); i++) {
-            upCard.row(CaseViews.upcomingCard(this, up.get(i), this::refresh));
+            upCard.row(CaseViews.upcomingCard(this, up.get(i), this::refresh, true));
         }
         if (!up.isEmpty()) upCard.viewAll(v -> openList("upcoming"));
         sections.addView(upCard.build(), CaseViews.lp(this, 18, 0));
@@ -326,7 +332,7 @@ public class MainActivity extends BaseActivity {
         int shown = 0;
         for (CaseItems.Item it : pdf) {
             if (shown++ >= 3) break;
-            card.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path)));
+            card.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path), true));
         }
         for (DiaryStore.HCase h : diary) {
             String ini = h.title().trim().isEmpty() ? "?" : h.title().trim().substring(0, 1).toUpperCase();
@@ -335,7 +341,7 @@ public class MainActivity extends BaseActivity {
                 i.putExtra("id", h.id);
                 startActivity(i);
             };
-            card.row(new AppCard(this)
+            card.row(new AppCard(this).compact()
                     .avatarText(ini)
                     .title(h.title())
                     .subtitle(h.court)

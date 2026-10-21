@@ -67,6 +67,7 @@ final class AppCard {
     private String primaryLabel = "";
     private View.OnClickListener primaryClick;
     private View.OnClickListener cardClick;
+    private boolean compact = false;
 
     AppCard(Context c) { this.c = c; }
 
@@ -105,24 +106,31 @@ final class AppCard {
         primaryLabel = label; primaryClick = l; return this;
     }
     AppCard onClick(View.OnClickListener l) { cardClick = l; return this; }
+    /** Smaller padding, text and buttons, for cards nested inside another card. */
+    AppCard compact() { compact = true; return this; }
 
     // ------------------------------------------------------------ shared look
 
     /** Empty rounded white card with the shared padding, stroke and soft shadow. */
-    static LinearLayout surface(Context c) {
+    static LinearLayout surface(Context c) { return surface(c, false); }
+
+    static LinearLayout surface(Context c, boolean compact) {
         LinearLayout l = new LinearLayout(c);
         l.setOrientation(LinearLayout.VERTICAL);
-        l.setPadding(dp(c, 16), dp(c, 16), dp(c, 16), dp(c, 16));
-        l.setBackground(CaseViews.box(c, AppTheme.field(c), 18, AppTheme.cardStroke(c), 1));
-        l.setElevation(dp(c, 2));
+        int pad = compact ? 10 : 16;
+        l.setPadding(dp(c, pad), dp(c, pad), dp(c, pad), dp(c, pad));
+        l.setBackground(CaseViews.box(c, AppTheme.field(c), compact ? 12 : 18, AppTheme.cardStroke(c), 1));
+        l.setElevation(dp(c, compact ? 1 : 2));
         return l;
     }
 
     /** Rounded chip, also usable on its own. */
-    static TextView chipView(Context c, String text, Tone tone) {
-        TextView t = CaseViews.text(c, text, 12, toneText(c, tone), false);
+    static TextView chipView(Context c, String text, Tone tone) { return chipView(c, text, tone, false); }
+
+    static TextView chipView(Context c, String text, Tone tone, boolean compact) {
+        TextView t = CaseViews.text(c, text, compact ? 11 : 12, toneText(c, tone), false);
         t.setSingleLine(true);
-        t.setPadding(dp(c, 12), dp(c, 5), dp(c, 12), dp(c, 5));
+        t.setPadding(dp(c, compact ? 9 : 12), dp(c, compact ? 3 : 5), dp(c, compact ? 9 : 12), dp(c, compact ? 3 : 5));
         t.setBackground(CaseViews.box(c, toneFill(c, tone), 14, 0, 0));
         return t;
     }
@@ -154,7 +162,7 @@ final class AppCard {
     // ------------------------------------------------------------ build
 
     View build() {
-        LinearLayout card = surface(c);
+        LinearLayout card = surface(c, compact);
 
         // top row: avatar, text column, right value
         LinearLayout top = new LinearLayout(c);
@@ -164,31 +172,31 @@ final class AppCard {
         if (avatarIcon != 0 || !avatarText.isEmpty()) {
             LinearLayout av = new LinearLayout(c);
             av.setGravity(Gravity.CENTER);
-            av.setBackground(CaseViews.box(c, toneFill(c, Tone.ACCENT), 14, 0, 0));
+            av.setBackground(CaseViews.box(c, toneFill(c, Tone.ACCENT), compact ? 10 : 14, 0, 0));
             if (avatarIcon != 0) {
-                av.addView(CaseViews.icon(c, avatarIcon, AppTheme.accent(c), 26));
+                av.addView(CaseViews.icon(c, avatarIcon, AppTheme.accent(c), compact ? 20 : 26));
             } else {
-                av.addView(CaseViews.text(c, avatarText, 22, AppTheme.accent(c), true));
+                av.addView(CaseViews.text(c, avatarText, compact ? 15 : 22, AppTheme.accent(c), true));
             }
-            top.addView(av, new LinearLayout.LayoutParams(dp(c, 56), dp(c, 56)));
+            top.addView(av, new LinearLayout.LayoutParams(dp(c, compact ? 38 : 56), dp(c, compact ? 38 : 56)));
         }
 
         LinearLayout names = new LinearLayout(c);
         names.setOrientation(LinearLayout.VERTICAL);
-        names.setPadding(avatarIcon != 0 || !avatarText.isEmpty() ? dp(c, 12) : 0, 0, dp(c, 8), 0);
+        names.setPadding(avatarIcon != 0 || !avatarText.isEmpty() ? dp(c, compact ? 10 : 12) : 0, 0, dp(c, 8), 0);
         if (!title.isEmpty()) {
-            TextView t = CaseViews.text(c, title, 17, AppTheme.text(c), true);
+            TextView t = CaseViews.text(c, title, compact ? 14 : 17, AppTheme.text(c), true);
             t.setMaxLines(2);
             t.setEllipsize(TextUtils.TruncateAt.END);
             names.addView(t);
         }
         if (!subtitle.isEmpty()) {
-            TextView s = CaseViews.text(c, subtitle, 13, AppTheme.text(c), false);
+            TextView s = CaseViews.text(c, subtitle, compact ? 12 : 13, AppTheme.text(c), false);
             s.setPadding(0, dp(c, 2), 0, 0);
             names.addView(s);
         }
         for (String l : lines) {
-            TextView m = CaseViews.text(c, l, 12, AppTheme.sub(c), false);
+            TextView m = CaseViews.text(c, l, compact ? 11 : 12, AppTheme.sub(c), false);
             m.setPadding(0, dp(c, 2), 0, 0);
             names.addView(m);
         }
@@ -210,13 +218,13 @@ final class AppCard {
         if (!chips.isEmpty()) {
             Flow flow = new Flow(c, dp(c, 8), dp(c, 8));
             for (Chip ch : chips) {
-                TextView v = chipView(c, ch.text, ch.tone);
+                TextView v = chipView(c, ch.text, ch.tone, compact);
                 if (ch.click != null) v.setOnClickListener(ch.click);
                 flow.addView(v);
             }
             LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            flp.topMargin = dp(c, 12);
+            flp.topMargin = dp(c, compact ? 8 : 12);
             card.addView(flow, flp);
         }
 
@@ -228,8 +236,8 @@ final class AppCard {
             line.setBackgroundColor(AppTheme.cardStroke(c));
             LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 1);
-            llp.topMargin = dp(c, 14);
-            llp.bottomMargin = dp(c, 12);
+            llp.topMargin = dp(c, compact ? 8 : 14);
+            llp.bottomMargin = dp(c, compact ? 8 : 12);
             card.addView(line, llp);
 
             LinearLayout foot = new LinearLayout(c);
@@ -239,19 +247,19 @@ final class AppCard {
             LinearLayout left = new LinearLayout(c);
             left.setOrientation(LinearLayout.VERTICAL);
             if (!footBig.isEmpty()) {
-                TextView fb = CaseViews.text(c, footBig, 16, footColor != 0 ? footColor : AppTheme.text(c), true);
+                TextView fb = CaseViews.text(c, footBig, compact ? 13 : 16, footColor != 0 ? footColor : AppTheme.text(c), true);
                 fb.setMaxLines(2);
                 fb.setEllipsize(TextUtils.TruncateAt.END);
                 left.addView(fb);
             }
-            if (!footSmall.isEmpty()) left.addView(CaseViews.text(c, footSmall, 12, AppTheme.sub(c), false));
+            if (!footSmall.isEmpty()) left.addView(CaseViews.text(c, footSmall, compact ? 11 : 12, AppTheme.sub(c), false));
             foot.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
             if (!secondaryLabel.isEmpty()) {
                 Button b = button(secondaryLabel, false);
                 b.setOnClickListener(secondaryClick);
                 LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, 40));
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, compact ? 30 : 40));
                 blp.leftMargin = dp(c, 8);
                 foot.addView(b, blp);
             }
@@ -259,7 +267,7 @@ final class AppCard {
                 Button b = button(primaryLabel, true);
                 b.setOnClickListener(primaryClick);
                 LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, 40));
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, compact ? 30 : 40));
                 blp.leftMargin = dp(c, 8);
                 foot.addView(b, blp);
             }
@@ -277,15 +285,15 @@ final class AppCard {
         Button b = new Button(c);
         b.setText(label);
         b.setAllCaps(false);
-        b.setTextSize(14);
+        b.setTextSize(compact ? 12 : 14);
         b.setTextColor(text);
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         b.setMinHeight(0);
         b.setMinimumHeight(0);
-        b.setPadding(dp(c, 18), 0, dp(c, 18), 0);
+        b.setPadding(dp(c, compact ? 12 : 18), 0, dp(c, compact ? 12 : 18), 0);
         b.setStateListAnimator(null);
-        b.setBackground(CaseViews.box(c, fill, 20, filled ? 0 : AppTheme.cardStroke(c), filled ? 0 : 1));
+        b.setBackground(CaseViews.box(c, fill, compact ? 15 : 20, filled ? 0 : AppTheme.cardStroke(c), filled ? 0 : 1));
         return b;
     }
 

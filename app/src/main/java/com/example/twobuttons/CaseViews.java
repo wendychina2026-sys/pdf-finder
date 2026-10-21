@@ -99,7 +99,12 @@ class CaseViews {
 
     /** Upcoming case card: avatar, name, chips, next date and Re-Schedule / View Details. */
     static View upcomingCard(Activity a, CaseItems.Item it, Runnable changed) {
-        return new AppCard(a)
+        return upcomingCard(a, it, changed, false);
+    }
+
+    static View upcomingCard(Activity a, CaseItems.Item it, Runnable changed, boolean compact) {
+        AppCard card = compact ? new AppCard(a).compact() : new AppCard(a);
+        return card
                 .avatarText(it.initial())
                 .title(it.title())
                 .subtitle(it.subtitle())
@@ -114,7 +119,12 @@ class CaseViews {
 
     /** Standard case card used in every list. */
     static View caseRow(Activity a, CaseItems.Item it, View.OnClickListener click) {
-        return new AppCard(a)
+        return caseRow(a, it, click, false);
+    }
+
+    static View caseRow(Activity a, CaseItems.Item it, View.OnClickListener click, boolean compact) {
+        AppCard card = compact ? new AppCard(a).compact() : new AppCard(a);
+        return card
                 .avatarText(it.initial())
                 .title(it.title())
                 .subtitle(it.subtitle())
