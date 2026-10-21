@@ -242,7 +242,7 @@ public class AllCasesActivity extends BaseActivity {
         String q = search.getText().toString().trim();
         if (!q.isEmpty()) {
             String all = h.title() + " " + h.cnr + " " + clientName(h) + " " + h.number + " " + h.court
-                    + " " + h.judge + " " + h.filingNo + " " + h.firNo + " " + h.acts;
+                    + " " + h.judge + " " + h.filingNo + " " + h.firNo + " " + h.firYear + " " + h.firSections + " " + h.acts;
             if (!has(all, q)) return false;
         }
         if (!fKind.equals(KINDS[0])) {
@@ -360,7 +360,8 @@ public class AllCasesActivity extends BaseActivity {
         String cn = clientName(h);
         if (on("client") && !cn.isEmpty()) c.line("Client: " + cn);
         if (on("station") && !h.firStation.isEmpty()) c.line("Police station: " + h.firStation);
-        if (on("fir") && !h.firNo.isEmpty()) c.line("FIR No: " + h.firNo);
+        if (on("fir") && !h.firNo.isEmpty()) c.line("FIR No: " + h.firNo + (h.firYear.isEmpty() ? "" : "/" + h.firYear));
+        if (on("fir") && !h.firSections.isEmpty()) c.line("FIR u/s: " + h.firSections);
         if (on("firdate") && !h.firDate.isEmpty()) c.line("FIR date: " + h.firDate);
         if (on("acts") && !h.acts.isEmpty()) c.line("Acts: " + h.acts);
         if (on("category") && !h.courtKind.isEmpty()) c.chip(h.courtKind, AppCard.Tone.ACCENT);

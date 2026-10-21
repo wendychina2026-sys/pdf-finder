@@ -80,6 +80,9 @@ public class NewCaseActivity extends BaseActivity {
     private EditText judgeEdit, subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
     private final List<EditText[]> actRows = new ArrayList<>();
+    private final List<EditText> firSecRows = new ArrayList<>();
+    private LinearLayout firSecBox;
+    private EditText firYearEdit;
     private final List<Uri> pickedUris = new ArrayList<>();
     private final List<String> pickedNames = new ArrayList<>();
     private LinearLayout filesBox;
@@ -748,11 +751,24 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout f5 = subForm();
         stationEdit = LegalUi.text(this, f5, "Police station", "");
         firNoEdit = LegalUi.text(this, f5, "FIR number", "");
+        firYearEdit = LegalUi.input(this, f5, "FIR year", "", InputType.TYPE_CLASS_NUMBER);
+        firYearEdit.setHint("e.g. 2024");
+        firYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
+        TextView secLabel = CaseViews.text(this, "Under section(s)", 12, AppTheme.sub(this), true);
+        secLabel.setPadding(0, dp(10), 0, 0);
+        f5.addView(secLabel);
+        firSecBox = new LinearLayout(this);
+        firSecBox.setOrientation(LinearLayout.VERTICAL);
+        f5.addView(firSecBox);
+        android.widget.Button addSec = LegalUi.outlineButton(this, "+ Add section");
+        addSec.setOnClickListener(v -> addFirSectionRow());
+        f5.addView(addSec, lpTop(10));
+        addFirSectionRow();
         firDateEdit = LegalUi.dmyInput(this, f5, "FIR date", "");
         firDateEdit.setHint("Select Date");
         firDateEdit.setOnClickListener(v -> PickerDialogs.calendar(this, "Select FIR Date", firDateEdit));
         extra.addView(section(R.drawable.ic_notes, "FIR Details",
-                "Police station, FIR number and date", f5));
+                "Police station, FIR number, year, sections and date", f5));
 
         // acts and sections
         LinearLayout f6 = subForm();
@@ -999,6 +1015,41 @@ public class NewCaseActivity extends BaseActivity {
         actsBox.addView(row);
     }
 
+    private void addFirSectionRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        EditText s = new EditText(this);
+        s.setHint("Section (e.g. 420 IPC)");
+        s.setSingleLine(true);
+        s.setTextSize(14);
+        ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
+        x.setPadding(dp(10), dp(10), dp(10), dp(10));
+        x.setContentDescription("Remove section");
+        firSecRows.add(s);
+        x.setOnClickListener(v -> {
+            if (firSecRows.size() == 1) { s.setText(""); return; }
+            firSecBox.removeView(row);
+            firSecRows.remove(s);
+        });
+        row.addView(s, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        if (scaled) shrink(row);
+        firSecBox.addView(row);
+    }
+
+    /** FIR sections joined with ", " (blank rows skipped). */
+    private String firSectionsText() {
+        StringBuilder sb = new StringBuilder();
+        for (EditText e : firSecRows) {
+            String v = LegalUi.str(e);
+            if (v.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(v);
+        }
+        return sb.toString();
+    }
+
     private String actsText() {
         StringBuilder sb = new StringBuilder();
         for (EditText[] p : actRows) {
@@ -1061,8 +1112,10 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "Appearing for", appearingFor);
         line(sb, "Agreed fee", LegalUi.str(feeEdit));
         line(sb, "Judge", LegalUi.str(judgeEdit));
-        line(sb, "FIR", (LegalUi.str(stationEdit) + " " + LegalUi.str(firNoEdit) + " "
+        String fn = LegalUi.str(firNoEdit), fy = LegalUi.str(firYearEdit);
+        line(sb, "FIR", (LegalUi.str(stationEdit) + " " + fn + (fy.isEmpty() ? "" : "/" + fy) + " "
                 + LegalUi.str(firDateEdit)).trim());
+        line(sb, "FIR under section(s)", firSectionsText());
         line(sb, "Acts", actsText().replace('\n', ';'));
         new AlertDialog.Builder(this).setTitle("Preview")
                 .setMessage(sb.toString())
@@ -1116,6 +1169,8 @@ public class NewCaseActivity extends BaseActivity {
         c.notes = LegalUi.str(notesEdit);
         c.firStation = LegalUi.str(stationEdit);
         c.firNo = LegalUi.str(firNoEdit);
+        c.firYear = LegalUi.str(firYearEdit);
+        c.firSections = firSectionsText();
         c.firDate = LegalUi.str(firDateEdit);
         c.acts = actsText();
 
