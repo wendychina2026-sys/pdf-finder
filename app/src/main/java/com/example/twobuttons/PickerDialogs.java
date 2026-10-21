@@ -216,6 +216,37 @@ final class PickerDialogs {
                 "Create New Court Type", onCreate, custom, onDelete, onPick);
     }
 
+    /** Bottom sheet with icon + label rows. onPick gets the row index. */
+    static void actions(Activity a, String title, String[] labels, int[] icons, Consumer<Integer> onPick) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackground(panel(a, 28, 0, false));
+        LinearLayout head = titleRow(a, d, title, null);
+        head.setPadding(dp(a, 22), dp(a, 18), dp(a, 14), dp(a, 12));
+        root.addView(head);
+        root.addView(hairline(a));
+        for (int i = 0; i < labels.length; i++) {
+            final int idx = i;
+            LinearLayout row = new LinearLayout(a);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(a, 22), dp(a, 16), dp(a, 22), dp(a, 16));
+            row.addView(CaseViews.icon(a, icons[i], AppTheme.accent(a), 26));
+            TextView t = CaseViews.text(a, labels[i], 16, ink(a), false);
+            t.setPadding(dp(a, 16), 0, 0, 0);
+            row.addView(t);
+            row.setOnClickListener(v -> {
+                d.dismiss();
+                onPick.accept(idx);
+            });
+            root.addView(row);
+        }
+        View pad = new View(a);
+        root.addView(pad, new LinearLayout.LayoutParams(1, dp(a, 12)));
+        present(d, a, root, true);
+    }
+
     /** Judges: same look as court types. Search, pinned "Add New Judge", custom badge and delete. */
     static void judges(Activity a, Supplier<List<String>> source, String selected, Runnable onCreate,
                        Predicate<String> custom, Consumer<String> onDelete, Consumer<String> onPick) {

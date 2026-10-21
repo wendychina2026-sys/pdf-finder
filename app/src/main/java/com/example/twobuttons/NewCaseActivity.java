@@ -12,6 +12,10 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
+import android.provider.MediaStore;
+import androidx.core.content.FileProvider;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,7 +31,11 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +50,7 @@ public class NewCaseActivity extends BaseActivity {
 
     private static final int REQ_CLIENT = 51;
     private static final int REQ_FILE = 52;
+    private static final int REQ_CAMERA = 53;
     private static final int REQUIRED = 5;
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
@@ -88,6 +97,10 @@ public class NewCaseActivity extends BaseActivity {
     private EditText firYearEdit;
     private final List<Uri> pickedUris = new ArrayList<>();
     private final List<String> pickedNames = new ArrayList<>();
+    private int replaceIdx = -1;          // >= 0 while a file is being replaced
+    private Uri cameraUri;
+    private int dragCur = -1;             // row being dragged, -1 = none
+    private float dragDownY, dragShift;
     private LinearLayout filesBox;
     private boolean scaled = false;
 
@@ -118,12 +131,12 @@ public class NewCaseActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         body.addView(toggleBar(), cardLp());
+        body.addView(buildUploadCard(), cardLp());      // 1st card
+        body.addView(buildCaseCard(), cardLp());        // 2nd card
         cnrCard = buildCnrCard();
         body.addView(cnrCard, cardLp());
         body.addView(buildClientCard(), cardLp());
-        body.addView(buildCaseCard(), cardLp());
         body.addView(buildAdditionalCard(), cardLp());
-        body.addView(buildUploadCard(), cardLp());
 
         root.addView(bottomBar());
         setContentView(root);
@@ -585,6 +598,10 @@ public class NewCaseActivity extends BaseActivity {
                 renderClient();
             }
         }
+        if (req == REQ_CAMERA && res == RESULT_OK && cameraUri != null) {
+            addPicked(cameraUri);
+            renderFiles();
+        }
         if (req == REQ_FILE && res == RESULT_OK && data != null) {
             ClipData clip = data.getClipData();
             if (clip != null) {
@@ -611,6 +628,8 @@ public class NewCaseActivity extends BaseActivity {
 
         LinearLayout f = LegalUi.form(this);
         f.setPadding(0, 0, 0, 0);
+        f.addView(lbl("My client is"));      // first option in Case details
+        f.addView(sideChips(() -> clientRole, v -> clientRole = v), lpTop(10));
         titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
         ((RoundEdit) titleEdit).setRequired(true);
         titleEdit.setHint("Enter Case Title");
@@ -662,8 +681,6 @@ public class NewCaseActivity extends BaseActivity {
                     nextStatus = s;
                     setChosen(nextStatusText, s, "Select Status");
                 }));
-        f.addView(lbl("My client is"));
-        f.addView(clientRoleRadios());
         c.addView(f, lpTop(4));
 
         titleEdit.addTextChangedListener(watcher);
@@ -841,9 +858,9 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout t = col("Upload File", 15, "Upload case file here");
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         ImageView plus = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 30);
-        plus.setContentDescription("Choose a PDF or image");
+        plus.setContentDescription("Upload a PDF or take a photo");
         head.addView(plus);
-        head.setOnClickListener(v -> pickFile());
+        head.setOnClickListener(v -> chooseSource(-1));
         c.addView(head);
 
         filesBox = new LinearLayout(this);
@@ -853,12 +870,53 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
+    /** Ask: PDF from the phone, or a camera photo. replaceAt >= 0 swaps that file instead of adding. */
+    private void chooseSource(int replaceAt) {
+        replaceIdx = replaceAt;
+        PickerDialogs.actions(this, replaceAt >= 0 ? "Replace file" : "Upload file",
+                new String[]{"Upload PDF", "Take photo"},
+                new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                i -> {
+                    if (i == 0) pickFile();
+                    else takePhoto();
+                });
+    }
+
+    private void takePhoto() {
+        try {
+            File dir = getExternalFilesDir("case_photos");
+            if (dir == null) dir = getCacheDir();
+            dir.mkdirs();
+            File f = new File(dir, "Photo_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                    .format(new Date()) + ".jpg");
+            cameraUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f);
+            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
+            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i, REQ_CAMERA);
+        } catch (Exception e) {
+            Toast.makeText(this, "Camera not available", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void openFile(int idx) {
+        Uri u = pickedUris.get(idx);
+        String type = getContentResolver().getType(u);
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setDataAndType(u, type == null ? "*/*" : type);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            Toast.makeText(this, "No app found to open this file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void pickFile() {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "image/*"});
-        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        i.setType("application/pdf");
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, replaceIdx < 0);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try {
             startActivityForResult(i, REQ_FILE);
@@ -868,12 +926,19 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private void addPicked(Uri uri) {
-        if (uri == null || pickedUris.contains(uri)) return;
+        if (uri == null) return;
         try {
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } catch (Exception ignored) {
             // not every provider offers a persistable grant; the file still shows in the list
         }
+        if (replaceIdx >= 0 && replaceIdx < pickedUris.size()) {
+            pickedUris.set(replaceIdx, uri);
+            pickedNames.set(replaceIdx, displayName(uri));
+            replaceIdx = -1;
+            return;
+        }
+        if (pickedUris.contains(uri)) return;
         pickedUris.add(uri);
         pickedNames.add(displayName(uri));
     }
@@ -892,32 +957,111 @@ public class NewCaseActivity extends BaseActivity {
         return name == null ? "File" : name;
     }
 
+    private ImageView fileAction(int icon, int color, String desc, View.OnClickListener l) {
+        ImageView x = CaseViews.icon(this, icon, color, 20);
+        x.setPadding(dp(8), dp(8), dp(8), dp(8));
+        x.setContentDescription(desc);
+        x.setOnClickListener(l);
+        return x;
+    }
+
+    private void swapFiles(int a, int b) {
+        Collections.swap(pickedUris, a, b);
+        Collections.swap(pickedNames, a, b);
+    }
+
     private void renderFiles() {
         filesBox.removeAllViews();
+        dragCur = -1;
+        if (pickedUris.size() > 1) {
+            TextView hint = CaseViews.text(this, "Press and hold a file, then drag up or down to reorder",
+                    12, AppTheme.sub(this), false);
+            hint.setPadding(0, 0, 0, dp(8));
+            filesBox.addView(hint);
+        }
         for (int i = 0; i < pickedUris.size(); i++) {
             final int idx = i;
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(12), dp(8), dp(4), dp(8));
-            row.setBackground(CaseViews.box(this, AppTheme.field(this), 12, AppTheme.fieldStroke(this), 1));
+            row.setPadding(dp(8), dp(6), dp(2), dp(6));
+            row.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
             boolean pdf = pickedNames.get(i).toLowerCase(Locale.ROOT).endsWith(".pdf");
-            row.addView(CaseViews.icon(this, pdf ? R.drawable.ic_pdf : R.drawable.ic_notes,
-                    AppTheme.accent(this), 22));
+
+            ImageView grip = CaseViews.icon(this, R.drawable.ic_drag, AppTheme.sub(this), 18);
+            grip.setContentDescription("Press and hold to move");
+            row.addView(grip, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            ImageView kind = CaseViews.icon(this, pdf ? R.drawable.ic_pdf : R.drawable.ic_camera,
+                    AppTheme.accent(this), 22);
+            row.addView(kind);
             TextView n = CaseViews.text(this, pickedNames.get(i), 13, AppTheme.text(this), false);
             n.setSingleLine(true);
             n.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-            n.setPadding(dp(10), 0, 0, 0);
+            n.setPadding(dp(10), 0, dp(4), 0);
             row.addView(n, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
-            x.setPadding(dp(10), dp(10), dp(10), dp(10));
-            x.setContentDescription("Remove file");
-            x.setOnClickListener(v -> {
+
+            row.addView(fileAction(R.drawable.ic_eye, AppTheme.accent(this), "View file",
+                    v -> openFile(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
+            row.addView(fileAction(R.drawable.ic_replace, AppTheme.accent(this), "Replace file",
+                    v -> chooseSource(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
+            row.addView(fileAction(R.drawable.ic_delete, RoundEdit.RED, "Remove file", v -> {
                 pickedUris.remove(idx);
                 pickedNames.remove(idx);
                 renderFiles();
+            }), new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+            // long press -> drag up / down to reorder
+            row.setOnLongClickListener(v -> {
+                dragCur = filesBox.indexOfChild(v) - (pickedUris.size() > 1 ? 1 : 0);
+                dragShift = 0;
+                v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                v.setAlpha(0.9f);
+                v.setElevation(dp(8));
+                if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
+                return true;
             });
-            row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            row.setOnTouchListener((v, e) -> {
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) dragDownY = e.getRawY();
+                if (dragCur < 0) return false;
+                int off = pickedUris.size() > 1 ? 1 : 0;       // first child is the hint line
+                if (filesBox.indexOfChild(v) - off != dragCur) return false;
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_MOVE: {
+                        float ty = e.getRawY() - dragDownY + dragShift;
+                        float step = v.getHeight() + dp(8);
+                        int cur = dragCur;
+                        if (ty > step * 0.55f && cur < pickedUris.size() - 1) {
+                            View other = filesBox.getChildAt(cur + 1 + off);
+                            swapFiles(cur, cur + 1);
+                            filesBox.removeView(other);
+                            filesBox.addView(other, cur + off);
+                            dragCur = cur + 1;
+                            dragShift -= step;
+                            ty -= step;
+                            v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                        } else if (ty < -step * 0.55f && cur > 0) {
+                            View other = filesBox.getChildAt(cur - 1 + off);
+                            swapFiles(cur, cur - 1);
+                            filesBox.removeView(other);
+                            filesBox.addView(other, cur + off);
+                            dragCur = cur - 1;
+                            dragShift += step;
+                            ty += step;
+                            v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                        }
+                        v.setTranslationY(ty);
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(false);
+                        renderFiles();      // drop: rebuild rows in the new order
+                        return true;
+                    default:
+                        return true;
+                }
+            });
+
             LinearLayout.LayoutParams lp = lpTop(0);
             lp.bottomMargin = dp(8);
             filesBox.addView(row, lp);
@@ -959,13 +1103,17 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Wrapping single-select chips: icon + name, the chosen one gets an outline and a check. */
     private View appearingChips() {
+        return sideChips(() -> appearingFor, v -> appearingFor = v);
+    }
+
+    private View sideChips(java.util.function.Supplier<String> get, Consumer<String> set) {
         final AppCard.Flow flow = new AppCard.Flow(this, dp(10), dp(10));
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
             flow.removeAllViews();
             for (int i = 0; i < SIDES.length; i++) {
                 final String side = SIDES[i];
-                boolean on = side.equals(appearingFor);
+                boolean on = side.equals(get.get());
                 LinearLayout chip = new LinearLayout(this);
                 chip.setOrientation(LinearLayout.HORIZONTAL);
                 chip.setGravity(Gravity.CENTER_VERTICAL);
@@ -983,7 +1131,7 @@ public class NewCaseActivity extends BaseActivity {
                     chip.addView(ck);
                 }
                 chip.setOnClickListener(v -> {
-                    appearingFor = side.equals(appearingFor) ? "" : side;
+                    set.accept(side.equals(get.get()) ? "" : side);
                     draw[0].run();
                 });
                 flow.addView(chip);
@@ -1124,24 +1272,6 @@ public class NewCaseActivity extends BaseActivity {
 
     private List<String> statusList() {
         return new ArrayList<>(Arrays.asList(AllCasesActivity.STAGES).subList(1, AllCasesActivity.STAGES.length));
-    }
-
-    /** "My client is": Appellant or Respondent, one radio each. */
-    private View clientRoleRadios() {
-        android.widget.RadioGroup g = new android.widget.RadioGroup(this);
-        g.setOrientation(android.widget.RadioGroup.HORIZONTAL);
-        String[] roles = {"Appellant", "Respondent"};
-        for (String r : roles) {
-            android.widget.RadioButton b = new android.widget.RadioButton(this);
-            b.setText(r);
-            b.setTextSize(14);
-            b.setTextColor(AppTheme.text(this));
-            b.setId(View.generateViewId());
-            b.setOnClickListener(v -> clientRole = r);
-            g.addView(b, new android.widget.RadioGroup.LayoutParams(0,
-                    android.widget.RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        return g;
     }
 
     private void addFirSectionRow() {
