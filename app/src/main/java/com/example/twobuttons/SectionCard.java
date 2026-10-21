@@ -55,15 +55,16 @@ final class SectionCard {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(CaseViews.box(a, AppTheme.bg(a), 16, AppTheme.cardStroke(a), 1));
         card.setElevation(dp(1));
+        card.setPadding(dp(1), dp(1), dp(1), dp(1));   // children stay inside the border stroke
 
         // ---- header band ----
         LinearLayout head = new LinearLayout(a);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(14), dp(12), dp(14), dp(12));
-        GradientDrawable band = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{AppTheme.card(a), AppTheme.bg(a)});
-        float rad = dp(16);
+        GradientDrawable band = new GradientDrawable();
+        band.setColor(AppTheme.card(a));
+        float rad = dp(15);
         band.setCornerRadii(new float[]{rad, rad, rad, rad, 0, 0, 0, 0});
         head.setBackground(band);
 
@@ -89,8 +90,14 @@ final class SectionCard {
             LinearLayout right = new LinearLayout(a);
             right.setOrientation(LinearLayout.VERTICAL);
             right.setGravity(Gravity.CENTER_HORIZONTAL);
-            right.addView(CaseViews.text(a, String.valueOf(count), 20, AppTheme.text(a), true));
-            right.addView(CaseViews.text(a, countLabel, 11, AppTheme.sub(a), false));
+            TextView num = CaseViews.text(a, String.valueOf(count), 20, AppTheme.text(a), true);
+            num.setGravity(Gravity.CENTER);
+            TextView lab = CaseViews.text(a, countLabel, 11, AppTheme.sub(a), false);
+            lab.setGravity(Gravity.CENTER);
+            right.addView(num, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            right.addView(lab, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             rlp.leftMargin = dp(10);
