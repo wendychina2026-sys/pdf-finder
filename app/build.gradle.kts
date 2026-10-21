@@ -30,6 +30,9 @@ android {
 }
 
 dependencies {
+    // ML Kit pulls in Kotlin 1.8.22 and 1.6.21 stdlib parts; pin all of them to one version
+    // (fixes "Duplicate class kotlin.collections.jdk8..." in checkDebugDuplicateClasses)
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.22"))
     implementation("androidx.core:core:1.13.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")              // camera: read text from a photo
