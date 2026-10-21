@@ -166,15 +166,11 @@ public class CaseDetailsActivity extends BaseActivity {
         needsRefresh = false;
         String ct = val(caseSpin), sb = val(subSpin), ss = val(subSubSpin), cr = val(courtSpin);
         opts = new CaseOptions(this);
-        courtSpin.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                withSelect(CaseOptions.arr(opts.courts()))));
+        courtSpin.setAdapter(CaseViews.wrapAdapter(this, withSelect(CaseOptions.arr(opts.courts()))));
         select(courtSpin, cr);
         pendingSub = sb.isEmpty() ? null : sb;
         pendingSubSub = ss.isEmpty() ? null : ss;
-        caseSpin.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                withSelect(CaseOptions.arr(opts.types()))));
+        caseSpin.setAdapter(CaseViews.wrapAdapter(this, withSelect(CaseOptions.arr(opts.types()))));
         select(caseSpin, ct);
     }
 
@@ -186,8 +182,7 @@ public class CaseDetailsActivity extends BaseActivity {
         boolean show = items.length > 0;
         subSubLabel.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
         subSubSpin.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
-        subSubSpin.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, withSelect(items)));
+        subSubSpin.setAdapter(CaseViews.wrapAdapter(this, withSelect(items)));
         if (pendingSubSub != null) {
             select(subSubSpin, pendingSubSub);
             pendingSubSub = null;
@@ -197,8 +192,7 @@ public class CaseDetailsActivity extends BaseActivity {
     private void fillSubs() {
         String ct = val(caseSpin);
         String[] subs = ct.isEmpty() ? new String[0] : CaseOptions.arr(opts.subs(ct));
-        subSpin.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, withSelect(subs)));
+        subSpin.setAdapter(CaseViews.wrapAdapter(this, withSelect(subs)));
         if (pendingSub != null) {
             select(subSpin, pendingSub);
             pendingSub = null;
@@ -214,8 +208,7 @@ public class CaseDetailsActivity extends BaseActivity {
 
     private Spinner spinner(String[] items) {
         Spinner s = new Spinner(this);
-        s.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, withSelect(items)));
+        s.setAdapter(CaseViews.wrapAdapter(this, withSelect(items)));
         return s;
     }
 
@@ -274,12 +267,11 @@ public class CaseDetailsActivity extends BaseActivity {
             }
         }
 
-        DatePickerDialog dlg = new DatePickerDialog(this, (view, y, m, d) -> {
-            nextDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d);
+        PickerDialogs.calendar(this, "Select Next Date", init, min, x -> {
+            nextDate = String.format(Locale.US, "%04d-%02d-%02d", x.get(Calendar.YEAR),
+                    x.get(Calendar.MONTH) + 1, x.get(Calendar.DAY_OF_MONTH));
             updateNextButton();
-        }, init.get(Calendar.YEAR), init.get(Calendar.MONTH), init.get(Calendar.DAY_OF_MONTH));
-        dlg.getDatePicker().setMinDate(min.getTimeInMillis());
-        dlg.show();
+        });
     }
 
     private void save() {

@@ -6,6 +6,8 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.EditText;
@@ -23,6 +25,10 @@ public class RoundEdit extends EditText {
 
     static final int RED = 0xFFD93025;
     private static final int RADIUS_DP = 14;
+    static final int HEIGHT_DP = 52;       // every single-line box is this tall
+    private static final float TEXT_SP = 15;
+
+    private int minPx;
 
     private boolean invalid;
     private boolean required;
@@ -35,6 +41,10 @@ public class RoundEdit extends EditText {
         setHintTextColor(AppTheme.sub(c));
         int h = CaseViews.dp(c, 16), v = CaseViews.dp(c, 12);
         setPadding(h, v, h, v);
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+        setGravity(Gravity.CENTER_VERTICAL);
+        minPx = CaseViews.dp(c, HEIGHT_DP);
+        setMinHeight(minPx);
         addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int d) { }
@@ -67,6 +77,19 @@ public class RoundEdit extends EditText {
         return ok;
     }
 
+    /** One text size for every box, so heights match. Callers' sizes are ignored. */
+    @Override
+    public void setTextSize(int unit, float size) {
+        super.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+    }
+
+    /** One line = the shared box height. More lines (Notes, Address) grow as asked. */
+    @Override
+    public void setMinLines(int n) {
+        if (n <= 1) setMinHeight(minPx);
+        else super.setMinLines(n);
+    }
+
     @Override
     public void setBackground(Drawable d) {
         if (d == null) {
@@ -94,6 +117,8 @@ public class RoundEdit extends EditText {
         ViewParent p = getParent();
         if (p instanceof View && ((View) p).getBackground() != null) {
             frame = (View) p;
+            minPx = Math.max(0, CaseViews.dp(getContext(), HEIGHT_DP) - frame.getPaddingTop() - frame.getPaddingBottom());
+            setMinHeight(minPx);
             paint();
         }
     }

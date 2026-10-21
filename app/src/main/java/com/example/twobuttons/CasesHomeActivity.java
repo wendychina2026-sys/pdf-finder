@@ -159,10 +159,7 @@ public class CasesHomeActivity extends BaseActivity {
     }
 
     private void pickCalendar() {
-        Calendar c = Calendar.getInstance();
-        new DatePickerDialog(this, (v, y, m, d) -> {
-            Calendar x = Calendar.getInstance();
-            x.set(y, m, d);
+        PickerDialogs.calendar(this, "Select Date", null, null, x -> {
             String ds = DiaryStore.fmt(x.getTime());
             List<String> names = new ArrayList<>();
             for (DiaryStore.HCase cs : store.cases()) if (ds.equals(cs.next)) names.add(cs.title());
@@ -171,7 +168,7 @@ public class CasesHomeActivity extends BaseActivity {
                     .setMessage(names.isEmpty() ? "Nothing on this date" : joinLines(names))
                     .setPositiveButton("OK", null)
                     .show();
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
+        });
     }
 
     private static String joinLines(List<String> l) {
@@ -400,17 +397,18 @@ public class CasesHomeActivity extends BaseActivity {
     }
 
     private void reschedule(DiaryStore.HCase c) {
-        Calendar cal = Calendar.getInstance();
+        Calendar cal = null;
         Date d = DiaryStore.parse(c.next);
-        if (d != null) cal.setTime(d);
-        new DatePickerDialog(this, (v, y, m, day) -> {
-            Calendar x = Calendar.getInstance();
-            x.set(y, m, day);
+        if (d != null) {
+            cal = Calendar.getInstance();
+            cal.setTime(d);
+        }
+        PickerDialogs.calendar(this, "Reschedule", cal, null, x -> {
             if (!c.next.isEmpty()) c.prev = c.next;
             c.next = DiaryStore.fmt(x.getTime());
             store.saveCase(c);
             render();
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+        });
     }
 
     private void shareWeek() {

@@ -138,7 +138,7 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Scales every text on this page down a little; views added later call this for themselves. */
     private void shrink(View v) {
-        if (v instanceof TextView) {
+        if (v instanceof TextView && !(v.getTag() instanceof View)) {   // dropdown text stays 15sp like the boxes
             TextView t = (TextView) v;
             t.setTextSize(TypedValue.COMPLEX_UNIT_PX, t.getTextSize() * TEXT_SCALE);
         }
@@ -212,7 +212,8 @@ public class NewCaseActivity extends BaseActivity {
         box.setGravity(Gravity.CENTER_VERTICAL);
         box.setPadding(dp(14), dp(12), dp(14), dp(12));
         box.setBackground(dropBg(false));
-        TextView t = CaseViews.text(this, placeholder, 14, AppTheme.sub(this), false);
+        box.setMinimumHeight(dp(RoundEdit.HEIGHT_DP));
+        TextView t = CaseViews.text(this, placeholder, 15, AppTheme.sub(this), false);
         t.setTag(box);
         box.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 22));
@@ -613,7 +614,6 @@ public class NewCaseActivity extends BaseActivity {
         titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
         ((RoundEdit) titleEdit).setRequired(true);
         titleEdit.setHint("Enter Case Title");
-        titleEdit.setMinLines(2);
         regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
         regEdit.setHint("Select Date");
         regEdit.setOnClickListener(v ->
@@ -646,6 +646,22 @@ public class NewCaseActivity extends BaseActivity {
         caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
         ((RoundEdit) caseNoEdit).setRequired(true);
         caseNoEdit.setHint("Case No.");
+        nextHearingEdit = LegalUi.dmyInput(this, f, "Next hearing date", "");
+        nextHearingEdit.setHint("Select Date");
+        nextHearingEdit.setOnClickListener(v ->
+                PickerDialogs.calendar(this, "Select Next Hearing Date", nextHearingEdit));
+        f.addView(lbl("Current status"));
+        curStatusText = dropdown(f, "Select Status", v ->
+                choose("Current status", statusList(), s -> {
+                    curStatus = s;
+                    setChosen(curStatusText, s, "Select Status");
+                }));
+        f.addView(lbl("Next status"));
+        nextStatusText = dropdown(f, "Select Status", v ->
+                choose("Next status", statusList(), s -> {
+                    nextStatus = s;
+                    setChosen(nextStatusText, s, "Select Status");
+                }));
         f.addView(lbl("My client is"));
         f.addView(clientRoleRadios());
         c.addView(f, lpTop(4));
@@ -741,8 +757,8 @@ public class NewCaseActivity extends BaseActivity {
 
         // parties
         LinearLayout f2 = subForm();
-        petEdit = partyField(f2, "Petitioner / Plaintiff / First Party", "Enter Petitioner / First Party", 2);
-        resEdit = partyField(f2, "Respondent / Defendant / Opposite Party", "Enter Respondent / Opposite Party", 2);
+        petEdit = partyField(f2, "Petitioner / Plaintiff / First Party", "Enter Petitioner / First Party", 1);
+        resEdit = partyField(f2, "Respondent / Defendant / Opposite Party", "Enter Respondent / Opposite Party", 1);
         oppAdvEdit = partyField(f2, "Opposing Advocate", "Enter Opposing Advocate Name", 1);
         f2.addView(partyLabel("Appearing For"));
         f2.addView(appearingChips(), lpTop(10));
@@ -765,24 +781,8 @@ public class NewCaseActivity extends BaseActivity {
         roomEdit = LegalUi.multiline(this, fj, "Court room / address", "");
         roomEdit.setMinLines(2);
         roomEdit.setHint("Court room no. and address");
-        nextHearingEdit = LegalUi.dmyInput(this, fj, "Next hearing date", "");
-        nextHearingEdit.setHint("Select Date");
-        nextHearingEdit.setOnClickListener(v ->
-                PickerDialogs.calendar(this, "Select Next Hearing Date", nextHearingEdit));
-        fj.addView(lbl("Current status"));
-        curStatusText = dropdown(fj, "Select Status", v ->
-                choose("Current status", statusList(), s -> {
-                    curStatus = s;
-                    setChosen(curStatusText, s, "Select Status");
-                }));
-        fj.addView(lbl("Next status"));
-        nextStatusText = dropdown(fj, "Select Status", v ->
-                choose("Next status", statusList(), s -> {
-                    nextStatus = s;
-                    setChosen(nextStatusText, s, "Select Status");
-                }));
         extra.addView(section(R.drawable.ic_court, "Judge & hearing",
-                "Judge, court room, next hearing date and status", fj));
+                "Judge and court room / address", fj));
 
         LinearLayout f4 = subForm();
         priority = LegalUi.spinner(this, f4, "Priority", PRIORITIES, PRIORITIES[0]);

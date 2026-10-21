@@ -98,15 +98,16 @@ public class SarthCaseListActivity extends BaseActivity {
     }
 
     private void pickDate() {
-        Calendar c = Calendar.getInstance();
+        Calendar c = null;
         Date d = DiaryStore.parse(dateFilter);
-        if (d != null) c.setTime(d);
-        new DatePickerDialog(this, (v, y, m, day) -> {
-            Calendar x = Calendar.getInstance();
-            x.set(y, m, day);
+        if (d != null) {
+            c = Calendar.getInstance();
+            c.setTime(d);
+        }
+        PickerDialogs.calendar(this, "Select Date", c, null, x -> {
             dateFilter = DiaryStore.fmt(x.getTime());
             render();
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
+        });
     }
 
     private void render() {
@@ -216,13 +217,6 @@ public class SarthCaseListActivity extends BaseActivity {
     }
 
     private void pick(EditText target) {
-        Calendar c = Calendar.getInstance();
-        Date d = DiaryStore.parse(target.getText().toString());
-        if (d != null) c.setTime(d);
-        new DatePickerDialog(this, (v, y, m, day) -> {
-            Calendar x = Calendar.getInstance();
-            x.set(y, m, day);
-            target.setText(DiaryStore.fmt(x.getTime()));
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
+        PickerDialogs.calendar(this, "Select Date", target);
     }
 }

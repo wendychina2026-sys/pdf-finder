@@ -36,6 +36,29 @@ class CaseViews {
         return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    /** Spinner adapter whose rows wrap to as many lines as needed: long names are never cut off. */
+    static android.widget.ArrayAdapter<String> wrapAdapter(Context c, String[] items) {
+        return new android.widget.ArrayAdapter<String>(c, android.R.layout.simple_spinner_dropdown_item, items) {
+            private View fix(View v) {
+                if (v instanceof TextView) {
+                    TextView t = (TextView) v;
+                    t.setSingleLine(false);
+                    t.setMaxLines(4);
+                    t.setEllipsize(null);
+                    t.setTextSize(14);
+                    t.setPadding(dp(getContext(), 10), dp(getContext(), 10), dp(getContext(), 10), dp(getContext(), 10));
+                }
+                return v;
+            }
+            @Override public View getView(int p, View cv, android.view.ViewGroup parent) {
+                return fix(super.getView(p, cv, parent));
+            }
+            @Override public View getDropDownView(int p, View cv, android.view.ViewGroup parent) {
+                return fix(super.getDropDownView(p, cv, parent));
+            }
+        };
+    }
+
     static GradientDrawable box(Context c, int fill, int radiusDp, int strokeColor, int strokeDp) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(fill);
@@ -153,16 +176,15 @@ class CaseViews {
             }
         }
 
-        DatePickerDialog dlg = new DatePickerDialog(a, (view, y, m, d) -> {
+        PickerDialogs.calendar(a, "Select Next Date", init, min, x -> {
             DetailsStore ds = new DetailsStore(a);
             DetailsStore.Details det = ds.get(it.path);
             if (det == null) return;
-            det.nextDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d);
+            det.nextDate = String.format(Locale.US, "%04d-%02d-%02d", x.get(Calendar.YEAR),
+                    x.get(Calendar.MONTH) + 1, x.get(Calendar.DAY_OF_MONTH));
             ds.save(it.path, det);
             after.run();
-        }, init.get(Calendar.YEAR), init.get(Calendar.MONTH), init.get(Calendar.DAY_OF_MONTH));
-        dlg.getDatePicker().setMinDate(min.getTimeInMillis());
-        dlg.show();
+        });
     }
 
     static void openDetails(Activity a, String path) {

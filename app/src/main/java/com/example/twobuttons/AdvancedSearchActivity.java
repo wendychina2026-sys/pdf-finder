@@ -108,8 +108,9 @@ public class AdvancedSearchActivity extends BaseActivity {
 
         // fixed (non-scrolling) filter block, in order: case type, sub, sub-sub, court, year, lawyer
         filters.addView(pair("Case type", caseSpin, "Sub case type", subSpin));
-        filters.addView(pair("Sub-sub case type", subSubSpin, "Court", courtSpin));
-        filters.addView(pair("Year of filing", yearSpin, "Lawyer", lawyerEdit));
+        filters.addView(full("Sub-sub case type", subSubSpin));
+        filters.addView(pair("Court", courtSpin, "Year of filing", yearSpin));
+        filters.addView(full("Lawyer", lawyerEdit));
 
         AdapterView.OnItemSelectedListener refresher = new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { refresh(); }
@@ -123,8 +124,7 @@ public class AdvancedSearchActivity extends BaseActivity {
                 // sub = All -> every sub-sub of chosen type, or civil + criminal together
                 java.util.List<String> l = sb.isEmpty() ? opts.allSubSubs(ct)
                         : (ct.isEmpty() ? opts.subSubsAnyType(sb) : opts.subSubs(ct, sb));
-                subSubSpin.setAdapter(new ArrayAdapter<>(AdvancedSearchActivity.this,
-                        android.R.layout.simple_spinner_dropdown_item,
+                subSubSpin.setAdapter(CaseViews.wrapAdapter(AdvancedSearchActivity.this,
                         withAll(CaseOptions.arr(l))));
                 refresh();
             }
@@ -136,8 +136,7 @@ public class AdvancedSearchActivity extends BaseActivity {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                 String ct = val(caseSpin);
                 String[] subs = CaseOptions.arr(ct.isEmpty() ? opts.allSubs() : opts.subs(ct));
-                subSpin.setAdapter(new ArrayAdapter<>(AdvancedSearchActivity.this,
-                        android.R.layout.simple_spinner_dropdown_item, withAll(subs)));
+                subSpin.setAdapter(CaseViews.wrapAdapter(AdvancedSearchActivity.this, withAll(subs)));
                 refresh();
             }
             @Override public void onNothingSelected(AdapterView<?> p) {}
@@ -248,8 +247,7 @@ public class AdvancedSearchActivity extends BaseActivity {
 
     private Spinner spinner(String[] items) {
         Spinner s = new Spinner(this);
-        s.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, withAll(items)));
+        s.setAdapter(CaseViews.wrapAdapter(this, withAll(items)));
         return s;
     }
 
@@ -258,6 +256,16 @@ public class AdvancedSearchActivity extends BaseActivity {
         String[] out = new String[now - 1950 + 1];
         for (int y = now, i = 0; y >= 1950; y--, i++) out[i] = String.valueOf(y);
         return out;
+    }
+
+    // one labelled field, full width (long option names stay readable)
+    private LinearLayout full(String la, View v) {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.addView(label(la));
+        col.addView(v, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return col;
     }
 
     // two labelled fields side by side

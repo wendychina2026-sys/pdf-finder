@@ -129,18 +129,18 @@ final class LegalUi {
         EditText e = input(c, f, label, value, InputType.TYPE_NULL);
         e.setFocusable(false);
         e.setOnClickListener(v -> {
-            Calendar cal = Calendar.getInstance();
             SimpleDateFormat fmt = new SimpleDateFormat("dd MMM yyyy", Locale.US);
+            Calendar cal = null;
             try {
                 Date d = fmt.parse(e.getText().toString().trim());
-                if (d != null) cal.setTime(d);
+                if (d != null) {
+                    cal = Calendar.getInstance();
+                    cal.setTime(d);
+                }
             } catch (Exception ignored) {
             }
-            new DatePickerDialog(c, (view, y, m, day) -> {
-                Calendar x = Calendar.getInstance();
-                x.set(y, m, day);
-                e.setText(fmt.format(x.getTime()));
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+            PickerDialogs.calendar((Activity) c, "Select Date", cal, null,
+                    x -> e.setText(fmt.format(x.getTime())));
         });
         return e;
     }
@@ -214,14 +214,7 @@ final class LegalUi {
 
     /** Date picker writing dd/MM/yyyy into the field. */
     static void pickDmy(Context c, EditText target) {
-        Calendar cal = Calendar.getInstance();
-        Date d = DiaryStore.parse(target.getText().toString());
-        if (d != null) cal.setTime(d);
-        new DatePickerDialog(c, (view, y, m, day) -> {
-            Calendar x = Calendar.getInstance();
-            x.set(y, m, day);
-            target.setText(DiaryStore.fmt(x.getTime()));
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+        PickerDialogs.calendar((Activity) c, "Select Date", target);
     }
 
     /** Read-only field, tap -> dd/MM/yyyy picker. */

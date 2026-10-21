@@ -426,19 +426,32 @@ final class PickerDialogs {
 
     /** Month calendar; a tapped day is written to the field as dd/MM/yyyy. */
     static void calendar(Activity a, String title, EditText target) {
+        Date parsed = DiaryStore.parse(target.getText().toString());
+        Calendar init = null;
+        if (parsed != null) {
+            init = Calendar.getInstance();
+            init.setTime(parsed);
+        }
+        calendar(a, title, init, null, c -> target.setText(DiaryStore.fmt(c.getTime())));
+    }
+
+    private static int dayKey(Calendar c) {
+        return c.get(Calendar.YEAR) * 1000 + c.get(Calendar.DAY_OF_YEAR);
+    }
+
+    static final int SUNDAY_RED = 0xFFD93025;
+
+    /**
+     * The one calendar for the whole app. Sundays (court holiday) are red filled circles.
+     * initial: highlighted day, may be null. min: earlier days are greyed and not tappable, may be null.
+     */
+    static void calendar(Activity a, String title, Calendar initial, Calendar min, Consumer<Calendar> onPick) {
         final String[] months = new String[12];
         System.arraycopy(new DateFormatSymbols(Locale.US).getMonths(), 0, months, 0, 12);
         final String[] weekdays = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
         final Calendar today = Calendar.getInstance();
-        Date parsed = DiaryStore.parse(target.getText().toString());
-        final Calendar selected;
-        if (parsed != null) {
-            selected = Calendar.getInstance();
-            selected.setTime(parsed);
-        } else {
-            selected = null;
-        }
+        final Calendar selected = initial;
         final Calendar shown = (Calendar) (selected != null ? selected : today).clone();
         shown.set(Calendar.DAY_OF_MONTH, 1);
 
@@ -489,7 +502,7 @@ final class PickerDialogs {
         wk.setOrientation(LinearLayout.HORIZONTAL);
         wk.setPadding(dp(a, 12), dp(a, 6), dp(a, 12), dp(a, 4));
         for (String w : weekdays) {
-            TextView t = CaseViews.text(a, w, 13, ink(a), false);
+            TextView t = CaseViews.text(a, w, 13, w.equals("Sun") ? SUNDAY_RED : ink(a), w.equals("Sun"));
             t.setGravity(Gravity.CENTER);
             wk.addView(t, weight());
         }
@@ -526,16 +539,27 @@ final class PickerDialogs {
                     TextView t = CaseViews.text(a, String.valueOf(day.get(Calendar.DAY_OF_MONTH)), 16,
                             inMonth ? ink(a) : fade, false);
                     t.setGravity(Gravity.CENTER);
-                    if (sameDay(day, mark)) {
+                    boolean sunday = day.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
+                    boolean blocked = min != null && dayKey(day) < dayKey(min);
+                    boolean chosen = sameDay(day, mark);
+                    if (sunday) {
+                        t.setBackground(CaseViews.box(a, SUNDAY_RED, 20, chosen ? ink(a) : 0, chosen ? 2 : 0));
+                        t.setTextColor(Color.WHITE);
+                        if (!inMonth) t.setAlpha(0.4f);
+                    } else if (chosen) {
                         t.setBackground(CaseViews.box(a, DAY_BLUE, 20, 0, 0));
                         t.setTextColor(Color.WHITE);
                     } else if (sameDay(day, today)) {
                         t.setBackground(CaseViews.box(a, Color.TRANSPARENT, 20, DAY_BLUE, 1));
                     }
-                    t.setOnClickListener(v -> {
-                        target.setText(DiaryStore.fmt(day.getTime()));
-                        d.dismiss();
-                    });
+                    if (blocked) {
+                        t.setAlpha(0.3f);
+                    } else {
+                        t.setOnClickListener(v -> {
+                            onPick.accept(day);
+                            d.dismiss();
+                        });
+                    }
                     FrameLayout cell = new FrameLayout(a);
                     cell.addView(t, new FrameLayout.LayoutParams(dp(a, 40), dp(a, 40), Gravity.CENTER));
                     row.addView(cell, new LinearLayout.LayoutParams(0, dp(a, 46), 1f));
