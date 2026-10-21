@@ -45,9 +45,11 @@ public class MainActivity extends BaseActivity {
     private ImageView avatar;
     private EditText searchBox;
     private LinearLayout sections;
-    private LinearLayout todayHead;
     private LinearLayout todayList;
     private ScrollView scroll;
+    // open/closed state of the collapsible cards; fields so a redraw keeps what the user chose
+    private final boolean[] tomorrowOpen = {false};
+    private final boolean[] upcomingOpen = {false};
     private ImageView timeIcon;
     private String shownGif = "";
     private LinearLayout drawer;
@@ -70,9 +72,6 @@ public class MainActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(buildHeader(), wide);
 
-        todayHead = new LinearLayout(this);
-        todayHead.setOrientation(LinearLayout.VERTICAL);
-        root.addView(todayHead, wide);
         root.addView(buildSearch());
         todayList = new LinearLayout(this);
         todayList.setOrientation(LinearLayout.VERTICAL);
@@ -264,47 +263,51 @@ public class MainActivity extends BaseActivity {
         showSections();
     }
 
+    private static String dmy(java.util.Date d) {
+        return new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(d);
+    }
+
     private void showSections() {
         sections.setVisibility(android.view.View.VISIBLE);
         sections.removeAllViews();
-        todayHead.removeAllViews();
         todayList.removeAllViews();
 
-        // 1. Today's Schedule (search bar sits right under this heading)
-        boolean anyToday = !CaseItems.today(this).isEmpty();
-        todayHead.addView(CaseViews.sectionHeader(this, "Today's Schedule",
-                anyToday ? (android.view.View.OnClickListener) (v -> openList("today")) : null));
+        // 1. Today: always open. Search box above it filters this card.
         String q = searchBox.getText().toString().trim();
         List<CaseItems.Item> today = CaseItems.todayMatching(this, q);
-        if (today.isEmpty()) {
-            todayList.addView(CaseViews.emptyNote(this,
-                    q.isEmpty() ? "Nothing scheduled today" : "No matching case today"),
-                    CaseViews.lp(this, 10, 0));
-        } else {
-            int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
-            for (int i = 0; i < n; i++) {
-                CaseItems.Item it = today.get(i);
-                todayList.addView(CaseViews.caseRow(this, it,
-                        v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 8, 2));
-            }
-            if (today.size() > n) {
-                todayList.addView(CaseViews.text(this, "+" + (today.size() - n) + " more",
-                        13, AppTheme.sub(this), false));
-            }
+        java.util.Set<String> courts = new java.util.HashSet<>();
+        for (CaseItems.Item it : today) if (!it.court.trim().isEmpty()) courts.add(it.court.trim());
+        SectionCard todayCard = new SectionCard(this)
+                .title("Today's Hearings")
+                .subtitle(dmy(new java.util.Date()) + " \u00B7 " + courts.size()
+                        + (courts.size() == 1 ? " court" : " courts"))
+                .count(today.size(), today.size() == 1 ? "Hearing" : "Hearings")
+                .empty(q.isEmpty() ? "No hearings scheduled" : "No matching case today",
+                        q.isEmpty() ? "Your agenda is clear for this date." : "Try a different case name.");
+        int n = q.isEmpty() ? Math.min(3, today.size()) : today.size();
+        for (int i = 0; i < n; i++) {
+            CaseItems.Item it = today.get(i);
+            todayCard.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path)));
         }
+        if (!today.isEmpty()) todayCard.viewAll(v -> openList("today"));
+        todayList.addView(todayCard.build(), CaseViews.lp(this, 10, 0));
 
-        // 2. Tomorrow's Hearings
+        // 2. Tomorrow: collapsible
         showTomorrow();
 
-        // 3. Upcoming Cases
-        sections.addView(CaseViews.sectionHeader(this, "Upcoming Cases",
-                v -> openList("upcoming")));
+        // 3. Upcoming: collapsible
         List<CaseItems.Item> up = CaseItems.upcoming(this);
-        if (up.isEmpty()) {
-            sections.addView(CaseViews.emptyNote(this, "No upcoming cases"));
-        } else {
-            sections.addView(CaseViews.upcomingCard(this, up.get(0), this::refresh));
+        SectionCard upCard = new SectionCard(this)
+                .title("Upcoming Cases")
+                .subtitle(up.isEmpty() ? "Nothing ahead" : "Next hearing " + CaseItems.pretty(up.get(0).nextDate))
+                .count(up.size(), "Cases")
+                .empty("No upcoming cases", "Nothing is scheduled ahead.")
+                .collapsible(upcomingOpen);
+        for (int i = 0; i < Math.min(3, up.size()); i++) {
+            upCard.row(CaseViews.upcomingCard(this, up.get(i), this::refresh));
         }
+        if (!up.isEmpty()) upCard.viewAll(v -> openList("upcoming"));
+        sections.addView(upCard.build(), CaseViews.lp(this, 18, 0));
 
         showViewAll();
     }
@@ -312,17 +315,18 @@ public class MainActivity extends BaseActivity {
     private void showTomorrow() {
         List<CaseItems.Item> pdf = CaseItems.tomorrow(this);
         List<DiaryStore.HCase> diary = CaseItems.tomorrowDiary(this);
-        boolean any = !pdf.isEmpty() || !diary.isEmpty();
-        sections.addView(CaseViews.sectionHeader(this, "Tomorrow's Hearings",
-                !pdf.isEmpty() ? (android.view.View.OnClickListener) (v -> openList("tomorrow")) : null));
-        if (!any) {
-            sections.addView(CaseViews.emptyNote(this, "No hearings tomorrow"));
-        }
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+        SectionCard card = new SectionCard(this)
+                .title("Tomorrow's Hearings")
+                .subtitle(dmy(cal.getTime()))
+                .count(pdf.size() + diary.size(), "Hearings")
+                .empty("No hearings scheduled", "Your agenda is clear for this date.")
+                .collapsible(tomorrowOpen);
         int shown = 0;
         for (CaseItems.Item it : pdf) {
             if (shown++ >= 3) break;
-            sections.addView(CaseViews.caseRow(this, it,
-                    v -> CaseViews.openDetails(this, it.path)), CaseViews.lp(this, 0, 10));
+            card.row(CaseViews.caseRow(this, it, v -> CaseViews.openDetails(this, it.path)));
         }
         for (DiaryStore.HCase h : diary) {
             String ini = h.title().trim().isEmpty() ? "?" : h.title().trim().substring(0, 1).toUpperCase();
@@ -331,21 +335,17 @@ public class MainActivity extends BaseActivity {
                 i.putExtra("id", h.id);
                 startActivity(i);
             };
-            android.view.View row = new AppCard(this)
+            card.row(new AppCard(this)
                     .avatarText(ini)
                     .title(h.title())
                     .subtitle(h.court)
                     .line(h.number)
                     .primary("Details", open)
                     .onClick(open)
-                    .build();
-            sections.addView(row, CaseViews.lp(this, 0, 10));
+                    .build());
         }
-        if (pdf.size() > 3) {
-            sections.addView(CaseViews.text(this, "+" + (pdf.size() - 3) + " more",
-                    13, AppTheme.sub(this), false));
-        }
-
+        if (!pdf.isEmpty()) card.viewAll(v -> openList("tomorrow"));
+        sections.addView(card.build(), CaseViews.lp(this, 18, 0));
     }
 
     private void showViewAll() {
