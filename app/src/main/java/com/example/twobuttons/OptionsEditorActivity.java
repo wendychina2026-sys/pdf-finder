@@ -119,9 +119,7 @@ public class OptionsEditorActivity extends BaseActivity {
         final String[] choices = canOpen
                 ? new String[]{"Open", "Rename", "Delete"}
                 : new String[]{"Rename", "Delete"};
-        new AlertDialog.Builder(this)
-                .setTitle(item)
-                .setItems(choices, (d, which) -> {
+        PickerDialogs.optionSheet(this, item, null, java.util.Arrays.asList(choices), -1, which -> {
                     String c = choices[which];
                     if (c.equals("Open")) {
                         if (level == TYPES) curType = item; else curSub = item;
@@ -141,8 +139,7 @@ public class OptionsEditorActivity extends BaseActivity {
                     } else {
                         confirmDelete(item);
                     }
-                })
-                .show();
+                });
     }
 
     private boolean rename(String old, String n) {

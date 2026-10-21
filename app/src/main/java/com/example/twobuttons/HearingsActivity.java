@@ -110,10 +110,10 @@ public class HearingsActivity extends BaseActivity {
                 if (all.isEmpty()) return true;
                 String[] names = new String[all.size()];
                 for (int i = 0; i < names.length; i++) names[i] = all.get(i).title();
-                new AlertDialog.Builder(this).setTitle("Cases").setItems(names, (d, w) -> {
+                PickerDialogs.optionSheet(this, "Cases", null, java.util.Arrays.asList(names), -1, w -> {
                     curId = all.get(w).id;
                     render();
-                }).show();
+                });
                 return true;
             default:
                 return super.onOptionsItemSelected(it);

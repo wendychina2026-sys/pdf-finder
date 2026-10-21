@@ -84,8 +84,11 @@ public class NewCaseActivity extends BaseActivity {
     private LinearLayout cnrCard, clientBox, actsBox, segAuto, segManual;
     private View progFill, progRest;
     private EditText cnrLookup, titleEdit, caseNoEdit, regEdit;
-    private EditText cnrId, filingEdit, diaryEdit, petEdit, resEdit, oppAdvEdit, feeEdit, feeNotesEdit;
-    private String appearingFor = "Petitioner";   // chip selection in Parties & representation
+    private EditText cnrId, filingEdit, diaryEdit, feeEdit, feeNotesEdit;
+    private final List<EditText> petRows = new ArrayList<>();   // several petitioners
+    private final List<EditText> resRows = new ArrayList<>();   // several respondents
+    private final List<EditText> advRows = new ArrayList<>();   // several opposing advocates
+    private StageStore stages;
     private String judgeName = "", curStatus = "", nextStatus = "", clientRole = "";
     private TextView judgeText, curStatusText, nextStatusText;
     private EditText roomEdit, nextHearingEdit;
@@ -116,6 +119,7 @@ public class NewCaseActivity extends BaseActivity {
         if (getActionBar() != null) getActionBar().hide();
         store = new DiaryStore(this);
         legal = new LegalStore(this);
+        stages = new StageStore(this);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -135,7 +139,6 @@ public class NewCaseActivity extends BaseActivity {
         body.addView(buildCaseCard(), cardLp());        // 2nd card
         cnrCard = buildCnrCard();
         body.addView(cnrCard, cardLp());
-        body.addView(buildClientCard(), cardLp());
         body.addView(buildAdditionalCard(), cardLp());
 
         root.addView(bottomBar());
@@ -213,9 +216,7 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private void choose(String title, List<String> opts, Consumer<String> cb) {
-        new AlertDialog.Builder(this).setTitle(title)
-                .setItems(opts.toArray(new String[0]), (d, i) -> cb.accept(opts.get(i)))
-                .show();
+        PickerDialogs.optionSheet(this, title, null, opts, -1, i -> cb.accept(opts.get(i)));
     }
 
     /** Dropdown-looking row; the caller keeps the returned TextView to show the chosen value. */
@@ -423,8 +424,10 @@ public class NewCaseActivity extends BaseActivity {
 
     // ---------- client ----------
 
+    /** Client picker. Sits inside Case details, right under "My client is". */
     private LinearLayout buildClientCard() {
-        LinearLayout c = card();
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
@@ -629,7 +632,10 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout f = LegalUi.form(this);
         f.setPadding(0, 0, 0, 0);
         f.addView(lbl("My client is"));      // first option in Case details
-        f.addView(sideChips(() -> clientRole, v -> clientRole = v), lpTop(10));
+        f.addView(clientSideRow(), lpTop(10));
+        f.addView(buildClientCard(), lpTop(16));
+        f.addView(lbl("Current Stage"));
+        curStatusText = dropdown(f, "Select Current Stage", v -> openStages(true));
         titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
         ((RoundEdit) titleEdit).setRequired(true);
         titleEdit.setHint("Enter Case Title");
@@ -669,18 +675,8 @@ public class NewCaseActivity extends BaseActivity {
         nextHearingEdit.setHint("Select Date");
         nextHearingEdit.setOnClickListener(v ->
                 PickerDialogs.calendar(this, "Select Next Hearing Date", nextHearingEdit));
-        f.addView(lbl("Current status"));
-        curStatusText = dropdown(f, "Select Status", v ->
-                choose("Current status", statusList(), s -> {
-                    curStatus = s;
-                    setChosen(curStatusText, s, "Select Status");
-                }));
         f.addView(lbl("Next status"));
-        nextStatusText = dropdown(f, "Select Status", v ->
-                choose("Next status", statusList(), s -> {
-                    nextStatus = s;
-                    setChosen(nextStatusText, s, "Select Status");
-                }));
+        nextStatusText = dropdown(f, "Select Status", v -> openStages(false));
         c.addView(f, lpTop(4));
 
         titleEdit.addTextChangedListener(watcher);
@@ -774,13 +770,14 @@ public class NewCaseActivity extends BaseActivity {
 
         // parties
         LinearLayout f2 = subForm();
-        petEdit = partyField(f2, "Petitioner / Plaintiff / First Party", "Enter Petitioner / First Party", 1);
-        resEdit = partyField(f2, "Respondent / Defendant / Opposite Party", "Enter Respondent / Opposite Party", 1);
-        oppAdvEdit = partyField(f2, "Opposing Advocate", "Enter Opposing Advocate Name", 1);
-        f2.addView(partyLabel("Appearing For"));
-        f2.addView(appearingChips(), lpTop(10));
+        multiNames(f2, "Petitioner / Plaintiff / First Party", "Add petitioner",
+                "Enter Petitioner / First Party", petRows);
+        multiNames(f2, "Respondent / Defendant / Opposite Party", "Add respondent",
+                "Enter Respondent / Opposite Party", resRows);
+        multiNames(f2, "Opposing Advocate", "Add opposing advocate",
+                "Enter Opposing Advocate Name", advRows);
         extra.addView(section(R.drawable.ic_contacts, "Parties & representation",
-                "Petitioner, respondent, opposing advocate and appearing for", f2));
+                "Petitioners, respondents and opposing advocates", f2));
 
         // fee
         LinearLayout f3 = subForm();
@@ -1003,12 +1000,17 @@ public class NewCaseActivity extends BaseActivity {
             row.addView(fileAction(R.drawable.ic_eye, AppTheme.accent(this), "View file",
                     v -> openFile(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
             row.addView(fileAction(R.drawable.ic_replace, AppTheme.accent(this), "Replace file",
-                    v -> chooseSource(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
-            row.addView(fileAction(R.drawable.ic_delete, RoundEdit.RED, "Remove file", v -> {
-                pickedUris.remove(idx);
-                pickedNames.remove(idx);
-                renderFiles();
-            }), new LinearLayout.LayoutParams(dp(36), dp(36)));
+                    v -> PickerDialogs.confirm(this, "Replace file?",
+                            "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
+                            "Replace", () -> chooseSource(idx))), new LinearLayout.LayoutParams(dp(36), dp(36)));
+            row.addView(fileAction(R.drawable.ic_delete, RoundEdit.RED, "Remove file",
+                    v -> PickerDialogs.confirm(this, "Delete file?",
+                            "\"" + pickedNames.get(idx) + "\" will be removed from this case.",
+                            "Delete", () -> {
+                                pickedUris.remove(idx);
+                                pickedNames.remove(idx);
+                                renderFiles();
+                            })), new LinearLayout.LayoutParams(dp(36), dp(36)));
 
             // long press -> drag up / down to reorder
             row.setOnLongClickListener(v -> {
@@ -1078,67 +1080,142 @@ public class NewCaseActivity extends BaseActivity {
         return t;
     }
 
-    /** Label above a soft filled, rounded text box with an "Enter ..." hint. */
-    private EditText partyField(LinearLayout f, String label, String hint, int lines) {
-        f.addView(partyLabel(label));
-        EditText e = new RoundEdit(this);
-        e.setInputType(NAME | (lines > 1 ? InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
-        e.setHint(hint);
-        e.setHintTextColor(AppTheme.sub(this));
-        e.setTextColor(AppTheme.text(this));
-        e.setTextSize(15);
-        e.setMinLines(lines);
-        e.setGravity(lines > 1 ? Gravity.TOP : Gravity.CENTER_VERTICAL);
-        e.setPadding(dp(16), dp(14), dp(16), dp(14));
-        e.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
-        f.addView(e, lpTop(8));
-        return e;
-    }
+    private static final String[] CLIENT_SIDES = {"Petitioner", "Respondent", "Appellant"};
+    private static final int[] CLIENT_ICONS = {R.drawable.ic_person, R.drawable.ic_contacts,
+            R.drawable.ic_notes};
 
-    private static final String[] SIDES = {"Petitioner", "Respondent", "Complainant", "Accused",
-            "Appellant", "Plaintiff", "Defendant", "Applicant"};
-    private static final int[] SIDE_ICONS = {R.drawable.ic_person, R.drawable.ic_contacts,
-            R.drawable.ic_info, R.drawable.ic_shield, R.drawable.ic_notes,
-            R.drawable.ic_person_add, R.drawable.ic_briefcase, R.drawable.ic_edit};
-
-    /** Wrapping single-select chips: icon + name, the chosen one gets an outline and a check. */
-    private View appearingChips() {
-        return sideChips(() -> appearingFor, v -> appearingFor = v);
-    }
-
-    private View sideChips(java.util.function.Supplier<String> get, Consumer<String> set) {
-        final AppCard.Flow flow = new AppCard.Flow(this, dp(10), dp(10));
+    /** "My client is": three single-select chips in one row. Tap the chosen one again to clear. */
+    private View clientSideRow() {
+        final LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
-            flow.removeAllViews();
-            for (int i = 0; i < SIDES.length; i++) {
-                final String side = SIDES[i];
-                boolean on = side.equals(get.get());
+            row.removeAllViews();
+            for (int i = 0; i < CLIENT_SIDES.length; i++) {
+                final String side = CLIENT_SIDES[i];
+                boolean on = side.equals(clientRole);
                 LinearLayout chip = new LinearLayout(this);
                 chip.setOrientation(LinearLayout.HORIZONTAL);
                 chip.setGravity(Gravity.CENTER_VERTICAL);
-                chip.setPadding(dp(14), dp(10), dp(14), dp(10));
+                chip.setPadding(dp(8), dp(10), dp(8), dp(10));
                 chip.setBackground(CaseViews.box(this, AppTheme.card(this), 22,
                         on ? AppTheme.text(this) : 0, on ? 2 : 0));
                 int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
-                chip.addView(CaseViews.icon(this, SIDE_ICONS[i], fg, 18));
-                TextView t = CaseViews.text(this, side, 14, fg, false);
-                t.setPadding(dp(8), 0, 0, 0);
-                chip.addView(t);
-                if (on) {
-                    ImageView ck = CaseViews.icon(this, R.drawable.ic_check, fg, 16);
-                    ((LinearLayout.LayoutParams) ck.getLayoutParams()).leftMargin = dp(8);
-                    chip.addView(ck);
-                }
+                chip.addView(CaseViews.icon(this, CLIENT_ICONS[i], fg, 16));
+                TextView t = CaseViews.text(this, side, 13, fg, false);
+                t.setSingleLine(true);
+                t.setPadding(dp(5), 0, 0, 0);
+                t.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, TypedValue.COMPLEX_UNIT_SP);
+                chip.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                if (on) chip.addView(CaseViews.icon(this, R.drawable.ic_check, fg, 14));
                 chip.setOnClickListener(v -> {
-                    set.accept(side.equals(get.get()) ? "" : side);
+                    clientRole = side.equals(clientRole) ? "" : side;
                     draw[0].run();
                 });
-                flow.addView(chip);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                if (i < CLIENT_SIDES.length - 1) lp.rightMargin = dp(8);
+                row.addView(chip, lp);
             }
         };
         draw[0].run();
-        return flow;
+        return row;
+    }
+
+    // ---------- several names: petitioners, respondents, opposing advocates ----------
+
+    private void multiNames(LinearLayout f, String label, String addLabel, String hint, List<EditText> rows) {
+        f.addView(partyLabel(label));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        f.addView(box, lpTop(8));
+        android.widget.Button add = LegalUi.outlineButton(this, "+ " + addLabel);
+        add.setOnClickListener(v -> addNameRow(box, rows, hint));
+        f.addView(add, lpTop(10));
+        addNameRow(box, rows, hint);
+    }
+
+    private void addNameRow(LinearLayout box, List<EditText> rows, String hint) {
+        final LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        final EditText e = new RoundEdit(this);
+        e.setInputType(NAME);
+        e.setHint(hint);
+        e.setSingleLine(true);
+        ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
+        x.setPadding(dp(10), dp(10), dp(10), dp(10));
+        x.setContentDescription("Remove");
+        rows.add(e);
+        x.setOnClickListener(v -> {
+            if (rows.size() == 1) {
+                e.setText("");
+                return;
+            }
+            box.removeView(row);
+            rows.remove(e);
+        });
+        row.addView(e, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        box.addView(row, lpTop(box.getChildCount() == 0 ? 0 : 8));
+        if (scaled) shrink(row);
+    }
+
+    /** All filled names joined with ", ". */
+    private String names(List<EditText> rows) {
+        StringBuilder sb = new StringBuilder();
+        for (EditText e : rows) {
+            String v = LegalUi.str(e);
+            if (v.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(v);
+        }
+        return sb.toString();
+    }
+
+    // ---------- current / next stage (editable list) ----------
+
+    private void openStages(boolean current) {
+        PickerDialogs.stageSheet(this, current ? "Current Stage" : "Next Status",
+                () -> stages.list(), current ? curStatus : nextStatus,
+                s -> {
+                    if (current) {
+                        curStatus = s;
+                        setChosen(curStatusText, s, "Select Current Stage");
+                    } else {
+                        nextStatus = s;
+                        setChosen(nextStatusText, s, "Select Status");
+                    }
+                },
+                s -> stages.add(s),
+                (old, neu) -> {
+                    stages.rename(old, neu);
+                    for (DiaryStore.HCase cs : store.cases()) {
+                        boolean ch = false;
+                        if (old.equals(cs.proceeding)) { cs.proceeding = neu; ch = true; }
+                        if (old.equals(cs.nextStatus)) { cs.nextStatus = neu; ch = true; }
+                        if (ch) store.saveCase(cs);
+                    }
+                    if (old.equals(curStatus)) {
+                        curStatus = neu;
+                        setChosen(curStatusText, neu, "Select Current Stage");
+                    }
+                    if (old.equals(nextStatus)) {
+                        nextStatus = neu;
+                        setChosen(nextStatusText, neu, "Select Status");
+                    }
+                },
+                gone -> {
+                    stages.delete(gone);
+                    if (gone.equals(curStatus)) {
+                        curStatus = "";
+                        setChosen(curStatusText, "", "Select Current Stage");
+                    }
+                    if (gone.equals(nextStatus)) {
+                        nextStatus = "";
+                        setChosen(nextStatusText, "", "Select Status");
+                    }
+                });
     }
 
     private LinearLayout subForm() {
@@ -1270,9 +1347,6 @@ public class NewCaseActivity extends BaseActivity {
         store.saveJudges(l);
     }
 
-    private List<String> statusList() {
-        return new ArrayList<>(Arrays.asList(AllCasesActivity.STAGES).subList(1, AllCasesActivity.STAGES.length));
-    }
 
     private void addFirSectionRow() {
         LinearLayout row = new LinearLayout(this);
@@ -1373,10 +1447,9 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "CNR", cnrValue());
         line(sb, "Filing no.", LegalUi.str(filingEdit));
         line(sb, "Diary no.", LegalUi.str(diaryEdit));
-        line(sb, "Petitioner / Plaintiff / First Party", LegalUi.str(petEdit));
-        line(sb, "Respondent / Defendant / Opposite Party", LegalUi.str(resEdit));
-        line(sb, "Opposing advocate", LegalUi.str(oppAdvEdit));
-        line(sb, "Appearing for", appearingFor);
+        line(sb, "Petitioner / Plaintiff / First Party", names(petRows));
+        line(sb, "Respondent / Defendant / Opposite Party", names(resRows));
+        line(sb, "Opposing advocate", names(advRows));
         line(sb, "Agreed fee", LegalUi.str(feeEdit));
         line(sb, "My client is", clientRole);
         line(sb, "Judge", judgeName);
@@ -1423,12 +1496,12 @@ public class NewCaseActivity extends BaseActivity {
         c.number = LegalUi.str(caseNoEdit);
         c.clientId = clientId;
 
-        String pet = LegalUi.str(petEdit);
+        String pet = names(petRows);
         c.first = pet.isEmpty() ? c.caseTitle : pet;
-        c.second = LegalUi.str(resEdit);
-        c.appearingFor = appearingFor;
-        c.opposingAdvocate = LegalUi.str(oppAdvEdit);
-        c.representing = cl != null ? cl.name : appearingFor;
+        c.second = names(resRows);
+        c.appearingFor = clientRole;
+        c.opposingAdvocate = names(advRows);
+        c.representing = cl != null ? cl.name : clientRole;
 
         c.cnr = cnrValue();
         c.filingNo = LegalUi.str(filingEdit);

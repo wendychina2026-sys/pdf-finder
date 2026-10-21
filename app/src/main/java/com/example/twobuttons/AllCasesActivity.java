@@ -83,7 +83,7 @@ public class AllCasesActivity extends BaseActivity {
     // filters
     private int sortIdx = 0;
     private String fKind = KINDS[0];
-    private String fStage = STAGES[0];
+    private String fStage = StageStore.ALL;
     private String fTitle = "", fCnr = "", fCourt = "", fNo = "", fFiling = "", fYear = "";
     private int fCnrMode = 0;   // 0 any, 1 has CNR, 2 no CNR
 
@@ -249,7 +249,7 @@ public class AllCasesActivity extends BaseActivity {
             String k = fKind.startsWith("Tribunal") ? "Tribunal" : fKind;
             if (!has(h.courtKind, k)) return false;
         }
-        if (!fStage.equals(STAGES[0]) && !has(h.proceeding, fStage)) return false;
+        if (!fStage.equals(StageStore.ALL) && !has(h.proceeding, fStage)) return false;
         if (!fTitle.isEmpty() && !has(h.title(), fTitle)) return false;
         if (!fCnr.isEmpty() && !has(h.cnr, fCnr)) return false;
         if (!fCourt.isEmpty() && !has(h.court, fCourt)) return false;
@@ -263,7 +263,7 @@ public class AllCasesActivity extends BaseActivity {
     }
 
     private boolean filtersActive() {
-        return sortIdx != 0 || !fKind.equals(KINDS[0]) || !fStage.equals(STAGES[0])
+        return sortIdx != 0 || !fKind.equals(KINDS[0]) || !fStage.equals(StageStore.ALL)
                 || !fTitle.isEmpty() || !fCnr.isEmpty() || !fCourt.isEmpty() || !fNo.isEmpty()
                 || !fFiling.isEmpty() || !fYear.isEmpty() || fCnrMode != 0;
     }
@@ -627,7 +627,8 @@ public class AllCasesActivity extends BaseActivity {
         final Dialog[] h = new Dialog[1];
         final int[] sort = {sortIdx};
         final int[] kind = {indexOf(KINDS, fKind)};
-        final int[] stage = {indexOf(STAGES, fStage)};
+        final String[] stageOpts = new StageStore(this).withAll();
+        final int[] stage = {Math.max(0, indexOf(stageOpts, fStage))};
         final int[] cnrMode = {fCnrMode};
         final EditText[] f = new EditText[6];
         final Runnable[] resetUi = new Runnable[1];
@@ -635,7 +636,7 @@ public class AllCasesActivity extends BaseActivity {
         LinearLayout body = sheet("Filter cases", "Reset", () -> resetUi[0].run(), "Apply filters", () -> {
             sortIdx = sort[0];
             fKind = KINDS[kind[0]];
-            fStage = STAGES[stage[0]];
+            fStage = stageOpts[Math.max(0, stage[0])];
             fTitle = f[0].getText().toString().trim();
             fCnr = f[1].getText().toString().trim();
             fCourt = f[2].getText().toString().trim();
@@ -652,7 +653,7 @@ public class AllCasesActivity extends BaseActivity {
         LinearLayout kindBody = section(body, "Court type", false);
         radios(kindBody, KINDS, kind);
         LinearLayout stageBody = section(body, "Hearing stage", false);
-        radios(stageBody, STAGES, stage);
+        radios(stageBody, stageOpts, stage);
 
         LinearLayout det = section(body, "Case details", false);
         f[0] = field(det, "Case title", fTitle, InputType.TYPE_CLASS_TEXT);
@@ -680,7 +681,7 @@ public class AllCasesActivity extends BaseActivity {
             for (EditText e : f) e.setText("");
             radios(sortBody, SORTS, sort);
             radios(kindBody, KINDS, kind);
-            radios(stageBody, STAGES, stage);
+            radios(stageBody, stageOpts, stage);
             radios(cnrBody, cnrOpts, cnrMode);
         };
     }

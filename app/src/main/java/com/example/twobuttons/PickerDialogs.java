@@ -30,6 +30,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -216,6 +217,178 @@ final class PickerDialogs {
                 "Create New Court Type", onCreate, custom, onDelete, onPick);
     }
 
+    /** Yes / Cancel question. Does not close on an outside tap. */
+    static void confirm(Activity a, String title, String message, String yes, Runnable ok) {
+        android.app.AlertDialog ad = new android.app.AlertDialog.Builder(a)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(yes, (dd, w) -> ok.run())
+                .setNegativeButton("Cancel", null)
+                .create();
+        ad.setCanceledOnTouchOutside(false);
+        ad.show();
+    }
+
+    private static LinearLayout optionRow(Activity a, String text, boolean sel) {
+        LinearLayout r = new LinearLayout(a);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(a, 16), dp(a, 14), dp(a, 12), dp(a, 14));
+        int fill = sel ? (dark(a) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(a) ? 0xFF0D1428 : 0xFFF4F5FA);
+        r.setBackground(CaseViews.box(a, fill, 16, sel ? BLUE : hair(a), 1));
+        r.addView(CaseViews.text(a, text, 15, ink(a), sel), weight());
+        return r;
+    }
+
+    private static View selMark(Activity a, boolean sel) {
+        if (sel) return CaseViews.icon(a, R.drawable.ic_check_circle, BLUE, 26);
+        View ring = new View(a);
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setStroke(dp(a, 2), dark(a) ? 0x66FFFFFF : 0x55000000);
+        ring.setBackground(g);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(a, 22), dp(a, 22));
+        lp.leftMargin = dp(a, 4);
+        lp.rightMargin = dp(a, 2);
+        ring.setLayoutParams(lp);
+        return ring;
+    }
+
+    /** The app's one option list: round cards, check on the chosen one. onPick gets the index. */
+    static void optionSheet(Activity a, String title, String subtitle, List<String> items, int selected,
+                            Consumer<Integer> onPick) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
+        root.setBackground(panel(a, 28, 0, true));
+        root.addView(titleRow(a, d, title, subtitle));
+        final MaxScroll sc = new MaxScroll(a, 0.62f);
+        LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sc.addView(list);
+        root.addView(sc);
+        View selRow = null;
+        for (int i = 0; i < items.size(); i++) {
+            final int idx = i;
+            boolean on = i == selected;
+            LinearLayout r = optionRow(a, items.get(i), on);
+            r.addView(selMark(a, on));
+            r.setOnClickListener(v -> {
+                d.dismiss();
+                onPick.accept(idx);
+            });
+            list.addView(r, topMargin(a, i == 0 ? 18 : 10));
+            if (on) selRow = r;
+        }
+        final View sel = selRow;
+        if (sel != null) sc.post(() -> sc.scrollTo(0, Math.max(0, sel.getTop() - dp(a, 60))));
+        present(d, a, root, true);
+    }
+
+    /**
+     * Option list the user edits: round cards, "Add New" card on top, rename and delete icons on
+     * every row. Rename and delete ask first.
+     */
+    static void stageSheet(Activity a, String title, Supplier<List<String>> source, String selected,
+                           Consumer<String> onPick, Consumer<String> onAdd,
+                           BiConsumer<String, String> onRename, Consumer<String> onDelete) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
+        root.setBackground(panel(a, 28, 0, true));
+        root.addView(titleRow(a, d, title, "Pick a stage. Add, rename or delete stages here."));
+
+        final String[] sel = {selected == null ? "" : selected};
+        final MaxScroll sc = new MaxScroll(a, 0.55f);
+        final LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sc.addView(list);
+        final Runnable[] fill = new Runnable[1];
+
+        LinearLayout add = new LinearLayout(a);
+        add.setOrientation(LinearLayout.HORIZONTAL);
+        add.setGravity(Gravity.CENTER_VERTICAL);
+        add.setPadding(dp(a, 16), dp(a, 14), dp(a, 16), dp(a, 14));
+        add.setBackground(CaseViews.box(a, dark(a) ? 0x1AFFFFFF : 0xFFEEF3FF, 16, BLUE, 1));
+        add.addView(CaseViews.text(a, "+", 22, BLUE, false));
+        TextView addLbl = CaseViews.text(a, "Add New Stage", 15, ink(a), true);
+        addLbl.setPadding(dp(a, 14), 0, 0, 0);
+        add.addView(addLbl, weight());
+        add.setOnClickListener(v -> customName(a, "Add New Stage", "Stage Name*", "Enter stage name",
+                "Stage name is required", s -> {
+                    if (hasName(source.get(), s, null)) {
+                        Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    onAdd.accept(s);
+                    fill[0].run();
+                }));
+        root.addView(add, topMargin(a, 18));
+        root.addView(sc, topMargin(a, 6));
+
+        fill[0] = () -> {
+            list.removeAllViews();
+            List<String> items = source.get();
+            for (int i = 0; i < items.size(); i++) {
+                final String name = items.get(i);
+                boolean on = name.equals(sel[0]);
+                LinearLayout r = optionRow(a, name, on);
+                ImageView edit = CaseViews.icon(a, R.drawable.ic_edit, ink(a), 36);
+                edit.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                edit.setContentDescription("Rename " + name);
+                edit.setOnClickListener(v -> customName(a, "Rename Stage", "Stage Name*", "Enter stage name",
+                        "Stage name is required", name, "Rename", s -> {
+                            if (s.equals(name)) return;
+                            if (hasName(source.get(), s, name)) {
+                                Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            confirm(a, "Rename stage?", "\"" + name + "\" will become \"" + s
+                                    + "\". Cases using it will be updated.", "Rename", () -> {
+                                onRename.accept(name, s);
+                                if (name.equals(sel[0])) sel[0] = s;
+                                fill[0].run();
+                            });
+                        }));
+                ImageView del = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 36);
+                del.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                del.setContentDescription("Delete " + name);
+                del.setOnClickListener(v -> confirm(a, "Delete stage?", "\"" + name
+                        + "\" will be removed from the list. Cases keep the stage they already have.",
+                        "Delete", () -> {
+                            onDelete.accept(name);
+                            if (name.equals(sel[0])) sel[0] = "";
+                            fill[0].run();
+                        }));
+                r.addView(edit, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                r.addView(del, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                r.addView(selMark(a, on));
+                r.setOnClickListener(v -> {
+                    d.dismiss();
+                    onPick.accept(name);
+                });
+                list.addView(r, topMargin(a, 10));
+            }
+            if (items.isEmpty()) {
+                TextView none = CaseViews.text(a, "No stages. Add one above.", 14, soft(a), false);
+                none.setPadding(dp(a, 6), dp(a, 18), dp(a, 6), dp(a, 6));
+                list.addView(none);
+            }
+        };
+        fill[0].run();
+        present(d, a, root, true);
+    }
+
+    private static boolean hasName(List<String> items, String name, String except) {
+        for (String s : items) {
+            if (except != null && s.equals(except)) continue;
+            if (s.equalsIgnoreCase(name)) return true;
+        }
+        return false;
+    }
+
     /** Bottom sheet with icon + label rows. onPick gets the row index. */
     static void actions(Activity a, String title, String[] labels, int[] icons, Consumer<Integer> onPick) {
         final Dialog d = shell(a);
@@ -394,6 +567,11 @@ final class PickerDialogs {
 
     static void customName(Activity a, String title, String labelText, String hint, String emptyMsg,
                            Consumer<String> onAdd) {
+        customName(a, title, labelText, hint, emptyMsg, "", "Add", onAdd);
+    }
+
+    static void customName(Activity a, String title, String labelText, String hint, String emptyMsg,
+                           String initial, String buttonLabel, Consumer<String> onAdd) {
         Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -416,6 +594,10 @@ final class PickerDialogs {
         name.setBackground(CaseViews.box(a, dark(a) ? 0x66000000 : 0xFFFFFFFF, 28,
                 dark(a) ? 0xFF000000 : 0xFFD9DBE6, 2));
         root.addView(name, topMargin(a, 8));
+        if (initial != null && !initial.isEmpty()) {
+            name.setText(initial);
+            name.setSelection(initial.length());
+        }
 
         LinearLayout btns = new LinearLayout(a);
         btns.setOrientation(LinearLayout.HORIZONTAL);
@@ -423,7 +605,7 @@ final class PickerDialogs {
         cancel.setGravity(Gravity.CENTER);
         cancel.setBackground(CaseViews.box(a, chip(a), 28, hair(a), 1));
         cancel.setOnClickListener(v -> d.dismiss());
-        TextView add = CaseViews.text(a, "Add", 15, dark(a) ? 0xFF0B1022 : 0xFFFFFFFF, true);
+        TextView add = CaseViews.text(a, buttonLabel, 15, dark(a) ? 0xFF0B1022 : 0xFFFFFFFF, true);
         add.setGravity(Gravity.CENTER);
         add.setBackground(CaseViews.box(a, BLUE, 28, 0, 0));
         add.setOnClickListener(v -> {

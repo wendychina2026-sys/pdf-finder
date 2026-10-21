@@ -117,9 +117,8 @@ class PdfActions {
     }
 
     private void showOptions(Pdf p) {
-        new AlertDialog.Builder(activity)
-                .setTitle(p.name)
-                .setItems(new String[]{"Mark", "Open containing folder", "Delete", "Select multiple"}, (d, which) -> {
+        PickerDialogs.optionSheet(activity, p.name, null,
+                java.util.Arrays.asList("Mark", "Open containing folder", "Delete", "Select multiple"), -1, which -> {
                     if (which == 0) {
                         Intent i = new Intent(activity, MarkActivity.class);
                         i.putExtra("path", p.path);
@@ -136,8 +135,7 @@ class PdfActions {
                         bar.setVisibility(View.VISIBLE);
                         refresh();
                     }
-                })
-                .show();
+                });
     }
 
     // Opens system file picker already inside the file's folder (works on any Android 8+ phone).

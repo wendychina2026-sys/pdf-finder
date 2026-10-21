@@ -412,16 +412,11 @@ public class AdvancedSearchActivity extends BaseActivity {
     }
 
     private void chooseSort() {
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Sort by")
-                .setSingleChoiceItems(SORTS, sortIdx, (dlg, which) -> {
-                    sortIdx = which;
-                    updateSortLabel();
-                    dlg.dismiss();
-                    refresh();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        PickerDialogs.optionSheet(this, "Sort by", null, java.util.Arrays.asList(SORTS), sortIdx, which -> {
+            sortIdx = which;
+            updateSortLabel();
+            refresh();
+        });
     }
 
     @Override
@@ -444,7 +439,7 @@ public class AdvancedSearchActivity extends BaseActivity {
     }
 
     private Spinner spinner(String[] items) {
-        Spinner s = new Spinner(this);
+        Spinner s = new RoundSpinner(this);
         s.setAdapter(CaseViews.wrapAdapter(this, withAll(items)));
         return s;
     }

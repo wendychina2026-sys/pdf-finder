@@ -69,14 +69,10 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void showDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Theme")
-                .setSingleChoiceItems(NAMES, indexOf(AppTheme.mode(this)), (d, which) -> {
+        PickerDialogs.optionSheet(this, "Theme", null, java.util.Arrays.asList(NAMES),
+                indexOf(AppTheme.mode(this)), which -> {
                     AppTheme.setMode(this, VALUES[which]);
-                    d.dismiss();
                     recreate();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                });
     }
 }

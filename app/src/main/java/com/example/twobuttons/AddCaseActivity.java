@@ -224,7 +224,7 @@ public class AddCaseActivity extends BaseActivity {
     private void buildStep2() {
         stepBox.addView(label("Court Tier *"));
         stepBox.addView(helper("Select from saved tiers, or add a new one."));
-        tier = new Spinner(this);
+        tier = new RoundSpinner(this);
         fillTier();
         stepBox.addView(tier, CaseViews.lp(this, 8, 0));
         TextView addTier = CaseViews.text(this, "+ Add court tier", 14, AppTheme.accent(this), true);
@@ -234,7 +234,7 @@ public class AddCaseActivity extends BaseActivity {
 
         stepBox.addView(label("Judge Name *"));
         stepBox.addView(helper("Judges are filtered by selected court tier."));
-        judge = new Spinner(this);
+        judge = new RoundSpinner(this);
         stepBox.addView(judge, CaseViews.lp(this, 8, 0));
         fillJudges();
 
@@ -351,16 +351,13 @@ public class AddCaseActivity extends BaseActivity {
         }
         String[] names = new String[all.size()];
         for (int i = 0; i < names.length; i++) names[i] = all.get(i).name + "  (" + all.get(i).court + ")";
-        new AlertDialog.Builder(this)
-                .setTitle("Tap a judge to delete")
-                .setItems(names, (d, w) -> LegalUi.confirm(this, "Delete " + all.get(w).name + "?",
+        PickerDialogs.optionSheet(this, "Tap a judge to delete", null, java.util.Arrays.asList(names), -1,
+                w -> LegalUi.confirm(this, "Delete " + all.get(w).name + "?",
                         "This cannot be undone.", () -> {
                             all.remove(w);
                             store.saveJudges(all);
                             fillJudges();
-                        }))
-                .setNegativeButton("Close", null)
-                .show();
+                        }));
     }
 
     // ---------- step 3 (assumed layout) ----------

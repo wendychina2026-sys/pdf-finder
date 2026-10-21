@@ -207,7 +207,7 @@ public class CaseDetailsActivity extends BaseActivity {
     }
 
     private Spinner spinner(String[] items) {
-        Spinner s = new Spinner(this);
+        Spinner s = new RoundSpinner(this);
         s.setAdapter(CaseViews.wrapAdapter(this, withSelect(items)));
         return s;
     }

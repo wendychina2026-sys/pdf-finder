@@ -151,7 +151,7 @@ public class MarkActivity extends BaseActivity {
         box.setPadding(48, 24, 48, 0);
         TextView msg = new TextView(this);
         msg.setText("Mark page " + (page + 1) + " as:");
-        Spinner spin = new Spinner(this);
+        Spinner spin = new RoundSpinner(this);
         spin.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, MarkStore.SUBS));
         if (current != null) {

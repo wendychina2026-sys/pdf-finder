@@ -147,7 +147,7 @@ final class LegalUi {
 
     static Spinner spinner(Context c, LinearLayout f, String label, String[] opts, String selected) {
         label(c, f, label);
-        Spinner s = new Spinner(c);
+        RoundSpinner s = new RoundSpinner(c).setTitle(label);
         s.setAdapter(new ArrayAdapter<>(c, android.R.layout.simple_spinner_dropdown_item, opts));
         for (int i = 0; i < opts.length; i++) if (opts[i].equalsIgnoreCase(selected)) s.setSelection(i);
         f.addView(s);

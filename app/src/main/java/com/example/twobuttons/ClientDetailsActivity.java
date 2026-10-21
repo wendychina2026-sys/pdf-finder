@@ -112,13 +112,10 @@ public class ClientDetailsActivity extends BaseActivity {
         }
         String[] names = new String[all.size()];
         for (int i = 0; i < names.length; i++) names[i] = all.get(i).name + "  (" + all.get(i).code + ")";
-        new AlertDialog.Builder(this)
-                .setTitle("Clients")
-                .setItems(names, (d, which) -> {
-                    curId = all.get(which).id;
-                    render();
-                })
-                .show();
+        PickerDialogs.optionSheet(this, "Clients", null, java.util.Arrays.asList(names), -1, which -> {
+            curId = all.get(which).id;
+            render();
+        });
     }
 
     private void addClient() {

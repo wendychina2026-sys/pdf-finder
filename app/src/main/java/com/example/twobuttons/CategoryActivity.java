@@ -39,7 +39,7 @@ public class CategoryActivity extends BaseActivity {
         // ----- MAIN -----
         root.addView(header("MAIN"));
 
-        typeSpinner = new Spinner(this);
+        typeSpinner = new RoundSpinner(this);
         typeSpinner.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, CaseStore.TYPES));
         root.addView(label("Type of case"));

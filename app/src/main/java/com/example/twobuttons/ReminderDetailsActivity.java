@@ -108,13 +108,10 @@ public class ReminderDetailsActivity extends BaseActivity {
         for (int i = 0; i < names.length; i++) {
             names[i] = all.get(i).title + " - " + all.get(i).caseName;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("Reminders")
-                .setItems(names, (d, which) -> {
-                    curId = all.get(which).id;
-                    render();
-                })
-                .show();
+        PickerDialogs.optionSheet(this, "Reminders", null, java.util.Arrays.asList(names), -1, which -> {
+            curId = all.get(which).id;
+            render();
+        });
     }
 
     private void addReminder() {
