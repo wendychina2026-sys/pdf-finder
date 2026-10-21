@@ -187,11 +187,12 @@ final class PickerDialogs {
             LinearLayout row = new LinearLayout(a);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(a, 16), dp(a, 16), dp(a, 16), dp(a, 16));
+            row.setMinimumHeight(dp(a, OPT_H));
+            row.setPadding(dp(a, 16), dp(a, 6), dp(a, 16), dp(a, 6));
             int fill = on ? (dark(a) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(a) ? 0xFF0D1428 : 0xFFF4F5FA);
             row.setBackground(CaseViews.box(a, fill, 16, on ? BLUE : hair(a), 1));
             row.addView(CaseViews.icon(a, icons[i], ink(a), 22));
-            TextView t = CaseViews.text(a, name, 15, ink(a), false);
+            TextView t = CaseViews.text(a, name, 14, ink(a), false);
             t.setPadding(dp(a, 14), 0, 0, 0);
             row.addView(t, weight());
             if (on) row.addView(CaseViews.icon(a, R.drawable.ic_check_circle, BLUE, 26));
@@ -199,7 +200,7 @@ final class PickerDialogs {
                 d.dismiss();
                 pick.accept(name);
             });
-            LinearLayout.LayoutParams lp = topMargin(a, i == 0 ? 18 : 10);
+            LinearLayout.LayoutParams lp = topMargin(a, i == 0 ? 16 : 8);
             opts.addView(row, lp);
         }
         present(d, a, root, true);
@@ -229,14 +230,34 @@ final class PickerDialogs {
         ad.show();
     }
 
+    /** Every option card in the app: same height and text size. */
+    private static final int OPT_H = 44;
+
+    /** Round "+ Add New ..." card shown on top of editable option lists. */
+    private static LinearLayout addCard(Activity a, String label, Runnable onClick) {
+        LinearLayout add = new LinearLayout(a);
+        add.setOrientation(LinearLayout.HORIZONTAL);
+        add.setGravity(Gravity.CENTER_VERTICAL);
+        add.setMinimumHeight(dp(a, OPT_H));
+        add.setPadding(dp(a, 16), dp(a, 8), dp(a, 16), dp(a, 8));
+        add.setBackground(CaseViews.box(a, dark(a) ? 0x1AFFFFFF : 0xFFEEF3FF, 16, BLUE, 1));
+        add.addView(CaseViews.text(a, "+", 20, BLUE, false));
+        TextView lbl = CaseViews.text(a, label, 14, ink(a), true);
+        lbl.setPadding(dp(a, 12), 0, 0, 0);
+        add.addView(lbl, weight());
+        add.setOnClickListener(v -> onClick.run());
+        return add;
+    }
+
     private static LinearLayout optionRow(Activity a, String text, boolean sel) {
         LinearLayout r = new LinearLayout(a);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(dp(a, 16), dp(a, 14), dp(a, 12), dp(a, 14));
+        r.setMinimumHeight(dp(a, OPT_H));
+        r.setPadding(dp(a, 16), dp(a, 6), dp(a, 12), dp(a, 6));
         int fill = sel ? (dark(a) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(a) ? 0xFF0D1428 : 0xFFF4F5FA);
         r.setBackground(CaseViews.box(a, fill, 16, sel ? BLUE : hair(a), 1));
-        r.addView(CaseViews.text(a, text, 15, ink(a), sel), weight());
+        r.addView(CaseViews.text(a, text, 14, ink(a), sel), weight());
         return r;
     }
 
@@ -278,7 +299,7 @@ final class PickerDialogs {
                 d.dismiss();
                 onPick.accept(idx);
             });
-            list.addView(r, topMargin(a, i == 0 ? 18 : 10));
+            list.addView(r, topMargin(a, i == 0 ? 16 : 8));
             if (on) selRow = r;
         }
         final View sel = selRow;
@@ -288,17 +309,19 @@ final class PickerDialogs {
 
     /**
      * Option list the user edits: round cards, "Add New" card on top, rename and delete icons on
-     * every row. Rename and delete ask first.
+     * every row, press-and-hold a row to drag it up or down. Rename and delete ask first.
+     * onMove(i, j) swaps the stages at positions i and j (always neighbours).
      */
     static void stageSheet(Activity a, String title, Supplier<List<String>> source, String selected,
                            Consumer<String> onPick, Consumer<String> onAdd,
-                           BiConsumer<String, String> onRename, Consumer<String> onDelete) {
+                           BiConsumer<String, String> onRename, Consumer<String> onDelete,
+                           BiConsumer<Integer, Integer> onMove) {
         final Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
         root.setBackground(panel(a, 28, 0, true));
-        root.addView(titleRow(a, d, title, "Pick a stage. Add, rename or delete stages here."));
+        root.addView(titleRow(a, d, title, "Pick a stage. Add, rename or delete. Press and hold to reorder."));
 
         final String[] sel = {selected == null ? "" : selected};
         final MaxScroll sc = new MaxScroll(a, 0.55f);
@@ -307,34 +330,33 @@ final class PickerDialogs {
         sc.addView(list);
         final Runnable[] fill = new Runnable[1];
 
-        LinearLayout add = new LinearLayout(a);
-        add.setOrientation(LinearLayout.HORIZONTAL);
-        add.setGravity(Gravity.CENTER_VERTICAL);
-        add.setPadding(dp(a, 16), dp(a, 14), dp(a, 16), dp(a, 14));
-        add.setBackground(CaseViews.box(a, dark(a) ? 0x1AFFFFFF : 0xFFEEF3FF, 16, BLUE, 1));
-        add.addView(CaseViews.text(a, "+", 22, BLUE, false));
-        TextView addLbl = CaseViews.text(a, "Add New Stage", 15, ink(a), true);
-        addLbl.setPadding(dp(a, 14), 0, 0, 0);
-        add.addView(addLbl, weight());
-        add.setOnClickListener(v -> customName(a, "Add New Stage", "Stage Name*", "Enter stage name",
-                "Stage name is required", s -> {
+        root.addView(addCard(a, "Add New Stage", () -> customName(a, "Add New Stage", "Stage Name*",
+                "Enter stage name", "Stage name is required", s -> {
                     if (hasName(source.get(), s, null)) {
                         Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     onAdd.accept(s);
                     fill[0].run();
-                }));
-        root.addView(add, topMargin(a, 18));
-        root.addView(sc, topMargin(a, 6));
+                })), topMargin(a, 16));
+        root.addView(sc, topMargin(a, 4));
+
+        final int[] dragCur = {-1};
+        final float[] dragY = {0, 0};      // {finger down y, accumulated shift}
 
         fill[0] = () -> {
             list.removeAllViews();
+            dragCur[0] = -1;
             List<String> items = source.get();
             for (int i = 0; i < items.size(); i++) {
                 final String name = items.get(i);
                 boolean on = name.equals(sel[0]);
                 LinearLayout r = optionRow(a, name, on);
+                ImageView grip = CaseViews.icon(a, R.drawable.ic_drag, soft(a), 18);
+                grip.setContentDescription("Press and hold to move");
+                LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(a, 22), dp(a, 22));
+                gp.rightMargin = dp(a, 8);
+                r.addView(grip, 0, gp);
                 ImageView edit = CaseViews.icon(a, R.drawable.ic_edit, ink(a), 36);
                 edit.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
                 edit.setContentDescription("Rename " + name);
@@ -369,7 +391,57 @@ final class PickerDialogs {
                     d.dismiss();
                     onPick.accept(name);
                 });
-                list.addView(r, topMargin(a, 10));
+
+                // press and hold -> drag up / down
+                r.setOnLongClickListener(v -> {
+                    dragCur[0] = list.indexOfChild(v);
+                    dragY[1] = 0;
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    v.setAlpha(0.92f);
+                    v.setElevation(dp(a, 8));
+                    sc.requestDisallowInterceptTouchEvent(true);
+                    return true;
+                });
+                r.setOnTouchListener((v, e) -> {
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) dragY[0] = e.getRawY();
+                    if (dragCur[0] < 0 || list.indexOfChild(v) != dragCur[0]) return false;
+                    switch (e.getActionMasked()) {
+                        case android.view.MotionEvent.ACTION_MOVE: {
+                            float ty = e.getRawY() - dragY[0] + dragY[1];
+                            float step = v.getHeight() + dp(a, 8);
+                            int cur = dragCur[0];
+                            if (ty > step * 0.55f && cur < list.getChildCount() - 1) {
+                                View other = list.getChildAt(cur + 1);
+                                onMove.accept(cur, cur + 1);
+                                list.removeView(other);
+                                list.addView(other, cur);
+                                dragCur[0] = cur + 1;
+                                dragY[1] -= step;
+                                ty -= step;
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                            } else if (ty < -step * 0.55f && cur > 0) {
+                                View other = list.getChildAt(cur - 1);
+                                onMove.accept(cur, cur - 1);
+                                list.removeView(other);
+                                list.addView(other, cur);
+                                dragCur[0] = cur - 1;
+                                dragY[1] += step;
+                                ty += step;
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                            }
+                            v.setTranslationY(ty);
+                            return true;
+                        }
+                        case android.view.MotionEvent.ACTION_UP:
+                        case android.view.MotionEvent.ACTION_CANCEL:
+                            sc.requestDisallowInterceptTouchEvent(false);
+                            fill[0].run();
+                            return true;
+                        default:
+                            return true;
+                    }
+                });
+                list.addView(r, topMargin(a, i == 0 ? 8 : 8));
             }
             if (items.isEmpty()) {
                 TextView none = CaseViews.text(a, "No stages. Add one above.", 14, soft(a), false);
@@ -465,21 +537,10 @@ final class PickerDialogs {
         }
 
         if (createLabel != null) {
-            LinearLayout create = new LinearLayout(a);
-            create.setOrientation(LinearLayout.HORIZONTAL);
-            create.setGravity(Gravity.CENTER_VERTICAL);
-            create.setPadding(dp(a, 14), dp(a, 14), dp(a, 14), dp(a, 14));
-            create.setBackgroundColor(dark(a) ? 0x1AFFFFFF : 0xFFEEF3FF);
-            create.addView(CaseViews.text(a, "+", 22, BLUE, false));
-            TextView lbl = CaseViews.text(a, createLabel, 15, ink(a), true);
-            lbl.setPadding(dp(a, 14), 0, 0, 0);
-            create.addView(lbl, weight());
-            create.setOnClickListener(v -> {
+            root.addView(addCard(a, createLabel, () -> {
                 d.dismiss();
                 if (onCreate != null) onCreate.run();
-            });
-            root.addView(create, topMargin(a, 16));
-            root.addView(hairline(a));
+            }), topMargin(a, 16));
         }
 
         final MaxScroll sv = new MaxScroll(a, 0.5f);
@@ -498,45 +559,32 @@ final class PickerDialogs {
                 final String it = items.get(i);
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
                 boolean on = it.equals(selected);
-                LinearLayout r = new LinearLayout(a);
-                r.setOrientation(LinearLayout.HORIZONTAL);
-                r.setGravity(Gravity.CENTER_VERTICAL);
-                r.setMinimumHeight(dp(a, 54));
-                r.setPadding(dp(a, 14), dp(a, 4), dp(a, 8), dp(a, 4));
-                TextView name = CaseViews.text(a, it, 15, on ? BLUE : ink(a), on);
-                r.addView(name, weight());
+                LinearLayout r = optionRow(a, it, on);
                 if (custom != null && custom.test(it)) {
-                    TextView badge = CaseViews.text(a, "Custom", 12, dark(a) ? 0xFF121212 : 0xFFFFFFFF, true);
+                    TextView badge = CaseViews.text(a, "Custom", 11, dark(a) ? 0xFF121212 : 0xFFFFFFFF, true);
                     badge.setGravity(Gravity.CENTER);
-                    badge.setPadding(dp(a, 11), dp(a, 4), dp(a, 11), dp(a, 4));
+                    badge.setPadding(dp(a, 10), dp(a, 3), dp(a, 10), dp(a, 3));
                     badge.setBackground(CaseViews.box(a, AppTheme.accent(a), 14, 0, 0));
                     r.addView(badge);
                     if (onDelete != null) {
-                        ImageView x = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 40);
-                        x.setPadding(dp(a, 9), dp(a, 9), dp(a, 9), dp(a, 9));
+                        ImageView x = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 36);
+                        x.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
                         x.setContentDescription("Delete " + it);
-                        x.setOnClickListener(v -> {
-                            android.app.AlertDialog ad = new android.app.AlertDialog.Builder(a)
-                                    .setTitle("Delete court type?")
-                                    .setMessage("\"" + it + "\" will be removed from your list.")
-                                    .setPositiveButton("Delete", (dd, w) -> {
-                                        onDelete.accept(it);
-                                        fill[0].run();
-                                    })
-                                    .setNegativeButton("Cancel", null)
-                                    .create();
-                            ad.setCanceledOnTouchOutside(false);
-                            ad.show();
-                        });
-                        r.addView(x);
+                        final String noun = createLabel != null && createLabel.contains("Judge") ? "judge" : "court type";
+                        x.setOnClickListener(v -> confirm(a, "Delete " + noun + "?",
+                                "\"" + it + "\" will be removed from your list.", "Delete", () -> {
+                                    onDelete.accept(it);
+                                    fill[0].run();
+                                }));
+                        r.addView(x, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
                     }
                 }
+                r.addView(selMark(a, on));
                 r.setOnClickListener(v -> {
                     d.dismiss();
                     onPick.accept(it);
                 });
-                list.addView(r);
-                list.addView(hairline(a));
+                list.addView(r, topMargin(a, i == 0 ? 14 : 8));
                 if (on) selRow = r;
             }
             if (list.getChildCount() == 0) {

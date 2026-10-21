@@ -71,6 +71,14 @@ final class StageStore {
         save(l);
     }
 
+    /** Swap two positions (reorder). */
+    void swap(int i, int j) {
+        List<String> l = list();
+        if (i < 0 || j < 0 || i >= l.size() || j >= l.size()) return;
+        java.util.Collections.swap(l, i, j);
+        save(l);
+    }
+
     void delete(String name) {
         List<String> l = list();
         l.remove(name);

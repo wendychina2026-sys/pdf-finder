@@ -583,10 +583,11 @@ public class AllCasesActivity extends BaseActivity {
             LinearLayout r = new LinearLayout(this);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(dp(16), dp(14), dp(16), dp(14));
+            r.setMinimumHeight(dp(44));
+            r.setPadding(dp(16), dp(6), dp(16), dp(6));
             int fill = sel ? (dark(this) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(this) ? 0xFF0D1428 : 0xFFF4F5FA);
             r.setBackground(CaseViews.box(this, fill, 16, sel ? BLUE : hair(), 1));
-            r.addView(CaseViews.text(this, opts[i], 15, ink(), sel),
+            r.addView(CaseViews.text(this, opts[i], 14, ink(), sel),
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             if (sel) {
                 r.addView(CaseViews.icon(this, R.drawable.ic_check_circle, BLUE, 26));

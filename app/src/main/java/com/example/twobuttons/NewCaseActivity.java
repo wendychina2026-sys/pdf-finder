@@ -224,15 +224,19 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(dp(14), dp(12), dp(14), dp(12));
+        box.setPadding(dp(14), 0, dp(14), 0);
         box.setBackground(dropBg(false));
         box.setMinimumHeight(dp(RoundEdit.HEIGHT_DP));
         TextView t = CaseViews.text(this, placeholder, 15, AppTheme.sub(this), false);
+        t.setSingleLine(true);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setTag(box);
         box.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 22));
         box.setOnClickListener(click);
-        parent.addView(box, lpTop(0));
+        LinearLayout.LayoutParams dl = lpTop(0);
+        dl.height = dp(RoundEdit.HEIGHT_DP);          // exactly the text box height
+        parent.addView(box, dl);
         return t;
     }
 
@@ -428,6 +432,8 @@ public class NewCaseActivity extends BaseActivity {
     private LinearLayout buildClientCard() {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(14), dp(14), dp(14), dp(14));
+        c.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
@@ -1080,46 +1086,66 @@ public class NewCaseActivity extends BaseActivity {
         return t;
     }
 
-    private static final String[] CLIENT_SIDES = {"Petitioner", "Respondent", "Appellant"};
+    private static final String[] CLIENT_SIDES = {"Petitioner", "Respondent", "Complainant", "Accused",
+            "Appellant", "Plaintiff", "Defendant", "Applicant"};
     private static final int[] CLIENT_ICONS = {R.drawable.ic_person, R.drawable.ic_contacts,
-            R.drawable.ic_notes};
+            R.drawable.ic_info, R.drawable.ic_shield, R.drawable.ic_notes,
+            R.drawable.ic_person_add, R.drawable.ic_briefcase, R.drawable.ic_edit};
 
-    /** "My client is": three single-select chips in one row. Tap the chosen one again to clear. */
+    /**
+     * "My client is": all options as single-select chips, three per row. Icon on top, full name
+     * below, chosen one gets an outline and a check. Tap the chosen one again to clear.
+     */
     private View clientSideRow() {
-        final LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
+        final LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
-            row.removeAllViews();
-            for (int i = 0; i < CLIENT_SIDES.length; i++) {
-                final String side = CLIENT_SIDES[i];
-                boolean on = side.equals(clientRole);
-                LinearLayout chip = new LinearLayout(this);
-                chip.setOrientation(LinearLayout.HORIZONTAL);
-                chip.setGravity(Gravity.CENTER_VERTICAL);
-                chip.setPadding(dp(8), dp(10), dp(8), dp(10));
-                chip.setBackground(CaseViews.box(this, AppTheme.card(this), 22,
-                        on ? AppTheme.text(this) : 0, on ? 2 : 0));
-                int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
-                chip.addView(CaseViews.icon(this, CLIENT_ICONS[i], fg, 16));
-                TextView t = CaseViews.text(this, side, 13, fg, false);
-                t.setSingleLine(true);
-                t.setPadding(dp(5), 0, 0, 0);
-                t.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, TypedValue.COMPLEX_UNIT_SP);
-                chip.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-                if (on) chip.addView(CaseViews.icon(this, R.drawable.ic_check, fg, 14));
-                chip.setOnClickListener(v -> {
-                    clientRole = side.equals(clientRole) ? "" : side;
-                    draw[0].run();
-                });
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
-                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                if (i < CLIENT_SIDES.length - 1) lp.rightMargin = dp(8);
-                row.addView(chip, lp);
+            grid.removeAllViews();
+            final int perRow = 3;
+            for (int start = 0; start < CLIENT_SIDES.length; start += perRow) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                for (int k = 0; k < perRow; k++) {
+                    int i = start + k;
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                            LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+                    if (k < perRow - 1) lp.rightMargin = dp(8);
+                    if (i >= CLIENT_SIDES.length) {          // keep the last row's chips the same width
+                        row.addView(new View(this), lp);
+                        continue;
+                    }
+                    final String side = CLIENT_SIDES[i];
+                    boolean on = side.equals(clientRole);
+                    LinearLayout chip = new LinearLayout(this);
+                    chip.setOrientation(LinearLayout.VERTICAL);
+                    chip.setGravity(Gravity.CENTER);
+                    chip.setPadding(dp(4), dp(10), dp(4), dp(10));
+                    chip.setBackground(CaseViews.box(this, AppTheme.card(this), 18,
+                            on ? AppTheme.text(this) : 0, on ? 2 : 0));
+                    int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
+                    chip.addView(CaseViews.icon(this, on ? R.drawable.ic_check_circle : CLIENT_ICONS[i], fg, 20));
+                    TextView t = CaseViews.text(this, side, 12, fg, on);
+                    t.setGravity(Gravity.CENTER);
+                    t.setSingleLine(false);
+                    t.setMaxLines(2);
+                    t.setPadding(0, dp(4), 0, 0);
+                    chip.addView(t, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    chip.setOnClickListener(v -> {
+                        clientRole = side.equals(clientRole) ? "" : side;
+                        draw[0].run();
+                    });
+                    row.addView(chip, lp);
+                }
+                LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (start > 0) rl.topMargin = dp(8);
+                grid.addView(row, rl);
             }
         };
         draw[0].run();
-        return row;
+        return grid;
     }
 
     // ---------- several names: petitioners, respondents, opposing advocates ----------
@@ -1215,7 +1241,8 @@ public class NewCaseActivity extends BaseActivity {
                         nextStatus = "";
                         setChosen(nextStatusText, "", "Select Status");
                     }
-                });
+                },
+                (i, j) -> stages.swap(i, j));
     }
 
     private LinearLayout subForm() {

@@ -51,7 +51,16 @@ class CaseViews {
                 return v;
             }
             @Override public View getView(int p, View cv, android.view.ViewGroup parent) {
-                return fix(super.getView(p, cv, parent));
+                View v = fix(super.getView(p, cv, parent));
+                if (v instanceof TextView) {            // closed box: one line, same height as a text box
+                    TextView t = (TextView) v;
+                    t.setSingleLine(true);
+                    t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    t.setTextSize(15);
+                    t.setPadding(dp(getContext(), 8), 0, 0, 0);
+                    t.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                }
+                return v;
             }
             @Override public View getDropDownView(int p, View cv, android.view.ViewGroup parent) {
                 return fix(super.getDropDownView(p, cv, parent));
