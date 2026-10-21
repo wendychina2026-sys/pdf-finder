@@ -227,30 +227,17 @@ public class MainActivity extends BaseActivity {
 
     // ---------- search box (rounded, magnifier icon) ----------
 
-    private LinearLayout buildSearch() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.HORIZONTAL);
-        box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(dp(10), 0, dp(10), 0);
-        box.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
+    private SmartSearchBar smartSearch;
 
-        box.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 18));
-
-        searchBox = new RoundEdit(this);
-        searchBox.setHint("Search today's cases by case name");
-        searchBox.setSingleLine(true);
-        searchBox.setTextSize(13);
-        searchBox.setBackground(null);
-        searchBox.setPadding(dp(8), dp(8), 0, dp(8));
+    private View buildSearch() {
+        smartSearch = new SmartSearchBar(this, "Search today's cases by case name");
+        searchBox = smartSearch.edit();
         searchBox.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { refresh(); }
             @Override public void afterTextChanged(Editable s) {}
         });
-        box.addView(searchBox, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        return box;
+        return smartSearch.view();
     }
 
     // ---------- content ----------
@@ -524,6 +511,7 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int req, int result, Intent data) {
         super.onActivityResult(req, result, data);
+        if (smartSearch != null && smartSearch.onActivityResult(req, result, data)) return;
         if (req == REQ_CAMERA && result == RESULT_OK && photoTemp().exists()) {
             photoFile().delete();
             photoTemp().renameTo(photoFile());

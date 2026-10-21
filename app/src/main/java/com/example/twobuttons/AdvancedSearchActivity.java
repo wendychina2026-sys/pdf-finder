@@ -66,6 +66,7 @@ public class AdvancedSearchActivity extends BaseActivity {
     private Spinner yearSpin;
     private AutoCompleteTextView lawyerEdit;
     private EditText fileEdit;
+    private SmartSearchBar smartSearch;
     private TextView status;
     private MarkStore marks;
     private DetailsStore details;
@@ -99,12 +100,8 @@ public class AdvancedSearchActivity extends BaseActivity {
         lawyerEdit.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, details.lawyers()));
 
-        fileEdit = new RoundEdit(this);
-        fileEdit.setHint("Search file name or case name");
-        fileEdit.setSingleLine(true);
-        fileEdit.setTextSize(15);
-        fileEdit.setBackground(null);
-        fileEdit.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 10), 0, CaseViews.dp(this, 10));
+        smartSearch = new SmartSearchBar(this, "Search file name or case name");
+        fileEdit = smartSearch.edit();
 
         // fixed (non-scrolling) filter block, in order: case type, sub, sub-sub, court, year, lawyer
         filters.addView(pair("Case type", caseSpin, "Sub case type", subSpin));
@@ -166,22 +163,14 @@ public class AdvancedSearchActivity extends BaseActivity {
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
 
-        // filters at the very top (fixed, no scrollbar)
-        root.addView(filters, wide);
+        // search bar (type, speak, photo of text, or scan) at the very top
+        root.addView(smartSearch.view(), wide);
 
-        // search box
-        LinearLayout searchRow = new LinearLayout(this);
-        searchRow.setOrientation(LinearLayout.HORIZONTAL);
-        searchRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        searchRow.setPadding(CaseViews.dp(this, 14), 0, CaseViews.dp(this, 14), 0);
-        searchRow.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
-        searchRow.addView(CaseViews.icon(this, R.drawable.ic_search, CaseViews.GREY, 22));
-        searchRow.addView(fileEdit, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
+        // filters under it (fixed, no scrollbar)
+        LinearLayout.LayoutParams filtersLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        searchLp.topMargin = CaseViews.dp(this, 10);
-        root.addView(searchRow, searchLp);
+        filtersLp.topMargin = CaseViews.dp(this, 6);
+        root.addView(filters, filtersLp);
 
         // marked category chips
         HorizontalScrollView chipScroll = new HorizontalScrollView(this);
@@ -199,6 +188,12 @@ public class AdvancedSearchActivity extends BaseActivity {
         root.addView(list, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        smartSearch.onActivityResult(req, res, data);
     }
 
     @Override

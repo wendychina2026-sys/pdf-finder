@@ -32,4 +32,6 @@ android {
 dependencies {
     implementation("androidx.core:core:1.13.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")              // camera: read text from a photo
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0") // scanner: QR / barcode
 }
