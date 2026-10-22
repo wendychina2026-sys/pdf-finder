@@ -966,13 +966,29 @@ public class NewCaseActivity extends BaseActivity {
         stageBox.addView(stageLbl);
         TextView stageTv = dropdown(stageBox, "Select stage", null);
         stageBox.setVisibility(View.GONE);
-        ((View) stageTv.getTag()).setOnClickListener(v -> {
-            List<String> items = stages.list();
-            PickerDialogs.optionSheet(this, "Stage", null, items, items.indexOf(stageSel[0]), i -> {
-                stageSel[0] = items.get(i);
-                setChosen(stageTv, stageSel[0], "Select stage");
-            });
-        });
+        final StageStore docStages = StageStore.forDocuments(this);
+        ((View) stageTv.getTag()).setOnClickListener(v ->
+                PickerDialogs.stageSheet(this, "Stage", () -> docStages.list(), stageSel[0],
+                        s -> {
+                            stageSel[0] = s;
+                            setChosen(stageTv, s, "Select stage");
+                        },
+                        s -> docStages.add(s),
+                        (old, neu) -> {
+                            docStages.rename(old, neu);
+                            if (old.equals(stageSel[0])) {
+                                stageSel[0] = neu;
+                                setChosen(stageTv, neu, "Select stage");
+                            }
+                        },
+                        gone -> {
+                            docStages.delete(gone);
+                            if (gone.equals(stageSel[0])) {
+                                stageSel[0] = "";
+                                setChosen(stageTv, "", "Select stage");
+                            }
+                        },
+                        (i, j) -> docStages.swap(i, j)));
 
         ((View) matterTv.getTag()).setOnClickListener(v -> {
             List<String> items = new ArrayList<>();
@@ -986,9 +1002,6 @@ public class NewCaseActivity extends BaseActivity {
                             stageSel[0] = "";
                             stageBox.setVisibility(View.GONE);
                         } else {
-                            String cur = cases.get(i - 1).proceeding;     // start from the case's own stage
-                            stageSel[0] = cur == null ? "" : cur;
-                            setChosen(stageTv, stageSel[0], "Select stage");
                             stageBox.setVisibility(View.VISIBLE);
                         }
                     });

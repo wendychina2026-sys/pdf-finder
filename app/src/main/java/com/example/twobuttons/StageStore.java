@@ -18,10 +18,27 @@ final class StageStore {
 
     static final String ALL = "All stages";
 
+    /** Built-in list for the upload dialog's document stages (user can add / rename / delete / reorder). */
+    static final String[] DOC_STAGES = {"Pleadings (Plaint / Revision / WS)",
+            "Applications (Bail / Interim / Exemption)", "Judicial Orders", "Final Judgments",
+            "Evidence & Deposition", "Vakalatnama", "Annexures & Exhibits"};
+
     private final SharedPreferences sp;
+    private final String[] defaults;     // null = hearing stages from AllCasesActivity
 
     StageStore(Context c) {
         sp = c.getSharedPreferences("hearing_stages", Context.MODE_PRIVATE);
+        defaults = null;
+    }
+
+    private StageStore(Context c, String prefs, String[] defaults) {
+        sp = c.getSharedPreferences(prefs, Context.MODE_PRIVATE);
+        this.defaults = defaults;
+    }
+
+    /** Separate editable list used by the Upload Legal Document dialog. */
+    static StageStore forDocuments(Context c) {
+        return new StageStore(c, "document_stages", DOC_STAGES);
     }
 
     /** Stages in order, without "All stages". */
@@ -29,7 +46,8 @@ final class StageStore {
         String raw = sp.getString("list", null);
         List<String> out = new ArrayList<>();
         if (raw == null) {
-            out.addAll(Arrays.asList(AllCasesActivity.STAGES).subList(1, AllCasesActivity.STAGES.length));
+            if (defaults != null) out.addAll(Arrays.asList(defaults));
+            else out.addAll(Arrays.asList(AllCasesActivity.STAGES).subList(1, AllCasesActivity.STAGES.length));
             return out;
         }
         try {
