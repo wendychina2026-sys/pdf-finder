@@ -163,6 +163,7 @@ public class DocumentsActivity extends BaseActivity {
         act.open = () -> DocFileCard.open(this, uri, d.name);
         act.save = () -> DocFileCard.startSave(this, REQ_SAVE, uri, d.name);
         act.share = () -> DocFileCard.share(this, uri, d.name);
+        act.edit = () -> editSaved(d);
         act.replace = () -> LegalUi.confirm(this, "Replace " + d.name + "?",
                 "The stored file will be swapped for the one you pick.", () -> {
                     replacing = d;
@@ -186,7 +187,7 @@ public class DocumentsActivity extends BaseActivity {
         });
         LinearLayout card = DocFileCard.build(this, info, act);
         card.setOnLongClickListener(v -> {      // long press = edit caption / category / matter
-            editDoc(d);
+            editSaved(d);
             return true;
         });
         return card;
@@ -229,6 +230,33 @@ public class DocumentsActivity extends BaseActivity {
             replacing = null;
             renderList();
         }
+    }
+
+    /** Edit button on a saved file card: caption, category, matter and stage. The file itself is kept. */
+    private void editSaved(LegalStore.Doc d) {
+        final String ext = DocFileCard.ext(d.name).isEmpty() ? "" : "." + DocFileCard.ext(d.name);
+        LinearLayout f = LegalUi.form(this);
+        EditText name = LegalUi.text(this, f, "Document name / caption", DocFileCard.stem(d.name));
+        List<String> cats = new java.util.ArrayList<>(java.util.Arrays.asList(LegalStore.allDocCategories()));
+        if (!d.category.isEmpty() && !cats.contains(d.category)) cats.add(0, d.category);
+        Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), d.category);
+        EditText matter = LegalUi.text(this, f, "Attached to (case / client, blank = General Document Vault)", d.caseName);
+        List<String> st = new java.util.ArrayList<>();
+        st.add("");
+        st.addAll(new StageStore(this).list());
+        if (!d.stage.isEmpty() && !st.contains(d.stage)) st.add(d.stage);
+        Spinner stage = LegalUi.spinner(this, f, "Stage", st.toArray(new String[0]), d.stage);
+
+        LegalUi.formDialog(this, "Edit document", f, () -> {
+            if (!LegalUi.need(this, name, "Document name")) return false;
+            d.name = LegalUi.str(name) + ext;
+            d.category = (String) cat.getSelectedItem();
+            d.caseName = LegalUi.str(matter);
+            d.stage = d.caseName.isEmpty() ? "" : (String) stage.getSelectedItem();
+            store.saveDoc(d);
+            renderList();
+            return true;
+        }, null);
     }
 
     private void editDoc(LegalStore.Doc existing) {

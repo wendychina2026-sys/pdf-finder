@@ -1419,7 +1419,7 @@ public class NewCaseActivity extends BaseActivity {
     private View clientSideRow() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setPadding(dp(12), dp(8), dp(12), dp(8));
         clientSideCard = card;
         clientSideInvalid(false);
         LinearLayout head = new LinearLayout(this);
@@ -1432,7 +1432,7 @@ public class NewCaseActivity extends BaseActivity {
 
         final LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
-        card.addView(grid, lpTop(12));
+        card.addView(grid, lpTop(6));
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
             grid.removeAllViews();
@@ -1444,7 +1444,7 @@ public class NewCaseActivity extends BaseActivity {
                     int i = start + k;
                     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
                             LinearLayout.LayoutParams.MATCH_PARENT, 1f);
-                    if (k < perRow - 1) lp.rightMargin = dp(8);
+                    if (k < perRow - 1) lp.rightMargin = dp(6);
                     if (i >= CLIENT_SIDES.length) {          // keep the last row's chips the same width
                         row.addView(new View(this), lp);
                         continue;
@@ -1454,16 +1454,16 @@ public class NewCaseActivity extends BaseActivity {
                     LinearLayout chip = new LinearLayout(this);
                     chip.setOrientation(LinearLayout.VERTICAL);
                     chip.setGravity(Gravity.CENTER);
-                    chip.setPadding(dp(4), dp(10), dp(4), dp(10));
+                    chip.setPadding(dp(4), dp(5), dp(4), dp(5));
                     chip.setBackground(CaseViews.box(this, AppTheme.field(this), 14,
                             on ? AppTheme.text(this) : AppTheme.fieldStroke(this), on ? 2 : 1));
                     int fg = on ? AppTheme.text(this) : AppTheme.sub(this);
-                    chip.addView(CaseViews.icon(this, on ? R.drawable.ic_check_circle : CLIENT_ICONS[i], fg, 20));
+                    chip.addView(CaseViews.icon(this, on ? R.drawable.ic_check_circle : CLIENT_ICONS[i], fg, 16));
                     TextView t = CaseViews.text(this, side, 12, fg, on);
                     t.setGravity(Gravity.CENTER);
                     t.setSingleLine(false);
                     t.setMaxLines(2);
-                    t.setPadding(0, dp(4), 0, 0);
+                    t.setPadding(0, dp(2), 0, 0);
                     chip.addView(t, new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     chip.setOnClickListener(v -> {
@@ -1476,7 +1476,7 @@ public class NewCaseActivity extends BaseActivity {
                 }
                 LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                if (start > 0) rl.topMargin = dp(8);
+                if (start > 0) rl.topMargin = dp(6);
                 grid.addView(row, rl);
             }
             if (scaled) shrink(grid);

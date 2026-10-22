@@ -27,7 +27,7 @@ final class DocFileCard {
     }
 
     static final class Actions {
-        Runnable open, save, replace, share, delete;
+        Runnable open, save, edit, replace, share, delete;
     }
 
     static final int PDF_RED = 0xFFE5484D, WORD_BLUE = 0xFF3B82F6, IMG_GREEN = 0xFF22C55E;
@@ -163,6 +163,7 @@ final class DocFileCard {
         int info = AppTheme.info(a), green = AppTheme.topics(a);
         if (act.open != null) row.addView(labelBtn(a, R.drawable.ic_eye, info, "Open", act.open), wlp(a, 0));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
+        if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
         if (act.replace != null) row.addView(iconBtn(a, R.drawable.ic_replace, gold, "Replace file", act.replace), ilp(a));
         if (act.share != null) row.addView(iconBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share file", act.share), ilp(a));
         if (act.delete != null) row.addView(iconBtn(a, R.drawable.ic_delete, RoundEdit.RED, "Delete file", act.delete), ilp(a));
