@@ -22,7 +22,7 @@ import java.util.Locale;
 final class DocFileCard {
 
     static final class Info {
-        String name = "", category = "", matter = "", stage = "", size = "", date = "";
+        String name = "", fileName = "", category = "", matter = "", stage = "", size = "", date = "";
         Uri uri;
     }
 
@@ -129,12 +129,10 @@ final class DocFileCard {
         details.setOrientation(LinearLayout.VERTICAL);
         details.setVisibility(View.GONE);
         details.setPadding(0, dp(a, 10), 0, 0);
-        detail(a, details, "File name", in.name);
-        detail(a, details, "Category", in.category);
+        // category, size, type and date already show on the card: only what is not visible
+        detail(a, details, "Document name", stem(in.name));
+        detail(a, details, "File name", in.fileName.isEmpty() ? in.name : in.fileName);
         detail(a, details, "Stage", in.stage);
-        detail(a, details, "File type", kindLabel(k, in.name));
-        detail(a, details, "Size", in.size);
-        detail(a, details, "Added on", in.date);
         card.addView(details);
 
         top.setOnClickListener(v -> {
@@ -177,7 +175,7 @@ final class DocFileCard {
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setPadding(0, dp(a, 3), 0, dp(a, 3));
         TextView l = CaseViews.text(a, label, 12, AppTheme.sub(a), true);
-        r.addView(l, new LinearLayout.LayoutParams(dp(a, 82), LinearLayout.LayoutParams.WRAP_CONTENT));
+        r.addView(l, new LinearLayout.LayoutParams(dp(a, 96), LinearLayout.LayoutParams.WRAP_CONTENT));
         r.addView(CaseViews.text(a, value, 13, AppTheme.text(a), false), LegalUi.weight());
         box.addView(r);
     }

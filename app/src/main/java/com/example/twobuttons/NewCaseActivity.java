@@ -1134,13 +1134,14 @@ public class NewCaseActivity extends BaseActivity {
                 pickedUris.add(u);
                 pickedNames.add(shown);
                 String today = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
-                pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], sizeText(fileSize(u)), today});
+                pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], sizeText(fileSize(u)), today, displayName(u)});
                 LegalStore.Doc d = new LegalStore.Doc();
                 d.name = shown;
                 d.caseName = matterName;
                 d.category = catSel[0];
                 d.stage = stageSel[0];
                 d.uri = u.toString();
+                d.fileName = displayName(u);
                 d.size = sizeText(fileSize(u));
                 d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
                 ls.saveDoc(d);
@@ -1251,6 +1252,7 @@ public class NewCaseActivity extends BaseActivity {
             pickedNames.set(replaceIdx, oldCap + extOf(displayName(uri)));
             String[] m = pickedMeta.get(replaceIdx);
             m[3] = sizeText(fileSize(uri));
+            m[5] = displayName(uri);
             m[4] = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
             replaceIdx = -1;
             return;
@@ -1259,7 +1261,7 @@ public class NewCaseActivity extends BaseActivity {
         pickedUris.add(uri);
         pickedNames.add(displayName(uri));
         pickedMeta.add(new String[]{"", "", "", sizeText(fileSize(uri)),
-                new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date())});
+                new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date()), displayName(uri)});
     }
 
     private String displayName(Uri uri) {
@@ -1301,7 +1303,7 @@ public class NewCaseActivity extends BaseActivity {
         }
         for (int i = 0; i < pickedUris.size(); i++) {
             final int idx = i;
-            String[] m = i < pickedMeta.size() ? pickedMeta.get(i) : new String[]{"", "", "", "", ""};
+            String[] m = i < pickedMeta.size() ? pickedMeta.get(i) : new String[]{"", "", "", "", "", ""};
             DocFileCard.Info info = new DocFileCard.Info();
             info.name = pickedNames.get(i);
             info.category = m[0];
@@ -1309,6 +1311,7 @@ public class NewCaseActivity extends BaseActivity {
             info.stage = m[2];
             info.size = m[3];
             info.date = m[4];
+            info.fileName = m.length > 5 ? m[5] : "";
             info.uri = pickedUris.get(i);
             DocFileCard.Actions act = new DocFileCard.Actions();
             act.open = () -> openFile(idx);

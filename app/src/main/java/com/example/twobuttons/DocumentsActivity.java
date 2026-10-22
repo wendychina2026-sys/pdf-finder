@@ -152,6 +152,7 @@ public class DocumentsActivity extends BaseActivity {
         final android.net.Uri uri = d.uri.isEmpty() ? null : android.net.Uri.parse(d.uri);
         DocFileCard.Info info = new DocFileCard.Info();
         info.name = d.name;
+        info.fileName = d.fileName;
         info.category = d.category;
         info.matter = d.caseName;
         info.stage = d.stage;
@@ -220,6 +221,7 @@ public class DocumentsActivity extends BaseActivity {
             String ext = nm != null && nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.')) : "";
             replacing.name = DocFileCard.stem(replacing.name) + ext;
             replacing.uri = u.toString();
+            if (nm != null) replacing.fileName = nm;
             if (sz > 0) replacing.size = sz < 1024 * 1024 ? String.format(Locale.US, "%.1f KB", sz / 1024.0)
                     : String.format(Locale.US, "%.1f MB", sz / (1024.0 * 1024.0));
             replacing.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
