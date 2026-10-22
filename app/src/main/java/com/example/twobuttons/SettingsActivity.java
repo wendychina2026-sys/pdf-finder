@@ -59,8 +59,32 @@ public class SettingsActivity extends BaseActivity {
         contact.setOnClickListener(v -> startActivity(new Intent(this, ContactUsActivity.class)));
         root.addView(contact, CaseViews.lp(this, 0, 0));
 
+        TextView app = CaseViews.text(this, "App", 14, AppTheme.accent(this), true);
+        app.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
+        root.addView(app);
+
+        LinearLayout upd = new LinearLayout(this);
+        upd.setOrientation(LinearLayout.VERTICAL);
+        upd.setGravity(Gravity.CENTER_VERTICAL);
+        upd.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        upd.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        upd.addView(CaseViews.text(this, "Install update from APK file", 16, AppTheme.text(this), true));
+        upd.addView(CaseViews.text(this, "Installed version " + ApkInstaller.installedLabel(this)
+                + ". Warns if the APK is the same or older.", 14, AppTheme.sub(this), false));
+        upd.setOnClickListener(v -> ApkInstaller.pick(this));
+        root.addView(upd, CaseViews.lp(this, 0, 0));
+
         sv.addView(root);
         setContentView(sv);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == ApkInstaller.REQ_PICK && res == RESULT_OK && data != null) {
+            ApkInstaller.handle(this, data.getData());
+        }
     }
 
     private int indexOf(String mode) {

@@ -15,12 +15,15 @@ android {
         }
     }
 
+    // CI sets GITHUB_RUN_NUMBER: every build gets a higher versionCode, so installs can be compared
+    val runNo = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+
     defaultConfig {
         applicationId = "com.example.twobuttons"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = runNo ?: 1
+        versionName = if (runNo != null) "1.0.$runNo" else "1.0"
     }
 
     compileOptions {
