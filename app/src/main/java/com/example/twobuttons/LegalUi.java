@@ -96,7 +96,7 @@ final class LegalUi {
         return f;
     }
 
-    private static void label(Context c, LinearLayout f, String s) {
+    static void label(Context c, LinearLayout f, String s) {
         f.addView(CaseViews.fieldLabel(c, s));
     }
 

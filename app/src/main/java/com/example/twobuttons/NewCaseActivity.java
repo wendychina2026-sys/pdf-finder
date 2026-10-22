@@ -1316,17 +1316,13 @@ public class NewCaseActivity extends BaseActivity {
         List<String> cats = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
         if (!m[0].isEmpty() && !cats.contains(m[0])) cats.add(0, m[0]);
         Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), m[0]);
-        EditText matter = LegalUi.text(this, f, "Attached to (case / client, blank = General Document Vault)", m[1]);
-        List<String> st = new ArrayList<>();
-        st.add("");
-        st.addAll(new StageStore(this).list());
-        if (!m[2].isEmpty() && !st.contains(m[2])) st.add(m[2]);
-        Spinner stage = LegalUi.spinner(this, f, "Stage", st.toArray(new String[0]), m[2]);
+        MatterPicker mp = new MatterPicker(this, f, m[1], m[2]);
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             String neu = LegalUi.str(name) + ext;
-            String mt = LegalUi.str(matter).isEmpty() ? "General Document Vault" : LegalUi.str(matter);
-            String sg = mt.equals("General Document Vault") ? "" : (String) stage.getSelectedItem();
+            if (!mp.valid()) return false;
+            String mt = mp.matter();
+            String sg = mp.stage();
             pickedNames.set(idx, neu);
             m[0] = (String) cat.getSelectedItem();
             m[1] = mt;

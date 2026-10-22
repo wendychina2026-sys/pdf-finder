@@ -240,19 +240,15 @@ public class DocumentsActivity extends BaseActivity {
         List<String> cats = new java.util.ArrayList<>(java.util.Arrays.asList(LegalStore.allDocCategories()));
         if (!d.category.isEmpty() && !cats.contains(d.category)) cats.add(0, d.category);
         Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), d.category);
-        EditText matter = LegalUi.text(this, f, "Attached to (case / client, blank = General Document Vault)", d.caseName);
-        List<String> st = new java.util.ArrayList<>();
-        st.add("");
-        st.addAll(new StageStore(this).list());
-        if (!d.stage.isEmpty() && !st.contains(d.stage)) st.add(d.stage);
-        Spinner stage = LegalUi.spinner(this, f, "Stage", st.toArray(new String[0]), d.stage);
+        MatterPicker mp = new MatterPicker(this, f, d.caseName, d.stage);
 
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             d.name = LegalUi.str(name) + ext;
             d.category = (String) cat.getSelectedItem();
-            d.caseName = LegalUi.str(matter).isEmpty() ? "General Document Vault" : LegalUi.str(matter);
-            d.stage = d.caseName.equals("General Document Vault") ? "" : (String) stage.getSelectedItem();
+            if (!mp.valid()) return false;
+            d.caseName = mp.matter();
+            d.stage = mp.stage();
             store.saveDoc(d);
             renderList();
             return true;
