@@ -222,41 +222,17 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Dropdown-looking row; the caller keeps the returned TextView to show the chosen value. */
     private TextView dropdown(LinearLayout parent, String placeholder, View.OnClickListener click) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.HORIZONTAL);
-        box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(dp(14), 0, dp(14), 0);
-        box.setBackground(dropBg(false));
-        box.setMinimumHeight(dp(RoundEdit.HEIGHT_DP));
-        TextView t = CaseViews.text(this, placeholder, 15, AppTheme.sub(this), false);
-        t.setIncludeFontPadding(false);
-        t.setSingleLine(true);
-        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.setTag(box);
-        box.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        box.addView(CaseViews.icon(this, R.drawable.ic_expand_more, AppTheme.text(this), 22));
-        box.setOnClickListener(click);
-        LinearLayout.LayoutParams dl = lpTop(0);
-        dl.height = dp(RoundEdit.HEIGHT_DP);          // exactly the text box height
-        parent.addView(box, dl);
-        return t;
-    }
-
-    /** Same round outline as RoundEdit: black normally, red when a mandatory pick is missing. */
-    private android.graphics.drawable.GradientDrawable dropBg(boolean invalid) {
-        return CaseViews.box(this, AppTheme.field(this), 14,
-                invalid ? RoundEdit.RED : AppTheme.text(this), invalid ? 2 : 1);
+        return FieldStyle.dropdown(this, parent, placeholder, click, lpTop(0));
     }
 
     private void dropInvalid(TextView t, boolean invalid) {
-        if (t != null && t.getTag() instanceof View) ((View) t.getTag()).setBackground(dropBg(invalid));
+        FieldStyle.setDropdownInvalid(t, invalid);
     }
 
     private void setChosen(TextView t, String value, String placeholder) {
         boolean has = value != null && !value.isEmpty();
         if (has) dropInvalid(t, false);
-        t.setText(has ? value : placeholder);
-        t.setTextColor(has ? AppTheme.text(this) : AppTheme.sub(this));
+        FieldStyle.setDropdownValue(t, value, placeholder);
     }
 
     // ---------- header / progress ----------
@@ -947,7 +923,7 @@ public class NewCaseActivity extends BaseActivity {
         TextView catTv = dropdown(f, "Select category", null);
         setChosen(catTv, catSel[0], "Select category");
         ((View) catTv.getTag()).setOnClickListener(v -> {
-            List<String> items = Arrays.asList(LegalStore.DOC_CATEGORIES);
+            List<String> items = Arrays.asList(LegalStore.allDocCategories());
             PickerDialogs.optionSheet(this, "Document Category", null, items, items.indexOf(catSel[0]), i -> {
                 catSel[0] = items.get(i);
                 setChosen(catTv, catSel[0], "Select category");
@@ -965,7 +941,8 @@ public class NewCaseActivity extends BaseActivity {
         stageBox.addView(stageLbl);
         TextView stageTv = dropdown(stageBox, "Select stage", null);
         stageBox.setVisibility(View.GONE);
-        final StageStore docStages = StageStore.forDocuments(this);
+        // hearing stages: same list as Filter cases > Hearing stage and New Case > Current Stage
+        final StageStore docStages = new StageStore(this);
         ((View) stageTv.getTag()).setOnClickListener(v ->
                 PickerDialogs.stageSheet(this, "Stage", () -> docStages.list(), stageSel[0],
                         s -> {
@@ -1537,11 +1514,9 @@ public class NewCaseActivity extends BaseActivity {
         EditText a = new RoundEdit(this);
         a.setHint("Act (e.g. IPC)");
         a.setSingleLine(true);
-        a.setTextSize(14);
         EditText s = new RoundEdit(this);
         s.setHint("Sections");
         s.setSingleLine(true);
-        s.setTextSize(14);
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
         x.setContentDescription("Remove act");

@@ -56,7 +56,7 @@ class CaseViews {
                     TextView t = (TextView) v;
                     t.setSingleLine(true);
                     t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    t.setTextSize(15);
+                    t.setTextSize(FieldStyle.TEXT_SP);
                     t.setPadding(dp(getContext(), 8), 0, 0, 0);
                     t.setGravity(android.view.Gravity.CENTER_VERTICAL);
                 }
@@ -85,21 +85,6 @@ class CaseViews {
         t.setPadding(0, dp(c, 10), 0, dp(c, 4));
         t.setTag("keep");
         return t;
-    }
-
-    /** Give a plain AutoCompleteTextView the exact RoundEdit look, size and font. */
-    static void styleAuto(android.widget.EditText e) {
-        Context c = e.getContext();
-        e.setTextColor(AppTheme.text(c));
-        e.setHintTextColor(AppTheme.sub(c));
-        e.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
-        e.setTypeface(android.graphics.Typeface.DEFAULT);
-        e.setIncludeFontPadding(false);
-        e.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
-        e.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        e.setMinHeight(dp(c, RoundEdit.HEIGHT_DP));
-        e.setHeight(dp(c, RoundEdit.HEIGHT_DP));
-        e.setBackground(box(c, AppTheme.field(c), 14, AppTheme.text(c), 1));
     }
 
     /** Fractional sp, for sizes that must match a 0.9-scaled page (e.g. 10.8). */

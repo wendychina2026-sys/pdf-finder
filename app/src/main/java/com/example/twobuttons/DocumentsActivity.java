@@ -22,7 +22,15 @@ import java.util.Locale;
 /** Document Library page: search, filter chips, add / edit / delete. */
 public class DocumentsActivity extends BaseActivity {
 
-    private static final String[] FILTERS = {"All", "Petition", "Order", "Evidence", "Other"};
+    private static final String[] FILTERS = filters();
+
+    private static String[] filters() {
+        String[] cats = LegalStore.allDocCategories();
+        String[] out = new String[cats.length + 1];
+        out[0] = "All";
+        System.arraycopy(cats, 0, out, 1, cats.length);
+        return out;
+    }
 
     private LegalStore store;
     private LinearLayout list;
@@ -55,9 +63,6 @@ public class DocumentsActivity extends BaseActivity {
         search = new RoundEdit(this);
         search.setHint("Search file, case or client");
         search.setSingleLine(true);
-        search.setTextSize(15);
-        search.setPadding(LegalUi.dp(this, 14), LegalUi.dp(this, 12), LegalUi.dp(this, 14), LegalUi.dp(this, 12));
-        search.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { renderList(); }
@@ -195,7 +200,7 @@ public class DocumentsActivity extends BaseActivity {
         EditText cs = LegalUi.text(this, f, "Case / client", d.caseName);
         EditText size = LegalUi.text(this, f, "Size (e.g. 1.2 MB)", d.size);
         EditText date = LegalUi.dateInput(this, f, "Date", d.date);
-        Spinner cat = LegalUi.spinner(this, f, "Category", LegalStore.DOC_CATEGORIES, d.category);
+        Spinner cat = LegalUi.spinner(this, f, "Category", LegalStore.allDocCategories(), d.category);
 
         LegalUi.formDialog(this, existing == null ? "Add document" : "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "File name")) return false;

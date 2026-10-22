@@ -205,10 +205,9 @@ public class AdvancedSearchActivity extends BaseActivity {
         final Spinner subSubSp = spinner(CaseOptions.arr(opts.allSubSubs("")));
         final Spinner courtSp = spinner(CaseOptions.arr(opts.courts()));
         final Spinner yearSp = spinner(years());
-        final AutoCompleteTextView lawyer = new AutoCompleteTextView(this);
+        final AutoCompleteTextView lawyer = new RoundAuto(this);
         lawyer.setHint("Lawyer name");
         lawyer.setSingleLine(true);
-        CaseViews.styleAuto(lawyer);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, details.lawyers()));

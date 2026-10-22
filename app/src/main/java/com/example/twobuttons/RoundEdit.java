@@ -3,148 +3,93 @@ package com.example.twobuttons;
 import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.util.TypedValue;
-import android.view.Gravity;
-import android.view.View;
-import android.view.ViewParent;
+
 import android.widget.EditText;
 
 /**
  * The one text box design for the whole app: round outline, hint (placeholder) while empty.
  * Border: black (white in dark theme) normally, accent colour while focused, red when invalid.
- * Invalid clears when the user types.
- *
- * Any code that sets its own non-null background on a RoundEdit is ignored, so every box looks
- * the same. setBackground(null) means "I sit inside a frame (icon + box row)": the parent frame
- * then gets the same round border and follows focus / invalid instead.
+ * Invalid clears when the user types. setBackground(null) means "I sit inside a frame (icon + box
+ * row)": the parent frame then gets the same round border and follows focus / invalid instead.
+ * All numbers and colours come from FieldStyle; the look is locked (see FieldState).
  */
 public class RoundEdit extends EditText {
 
-    static final int RED = 0xFFD93025;
-    private static final int RADIUS_DP = 14;
-    static final int HEIGHT_DP = 52;       // every single-line box is this tall
-    private static final float TEXT_SP = 15;
-
-    private int minPx;
-
-    private boolean invalid;
-    private boolean required;
-    private boolean inFrame;
-    private View frame;
+    static final int RED = FieldStyle.RED;
+    static final int HEIGHT_DP = FieldStyle.HEIGHT_DP;
 
     public RoundEdit(Context c) {
         super(c);
-        setTextColor(AppTheme.text(c));
-        setHintTextColor(AppTheme.sub(c));
-        int h = CaseViews.dp(c, 16), v = CaseViews.dp(c, 12);
-        setPadding(h, v, h, v);
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
-        setTypeface(android.graphics.Typeface.DEFAULT);       // same face / weight as dropdown text
-        setIncludeFontPadding(false);
-        setGravity(Gravity.CENTER_VERTICAL);
-        minPx = CaseViews.dp(c, HEIGHT_DP);
-        setMinHeight(minPx);
-        addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
-            @Override public void onTextChanged(CharSequence s, int a, int b, int d) { }
-            @Override public void afterTextChanged(Editable s) {
-                if (invalid && s.length() > 0) setInvalid(false);
-            }
-        });
-        paint();
+        st = new FieldState(this, d -> super.setBackground(d));
+        st.install();
     }
+
+    private FieldState st;
 
     /** Single-line box = exactly the shared height, the same number RoundSpinner and the dropdown boxes use. */
     @Override
     protected void onMeasure(int w, int h) {
         super.onMeasure(w, h);
-        if (getMaxLines() == 1) setMeasuredDimension(getMeasuredWidth(), minPx);
+        if (st != null && getMaxLines() == 1) setMeasuredDimension(getMeasuredWidth(), st.minPx());
     }
 
     /** Mark / unmark as failed validation (red border). */
-    public void setInvalid(boolean bad) {
-        invalid = bad;
-        paint();
-    }
+    public void setInvalid(boolean bad) { st.setInvalid(bad); }
 
-    public boolean isInvalid() { return invalid; }
+    public boolean isInvalid() { return st.isInvalid(); }
 
     /** Mandatory box: turns red when the user leaves it empty. Returns this for chaining. */
     public RoundEdit setRequired(boolean r) {
-        required = r;
+        st.setRequired(r);
         return this;
     }
 
     /** Red border + focus when the value is empty. Returns true when the value is fine. */
-    public boolean requireFilled() {
-        boolean ok = getText().toString().trim().length() > 0;
-        setInvalid(!ok);
-        if (!ok) requestFocus();
-        return ok;
-    }
+    public boolean requireFilled() { return st.requireFilled(); }
 
-    /** One text size for every box, so heights match. Callers' sizes are ignored. */
+    // ---- locked look: outside callers cannot restyle the box (one look app-wide) ----
+
     @Override
     public void setTextSize(int unit, float size) {
-        super.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+        super.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, FieldStyle.TEXT_SP);
     }
 
-    /** One line = the shared box height. More lines (Notes, Address) grow as asked. */
     @Override
     public void setMinLines(int n) {
-        if (n <= 1) setMinHeight(minPx);
+        if (st == null) { super.setMinLines(n); return; }
+        if (n <= 1) setMinHeight(st.minPx());
         else super.setMinLines(n);
     }
 
     @Override
     public void setBackground(Drawable d) {
-        if (d == null) {
-            inFrame = true;
-            super.setBackground(null);
-            bindFrame();
-        }
-        // non-null: ignored, keeps the shared look (also hit by the framework's default underline)
+        if (st == null) { super.setBackground(d); return; }
+        if (d == null) st.enterFrame();      // "I sit inside a frame": the frame gets the border
+        // non-null: ignored
     }
+
+    /** Padding is fixed, except inside an icon + box frame row where the row decides. */
+    @Override
+    public void setPadding(int l, int t, int r, int b) {
+        if (st == null || !st.locked || st.inFrame()) super.setPadding(l, t, r, b);
+    }
+
+    @Override public void setTypeface(android.graphics.Typeface tf) { if (st == null || !st.locked) super.setTypeface(tf); }
+    @Override public void setTypeface(android.graphics.Typeface tf, int style) { if (st == null || !st.locked) super.setTypeface(tf, style); }
+    @Override public void setTextColor(int color) { if (st == null || !st.locked) super.setTextColor(color); }
+    @Override public void setTextColor(android.content.res.ColorStateList colors) { if (st == null || !st.locked) super.setTextColor(colors); }
+    @Override public void setHintTextColor(int color) { if (st == null || !st.locked) super.setHintTextColor(color); }
+    @Override public void setHintTextColor(android.content.res.ColorStateList colors) { if (st == null || !st.locked) super.setHintTextColor(colors); }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (inFrame) bindFrame();
+        if (st != null) st.onAttached();
     }
 
     @Override
     protected void onFocusChanged(boolean focused, int direction, Rect prev) {
         super.onFocusChanged(focused, direction, prev);
-        if (!focused && required && getText().toString().trim().isEmpty()) invalid = true;
-        paint();
-    }
-
-    private void bindFrame() {
-        ViewParent p = getParent();
-        if (p instanceof View && ((View) p).getBackground() != null) {
-            frame = (View) p;
-            minPx = Math.max(0, CaseViews.dp(getContext(), HEIGHT_DP) - frame.getPaddingTop() - frame.getPaddingBottom());
-            setMinHeight(minPx);
-            paint();
-        }
-    }
-
-    private void paint() {
-        Context c = getContext();
-        boolean focus = isFocused();
-        int stroke = invalid ? RED : focus ? AppTheme.accent(c) : AppTheme.text(c);
-        int w = (invalid || focus) ? 2 : 1;
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(AppTheme.field(c));
-        g.setCornerRadius(CaseViews.dp(c, RADIUS_DP));
-        g.setStroke(CaseViews.dp(c, w), stroke);
-        if (inFrame) {
-            if (frame != null) frame.setBackground(g);
-        } else {
-            super.setBackground(g);
-        }
+        if (st != null) st.onFocus();
     }
 }

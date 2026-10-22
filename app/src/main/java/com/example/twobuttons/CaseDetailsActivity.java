@@ -108,10 +108,9 @@ public class CaseDetailsActivity extends BaseActivity {
         dateRow.addView(clear);
         root.addView(dateRow);
 
-        lawyer = new AutoCompleteTextView(this);
+        lawyer = new RoundAuto(this);
         lawyer.setHint("Lawyer name");
         lawyer.setSingleLine(true);
-        CaseViews.styleAuto(lawyer);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, store.lawyers()));

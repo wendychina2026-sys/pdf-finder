@@ -51,10 +51,6 @@ public class SarthCaseListActivity extends BaseActivity {
         search = new RoundEdit(this);
         search.setHint("Search");
         search.setSingleLine(true);
-        search.setTextColor(0xFF000000);
-        search.setHintTextColor(0xFF757575);
-        search.setPadding(LegalUi.dp(this, 14), LegalUi.dp(this, 10), LegalUi.dp(this, 14), LegalUi.dp(this, 10));
-        search.setBackground(CaseViews.box(this, 0xFFFFFFFF, 10, 0xFF9E9E9E, 1));
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { render(); }

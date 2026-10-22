@@ -23,15 +23,15 @@ public class RoundSpinner extends Spinner {
     public RoundSpinner(Context c) {
         super(c);
         Drawable arrow = c.getDrawable(R.drawable.ic_expand_more).mutate();
-        arrow.setTint(AppTheme.text(c));
+        arrow.setTint(FieldStyle.textColor(c));
         LayerDrawable ld = new LayerDrawable(new Drawable[]{
-                CaseViews.box(c, AppTheme.field(c), 14, AppTheme.text(c), 1), arrow});
-        ld.setLayerSize(1, CaseViews.dp(c, 22), CaseViews.dp(c, 22));
+                FieldStyle.border(c, false, false), arrow});
+        ld.setLayerSize(1, CaseViews.dp(c, FieldStyle.ARROW_DP), CaseViews.dp(c, FieldStyle.ARROW_DP));
         ld.setLayerGravity(1, Gravity.END | Gravity.CENTER_VERTICAL);
         ld.setLayerInsetRight(1, CaseViews.dp(c, 14));
         setBackground(ld);
         setPadding(CaseViews.dp(c, 6), CaseViews.dp(c, 8), CaseViews.dp(c, 44), CaseViews.dp(c, 8));   // + 8dp text pad = 14dp, same as New Case dropdowns
-        setMinimumHeight(CaseViews.dp(c, RoundEdit.HEIGHT_DP));
+        setMinimumHeight(FieldStyle.heightPx(c));
     }
 
     /**
@@ -40,7 +40,7 @@ public class RoundSpinner extends Spinner {
      */
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
-        int h = CaseViews.dp(getContext(), RoundEdit.HEIGHT_DP);
+        int h = FieldStyle.heightPx(getContext());
         int w = MeasureSpec.getMode(widthSpec) == MeasureSpec.UNSPECIFIED
                 ? widthSpec
                 : MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthSpec), MeasureSpec.EXACTLY);
@@ -57,22 +57,14 @@ public class RoundSpinner extends Spinner {
             android.widget.TextView tv = (android.widget.TextView) v;
             Context c = getContext();
             int pad = CaseViews.dp(c, 8);
-            String shownText = String.valueOf(tv.getText());
-            boolean holder = shownText.isEmpty() || shownText.startsWith("--") || shownText.startsWith("Select")
-                    || shownText.equals("All") || shownText.startsWith("All ");
-            int wantColor = holder ? AppTheme.sub(c) : AppTheme.text(c);
+            boolean holder = FieldStyle.isPlaceholder(tv.getText());
+            int wantColor = holder ? FieldStyle.hintColor(c) : FieldStyle.textColor(c);
             if (tv.getCurrentTextColor() != wantColor) tv.setTextColor(wantColor);
-            if (tv.getTypeface() != android.graphics.Typeface.DEFAULT) {
-                tv.setTypeface(android.graphics.Typeface.DEFAULT);
-                tv.setIncludeFontPadding(false);
-            }
-            float want = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 15,
-                    c.getResources().getDisplayMetrics());
-            if (Math.abs(tv.getTextSize() - want) > 0.5f || tv.getPaddingLeft() != pad
-                    || tv.getEllipsize() != android.text.TextUtils.TruncateAt.END) {
-                tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
-                tv.setSingleLine(true);
-                tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            float want = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+                    FieldStyle.TEXT_SP, c.getResources().getDisplayMetrics());
+            if (tv.getTypeface() != android.graphics.Typeface.DEFAULT || Math.abs(tv.getTextSize() - want) > 0.5f
+                    || tv.getPaddingLeft() != pad || tv.getEllipsize() != android.text.TextUtils.TruncateAt.END) {
+                FieldStyle.applyDropdownText(tv, holder);
                 tv.setPadding(pad, 0, 0, 0);
                 tv.setGravity(Gravity.CENTER_VERTICAL);
             }

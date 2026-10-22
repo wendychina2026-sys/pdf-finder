@@ -44,6 +44,24 @@ final class LegalStore {
     }
 
     static final String[] DOC_CATEGORIES = {"Petition", "Order", "Evidence", "Other"};
+
+    /** Former "document stages": now extra document categories (shown before "Other"). */
+    static final String[] DOC_CATEGORIES_EXTRA = {"Pleadings (Plaint / Revision / WS)",
+            "Applications (Bail / Interim / Exemption)", "Judicial Orders", "Final Judgments",
+            "Evidence & Deposition", "Vakalatnama", "Annexures & Exhibits"};
+
+    /** Every document category, in pick order: the original ones, then the extra ones, "Other" last. */
+    static String[] allDocCategories() {
+        java.util.List<String> l = new java.util.ArrayList<>();
+        for (String c : DOC_CATEGORIES) if (!c.equals("Other")) l.add(c);
+        for (String c : DOC_CATEGORIES_EXTRA) {
+            boolean dup = false;
+            for (String x : l) if (x.equalsIgnoreCase(c)) dup = true;
+            if (!dup) l.add(c);
+        }
+        l.add("Other");
+        return l.toArray(new String[0]);
+    }
     static final String[] CASE_STATUS = {"Active", "Pending", "Closed"};
     static final String[] CHANNELS = {"WHATSAPP", "SMS", "EMAIL"};
     static final String[] REM_STATUS = {"DELIVERED", "SENT", "PENDING", "FAILED"};

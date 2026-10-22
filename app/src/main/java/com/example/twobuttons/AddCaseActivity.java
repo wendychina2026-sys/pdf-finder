@@ -160,9 +160,6 @@ public class AddCaseActivity extends BaseActivity {
         e.setText(value);
         e.setInputType(type);
         e.setSingleLine(true);
-        e.setTextSize(17);
-        e.setPadding(LegalUi.dp(this, 18), LegalUi.dp(this, 14), LegalUi.dp(this, 18), LegalUi.dp(this, 14));
-        e.setBackground(CaseViews.box(this, AppTheme.field(this), 12, AppTheme.fieldStroke(this), 1));
         return e;
     }
 

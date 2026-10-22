@@ -615,12 +615,8 @@ public class AllCasesActivity extends BaseActivity {
         body.addView(lb);
         EditText e = new RoundEdit(this);
         e.setText(value);
-        e.setTextSize(14);
         e.setSingleLine(true);
         e.setInputType(inputType);
-        e.setTextColor(ink());
-        e.setPadding(dp(16), dp(12), dp(16), dp(12));
-        e.setBackground(CaseViews.box(this, PickerDialogs.chip(this), 14, hair(), 1));
         body.addView(e, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return e;
