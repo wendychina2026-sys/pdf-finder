@@ -1010,7 +1010,7 @@ public class NewCaseActivity extends BaseActivity {
         drop.setBackground(dash);
         f.addView(drop, lpTop(16));
 
-        final int[] shown = {0};
+        final int[] landed = {0};
         final Runnable draw = () -> {
             drop.removeAllViews();
             final boolean has = !dlgUris.isEmpty();
@@ -1029,7 +1029,7 @@ public class NewCaseActivity extends BaseActivity {
             ImageView top = CaseViews.icon(this, has ? R.drawable.ic_check_circle : R.drawable.ic_upload,
                     has ? ok : AppTheme.accent(this), has ? 40 : 34);
             drop.addView(top);
-            if (has && dlgUris.size() > shown[0]) {          // a new file just landed: pop the tick
+            if (has && dlgUris.size() > landed[0]) {          // a new file just landed: pop the tick
                 top.setScaleX(0.3f);
                 top.setScaleY(0.3f);
                 top.animate().scaleX(1f).scaleY(1f).setDuration(380)
@@ -1038,7 +1038,7 @@ public class NewCaseActivity extends BaseActivity {
                 drop.animate().alpha(1f).setDuration(300).start();
                 drop.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
             }
-            shown[0] = dlgUris.size();
+            landed[0] = dlgUris.size();
             if (!has) {
                 TextView t1 = CaseViews.text(this, "Tap to choose PDF, Word or image file", 13.5f, AppTheme.accent(this), true);
                 t1.setGravity(Gravity.CENTER);
