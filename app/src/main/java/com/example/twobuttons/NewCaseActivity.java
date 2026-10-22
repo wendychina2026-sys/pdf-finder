@@ -1427,7 +1427,9 @@ public class NewCaseActivity extends BaseActivity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(CaseViews.text(this, "My client is *", 15, AppTheme.text(this), false),
                 new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        head.addView(CaseViews.text(this, "Required", 12, AppTheme.sub(this), false));
+        final TextView req = CaseViews.text(this, "Required", 12, AppTheme.sub(this), false);
+        req.setPadding(dp(10), dp(4), dp(2), dp(4));
+        head.addView(req);
         card.addView(head);
 
         final LinearLayout grid = new LinearLayout(this);
@@ -1436,6 +1438,20 @@ public class NewCaseActivity extends BaseActivity {
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
             grid.removeAllViews();
+            if (clientRole.isEmpty()) {              // nothing chosen: plain "Required" tag
+                req.setText("Required");
+                req.setTextColor(AppTheme.sub(this));
+                req.setOnClickListener(null);
+                req.setClickable(false);
+            } else {                                 // chosen: visible Clear button to undo a mistaken pick
+                req.setText("\u2715  Clear");
+                req.setTextColor(RoundEdit.RED);
+                req.setOnClickListener(v -> {
+                    clientRole = "";
+                    draw[0].run();
+                    refresh();
+                });
+            }
             final int perRow = 3;
             for (int start = 0; start < CLIENT_SIDES.length; start += perRow) {
                 LinearLayout row = new LinearLayout(this);
