@@ -251,8 +251,8 @@ public class DocumentsActivity extends BaseActivity {
             if (!LegalUi.need(this, name, "Document name")) return false;
             d.name = LegalUi.str(name) + ext;
             d.category = (String) cat.getSelectedItem();
-            d.caseName = LegalUi.str(matter);
-            d.stage = d.caseName.isEmpty() ? "" : (String) stage.getSelectedItem();
+            d.caseName = LegalUi.str(matter).isEmpty() ? "General Document Vault" : LegalUi.str(matter);
+            d.stage = d.caseName.equals("General Document Vault") ? "" : (String) stage.getSelectedItem();
             store.saveDoc(d);
             renderList();
             return true;

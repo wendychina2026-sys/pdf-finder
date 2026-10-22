@@ -1157,7 +1157,7 @@ public class NewCaseActivity extends BaseActivity {
                 d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
                 ls.saveDoc(d);
             }
-            if (matterSel[0].equals(general)) { vaultSaved = true; missing(); }
+            if (matterSel[0].equals(general)) { vaultSaved = true; missing(); relaxRequiredLabels(findViewById(android.R.id.content)); }
             dlgUris.clear();
             renderFiles();
             refresh();
@@ -1305,6 +1305,49 @@ public class NewCaseActivity extends BaseActivity {
         Collections.swap(pickedMeta, a, b);
     }
 
+    /** Edit button on an uploaded file card: caption, category, matter, stage (also updates the Vault copy). */
+    private void editPicked(int idx) {
+        final String shown = pickedNames.get(idx);
+        final String[] m = pickedMeta.get(idx);
+        final String ext = extOf(shown);
+        final String stem = ext.isEmpty() ? shown : shown.substring(0, shown.length() - ext.length());
+        LinearLayout f = LegalUi.form(this);
+        EditText name = LegalUi.text(this, f, "Document name / caption", stem);
+        List<String> cats = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
+        if (!m[0].isEmpty() && !cats.contains(m[0])) cats.add(0, m[0]);
+        Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), m[0]);
+        EditText matter = LegalUi.text(this, f, "Attached to (case / client, blank = General Document Vault)", m[1]);
+        List<String> st = new ArrayList<>();
+        st.add("");
+        st.addAll(new StageStore(this).list());
+        if (!m[2].isEmpty() && !st.contains(m[2])) st.add(m[2]);
+        Spinner stage = LegalUi.spinner(this, f, "Stage", st.toArray(new String[0]), m[2]);
+        LegalUi.formDialog(this, "Edit document", f, () -> {
+            if (!LegalUi.need(this, name, "Document name")) return false;
+            String neu = LegalUi.str(name) + ext;
+            String mt = LegalUi.str(matter).isEmpty() ? "General Document Vault" : LegalUi.str(matter);
+            String sg = mt.equals("General Document Vault") ? "" : (String) stage.getSelectedItem();
+            pickedNames.set(idx, neu);
+            m[0] = (String) cat.getSelectedItem();
+            m[1] = mt;
+            m[2] = sg;
+            String uri = pickedUris.get(idx).toString();
+            LegalStore ls = new LegalStore(this);
+            for (LegalStore.Doc d : ls.docs()) {
+                if (uri.equals(d.uri)) {
+                    d.name = neu;
+                    d.category = m[0];
+                    d.caseName = mt;
+                    d.stage = sg;
+                    ls.saveDoc(d);
+                    break;
+                }
+            }
+            renderFiles();
+            return true;
+        }, null);
+    }
+
     private void renderFiles() {
         filesBox.removeAllViews();
         dragCur = -1;
@@ -1330,6 +1373,7 @@ public class NewCaseActivity extends BaseActivity {
             act.open = () -> openFile(idx);
             act.save = () -> DocFileCard.startSave(this, REQ_SAVE, pickedUris.get(idx), pickedNames.get(idx));
             act.share = () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
+            act.edit = () -> editPicked(idx);
             act.replace = () -> PickerDialogs.confirm(this, "Replace file?",
                     "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
                     "Replace", () -> chooseSource(idx));
@@ -1452,7 +1496,7 @@ public class NewCaseActivity extends BaseActivity {
         draw[0] = () -> {
             grid.removeAllViews();
             if (clientRole.isEmpty()) {              // nothing chosen: plain "Required" tag
-                req.setText("Required");
+                req.setText(vaultSaved ? "Optional" : "Required");
                 req.setTextColor(AppTheme.sub(this));
                 req.setOnClickListener(null);
                 req.setClickable(false);
@@ -1806,6 +1850,20 @@ public class NewCaseActivity extends BaseActivity {
         createBtn = create;
         b.addView(create, lpTop(10));
         return b;
+    }
+
+    /** Vault-only: no field is mandatory any more, so drop every "*" and "Required" mark on the page. */
+    private void relaxRequiredLabels(View v) {
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) relaxRequiredLabels(g.getChildAt(i));
+        } else if (v instanceof TextView && !(v instanceof EditText)) {
+            TextView t = (TextView) v;
+            String x = t.getText().toString().trim();
+            if (x.equals("Required")) t.setText("Optional");
+            else if (x.startsWith("Fields marked *")) t.setText("All fields are optional now.");
+            else if (x.endsWith("*") && x.length() <= 40) t.setText(x.substring(0, x.length() - 1).trim());
+        }
     }
 
     private List<String> missing() {
