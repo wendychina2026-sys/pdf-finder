@@ -223,12 +223,16 @@ final class LegalUi {
 
     /** Small tinted pill: coloured person-add icon + label. Wraps its content, so it takes little room. */
     static LinearLayout chipButton(Context c, String label, int color) {
+        return chipButton(c, label, color, R.drawable.ic_person_add);
+    }
+
+    static LinearLayout chipButton(Context c, String label, int color, int iconRes) {
         LinearLayout b = new LinearLayout(c);
         b.setOrientation(LinearLayout.HORIZONTAL);
         b.setGravity(Gravity.CENTER_VERTICAL);
         b.setPadding(CaseViews.dp(c, 10), CaseViews.dp(c, 5), CaseViews.dp(c, 12), CaseViews.dp(c, 5));
         b.setBackground(CaseViews.box(c, (color & 0x00FFFFFF) | 0x1F000000, 16, color, 1));
-        ImageView ic = CaseViews.iconPlain(c, R.drawable.ic_person_add, color, 16);
+        ImageView ic = CaseViews.iconPlain(c, iconRes, color, 16);
         b.addView(ic);
         TextView t = CaseViews.text(c, label, 12.5f, color, true);
         t.setPadding(CaseViews.dp(c, 6), 0, 0, 0);

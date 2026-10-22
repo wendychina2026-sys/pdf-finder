@@ -147,6 +147,7 @@ public class DocumentsActivity extends BaseActivity {
 
     private static final int REQ_REPLACE = 61, REQ_SAVE = 62;
     private LegalStore.Doc replacing;
+    private final PhotoFlow flow = new PhotoFlow(this, 63);
 
     private LinearLayout row(LegalStore.Doc d) {
         final android.net.Uri uri = d.uri.isEmpty() ? null : android.net.Uri.parse(d.uri);
@@ -196,6 +197,7 @@ public class DocumentsActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int req, int res, android.content.Intent data) {
         super.onActivityResult(req, res, data);
+        if (flow.handle(req, res)) return;
         if (req == REQ_SAVE) {
             DocFileCard.finishSave(this, res, data);
             return;
@@ -239,6 +241,21 @@ public class DocumentsActivity extends BaseActivity {
         EditText name = LegalUi.text(this, f, "Document name / caption", DocFileCard.stem(d.name));
         CategoryPicker cp = new CategoryPicker(this, f, d.category);
         MatterPicker mp = new MatterPicker(this, f, d.caseName, d.stage);
+        if (DocFileCard.kind(d.name) == 0 && !d.uri.isEmpty()) {
+            LinearLayout chip = LegalUi.chipButton(this, "Edit PDF pages (add / remove)",
+                    IconPalette.pick(this, 0xFFE65100, 0xFFFFB74D), R.drawable.ic_edit);
+            chip.setOnClickListener(v -> PdfPageEditor.open(this, flow, android.net.Uri.parse(d.uri), neu -> {
+                d.uri = neu.toString();
+                d.fileName = PdfTools.fileName(this, neu);
+                d.size = PdfTools.sizeLabel(this, neu);
+                store.saveDoc(d);
+                renderList();
+            }));
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.topMargin = LegalUi.dp(this, 12);
+            f.addView(chip, clp);
+        }
 
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;

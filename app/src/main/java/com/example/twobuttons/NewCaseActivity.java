@@ -110,8 +110,7 @@ public class NewCaseActivity extends BaseActivity {
     private final List<String[]> pickedMeta = new ArrayList<>();   // per file: category, matter, stage, size, date
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
-    private File cameraFile;
-    private final List<File> scanFiles = new ArrayList<>();   // camera shots of the page-scan in progress
+    private final PhotoFlow flow = new PhotoFlow(this, REQ_SCAN);
     // upload dialog state: files chosen inside the open dialog, and a callback that redraws its drop area
     private final List<Uri> dlgUris = new ArrayList<>();
     private Runnable dlgRefresh = null;
@@ -610,13 +609,7 @@ public class NewCaseActivity extends BaseActivity {
             DocFileCard.finishSave(this, res, data);
             return;
         }
-        if (req == REQ_SCAN) {
-            if (res == RESULT_OK && cameraFile != null && cameraFile.length() > 0) scanFiles.add(cameraFile);
-            else if (cameraFile != null) cameraFile.delete();
-            if (scanFiles.isEmpty()) dlgReplaceIdx = -1;
-            else scanPrompt();
-            return;
-        }
+        if (flow.handle(req, res)) return;
         if (req == REQ_CLIENT && res == RESULT_OK && data != null) {
             String id = data.getStringExtra("client_id");
             if (id != null) {
@@ -1124,6 +1117,17 @@ public class NewCaseActivity extends BaseActivity {
                                     })), dlgBtnLp(true));
                     drop.addView(btns, new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    if (kind == 0) {       // PDF: reopen it to delete pages or add photos
+                        View pages = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit pages (add / remove)", () ->
+                                PdfPageEditor.open(this, flow, dlgUris.get(idx), neu -> {
+                                    dlgUris.set(idx, neu);
+                                    dlgRefresh.run();
+                                }));
+                        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                        plp.topMargin = dp(8);
+                        drop.addView(pages, plp);
+                    }
                 }
             }
             // empty box: tap to choose. With files: only the View / Replace / Delete buttons act.
@@ -1215,75 +1219,21 @@ public class NewCaseActivity extends BaseActivity {
                 });
     }
 
-    /** Camera: any number of photos in a row, then the user picks PDF or image. */
+    /** Camera: any number of photos in a row (each can be deleted), then the user picks PDF or image. */
     private void takePhoto() {
-        startScan();
-    }
-
-    private void shoot(int req) {
-        try {
-            File dir = getExternalFilesDir("case_photos");
-            if (dir == null) dir = getCacheDir();
-            dir.mkdirs();
-            File f = new File(dir, "Photo_" + new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
-                    .format(new Date()) + ".jpg");
-            cameraFile = f;
-            cameraUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f);
-            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
-            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivityForResult(i, req);
-        } catch (Exception e) {
-            Toast.makeText(this, "Camera not available", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    // ---------- camera: several photos in a row, saved as one PDF or as separate images ----------
-
-    private void startScan() {
-        for (File f : scanFiles) f.delete();
-        scanFiles.clear();
-        shoot(REQ_SCAN);
-    }
-
-    private void scanPrompt() {
-        int n = scanFiles.size();
-        new AlertDialog.Builder(this)
-                .setTitle(n + (n == 1 ? " photo taken" : " photos taken"))
-                .setMessage("Take another photo, or press Done.")
-                .setCancelable(false)
-                .setPositiveButton("Done", (d, w) -> formatPrompt())
-                .setNegativeButton("Add more", (d, w) -> shoot(REQ_SCAN))
-                .setNeutralButton("Discard", (d, w) -> {
-                    for (File f : scanFiles) f.delete();
-                    scanFiles.clear();
-                    dlgReplaceIdx = -1;
-                })
-                .show();
-    }
-
-    /** After the photos: keep them as images, or make a PDF. */
-    private void formatPrompt() {
-        final boolean one = scanFiles.size() == 1;
-        String[] items = one
-                ? new String[]{"Save as PDF", "Save as image (JPG)"}
-                : new String[]{"One PDF (each photo is a page)", "Images (each photo separate)"};
-        new AlertDialog.Builder(this)
-                .setTitle("Save as")
-                .setItems(items, (d, which) -> {
-                    if (which == 0) {
-                        buildScanPdf();
-                    } else {
-                        List<Uri> uris = new ArrayList<>();
-                        for (File f : scanFiles) {
-                            uris.add(FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f));
-                        }
-                        scanFiles.clear();
-                        deliverAll(uris);
-                    }
-                })
-                .setOnCancelListener(d -> scanPrompt())
-                .show();
+        flow.start(true, new PhotoFlow.Result() {
+            @Override public void images(List<File> files) {
+                List<Uri> u = new ArrayList<>();
+                for (File f : files) u.add(PhotoFlow.uri(NewCaseActivity.this, f));
+                deliverAll(u);
+            }
+            @Override public void pdf(File file) {
+                deliverAll(java.util.Collections.singletonList(PhotoFlow.uri(NewCaseActivity.this, file)));
+            }
+            @Override public void cancelled() {
+                dlgReplaceIdx = -1;
+            }
+        });
     }
 
     private void deliverAll(List<Uri> uris) {
@@ -1296,84 +1246,18 @@ public class NewCaseActivity extends BaseActivity {
         }
     }
 
-    private void buildScanPdf() {
-        final List<File> shots = new ArrayList<>(scanFiles);
-        scanFiles.clear();
-        Toast.makeText(this, "Making PDF...", Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            File out = null;
-            try {
-                File dir = getExternalFilesDir("case_photos");
-                if (dir == null) dir = getCacheDir();
-                out = new File(dir, "Scan_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                        .format(new Date()) + ".pdf");
-                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
-                com.tom_roush.pdfbox.pdmodel.PDDocument doc = new com.tom_roush.pdfbox.pdmodel.PDDocument();
-                try {
-                    for (File shot : shots) {
-                        android.graphics.Bitmap bmp = decodeShot(shot);
-                        if (bmp == null) continue;
-                        boolean land = bmp.getWidth() > bmp.getHeight();
-                        com.tom_roush.pdfbox.pdmodel.common.PDRectangle a4 =
-                                com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4;
-                        com.tom_roush.pdfbox.pdmodel.common.PDRectangle size = land
-                                ? new com.tom_roush.pdfbox.pdmodel.common.PDRectangle(a4.getHeight(), a4.getWidth())
-                                : a4;
-                        com.tom_roush.pdfbox.pdmodel.PDPage page = new com.tom_roush.pdfbox.pdmodel.PDPage(size);
-                        doc.addPage(page);
-                        float m = 18f;
-                        float aw = size.getWidth() - 2 * m, ah = size.getHeight() - 2 * m;
-                        float sc = Math.min(aw / bmp.getWidth(), ah / bmp.getHeight());
-                        float w = bmp.getWidth() * sc, h = bmp.getHeight() * sc;
-                        com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject img =
-                                com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromImage(doc, bmp, 0.8f);
-                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream cs =
-                                new com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page);
-                        cs.drawImage(img, (size.getWidth() - w) / 2f, (size.getHeight() - h) / 2f, w, h);
-                        cs.close();
-                        bmp.recycle();
-                    }
-                    if (doc.getNumberOfPages() == 0) throw new java.io.IOException("no pages");
-                    doc.save(out);
-                } finally {
-                    doc.close();
-                }
-                for (File f : shots) f.delete();
-                final Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
-                runOnUiThread(() -> deliverAll(java.util.Collections.singletonList(uri)));
-            } catch (Exception | OutOfMemoryError e) {
-                if (out != null) out.delete();
-                runOnUiThread(() -> {
-                    dlgReplaceIdx = -1;
-                    Toast.makeText(this, "Could not make the PDF. Try again.", Toast.LENGTH_LONG).show();
-                });
+    /** After a PDF was edited (pages removed / photos added): keep the Vault copy pointing at the new file. */
+    private void updateStoredDoc(Uri old, Uri neu) {
+        LegalStore ls = new LegalStore(this);
+        for (LegalStore.Doc d : ls.docs()) {
+            if (old.toString().equals(d.uri)) {
+                d.uri = neu.toString();
+                d.fileName = PdfTools.fileName(this, neu);
+                d.size = PdfTools.sizeLabel(this, neu);
+                ls.saveDoc(d);
+                break;
             }
-        }).start();
-    }
-
-    /** Decode a camera shot at a sane size and turn it upright using its EXIF rotation. */
-    private static android.graphics.Bitmap decodeShot(File f) throws java.io.IOException {
-        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
-        o.inJustDecodeBounds = true;
-        android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
-        int big = Math.max(o.outWidth, o.outHeight), ss = 1;
-        while (big / ss > 2400) ss *= 2;
-        o = new android.graphics.BitmapFactory.Options();
-        o.inSampleSize = ss;
-        android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
-        if (b == null) return null;
-        int deg = 0;
-        int ori = new android.media.ExifInterface(f.getAbsolutePath())
-                .getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
-        if (ori == 6) deg = 90;
-        else if (ori == 3) deg = 180;
-        else if (ori == 8) deg = 270;
-        if (deg == 0) return b;
-        android.graphics.Matrix mx = new android.graphics.Matrix();
-        mx.postRotate(deg);
-        android.graphics.Bitmap r = android.graphics.Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mx, true);
-        if (r != b) b.recycle();
-        return r;
+        }
     }
 
     private void openFile(int idx) {
@@ -1471,6 +1355,21 @@ public class NewCaseActivity extends BaseActivity {
         EditText name = LegalUi.text(this, f, "Document name / caption", stem);
         CategoryPicker cp = new CategoryPicker(this, f, m[0]);
         MatterPicker mp = new MatterPicker(this, f, m[1], m[2]);
+        if (DocFileCard.kind(shown) == 0) {
+            LinearLayout chip = LegalUi.chipButton(this, "Edit PDF pages (add / remove)",
+                    IconPalette.pick(this, 0xFFE65100, 0xFFFFB74D), R.drawable.ic_edit);
+            chip.setOnClickListener(v -> PdfPageEditor.open(this, flow, pickedUris.get(idx), neu -> {
+                updateStoredDoc(pickedUris.get(idx), neu);
+                pickedUris.set(idx, neu);
+                m[3] = PdfTools.sizeLabel(this, neu);
+                m[5] = PdfTools.fileName(this, neu);
+                renderFiles();
+            }));
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.topMargin = dp(12);
+            f.addView(chip, clp);
+        }
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             String neu = LegalUi.str(name) + ext;
