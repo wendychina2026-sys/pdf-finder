@@ -237,15 +237,13 @@ public class DocumentsActivity extends BaseActivity {
         final String ext = DocFileCard.ext(d.name).isEmpty() ? "" : "." + DocFileCard.ext(d.name);
         LinearLayout f = LegalUi.form(this);
         EditText name = LegalUi.text(this, f, "Document name / caption", DocFileCard.stem(d.name));
-        List<String> cats = new java.util.ArrayList<>(java.util.Arrays.asList(LegalStore.allDocCategories()));
-        if (!d.category.isEmpty() && !cats.contains(d.category)) cats.add(0, d.category);
-        Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), d.category);
+        CategoryPicker cp = new CategoryPicker(this, f, d.category);
         MatterPicker mp = new MatterPicker(this, f, d.caseName, d.stage);
 
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             d.name = LegalUi.str(name) + ext;
-            d.category = (String) cat.getSelectedItem();
+            d.category = cp.get();
             if (!mp.valid()) return false;
             d.caseName = mp.matter();
             d.stage = mp.stage();

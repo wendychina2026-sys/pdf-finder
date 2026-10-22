@@ -49,8 +49,15 @@ final class LegalStore {
     static final String[] DOC_CATEGORIES_EXTRA = {"Pleadings (Plaint / Revision / WS)",
             "Applications (Bail / Interim / Exemption)", "Judicial Orders", "Final Judgments",
             "Evidence & Deposition", "Vakalatnama", "Annexures & Exhibits",
-            "Complaint", "Complaint › Return Complaint",
-            "Complaint › Return Complaint › Sent via Speed Post"};
+            "Complaint"};
+
+    /** Next level of a category path (opens after picking it); empty when it has no sub-options. */
+    static String[] docSubOptions(String path) {
+        if (path.equals("Complaint")) return new String[]{"Return Complaint", "Complaint Copy", "Complaint Reply"};
+        if (path.equals("Complaint › Return Complaint"))
+            return new String[]{"Sent via Speed Post", "Sent via Registered Post", "Delivered by Hand"};
+        return new String[0];
+    }
 
     /** Every document category, in pick order: the original ones, then the extra ones, "Other" last. */
     static String[] allDocCategories() {

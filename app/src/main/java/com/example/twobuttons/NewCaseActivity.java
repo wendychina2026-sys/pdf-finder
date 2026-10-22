@@ -948,9 +948,8 @@ public class NewCaseActivity extends BaseActivity {
         TextView catTv = dropdown(f, "Select category", null);
         setChosen(catTv, catSel[0], "Select category");
         ((View) catTv.getTag()).setOnClickListener(v -> {
-            List<String> items = Arrays.asList(LegalStore.allDocCategories());
-            PickerDialogs.optionSheet(this, "Document Category", null, items, items.indexOf(catSel[0]), i -> {
-                catSel[0] = items.get(i);
+            CategoryPicker.pick(this, catSel[0], c -> {
+                catSel[0] = c;
                 setChosen(catTv, catSel[0], "Select category");
             });
         });
@@ -1306,9 +1305,7 @@ public class NewCaseActivity extends BaseActivity {
         final String stem = ext.isEmpty() ? shown : shown.substring(0, shown.length() - ext.length());
         LinearLayout f = LegalUi.form(this);
         EditText name = LegalUi.text(this, f, "Document name / caption", stem);
-        List<String> cats = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
-        if (!m[0].isEmpty() && !cats.contains(m[0])) cats.add(0, m[0]);
-        Spinner cat = LegalUi.spinner(this, f, "Category", cats.toArray(new String[0]), m[0]);
+        CategoryPicker cp = new CategoryPicker(this, f, m[0]);
         MatterPicker mp = new MatterPicker(this, f, m[1], m[2]);
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
@@ -1317,7 +1314,7 @@ public class NewCaseActivity extends BaseActivity {
             String mt = mp.matter();
             String sg = mp.stage();
             pickedNames.set(idx, neu);
-            m[0] = (String) cat.getSelectedItem();
+            m[0] = cp.get();
             m[1] = mt;
             m[2] = sg;
             String uri = pickedUris.get(idx).toString();
