@@ -610,7 +610,9 @@ public class AllCasesActivity extends BaseActivity {
     }
 
     private EditText field(LinearLayout body, String label, String value, int inputType) {
-        body.addView(CaseViews.text(this, label, 13, soft(), true), CaseViews.lp(this, 8, 4));
+        TextView lb = CaseViews.fieldLabel(this, label);
+        lb.setTextColor(soft());
+        body.addView(lb);
         EditText e = new RoundEdit(this);
         e.setText(value);
         e.setTextSize(14);
