@@ -53,9 +53,8 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQ_CAMERA = 53;
     private static final int REQ_SAVE = 54;
     private static final int REQ_SCAN = 55;
-    private static final String[] SRC_LABELS = {"Upload PDF / Word / image", "Take photo",
-            "Scan pages with camera (one PDF)"};
-    private static final int[] SRC_ICONS = {R.drawable.ic_pdf, R.drawable.ic_camera, R.drawable.ic_scanner};
+    private static final String[] SRC_LABELS = {"Upload PDF / Word / image", "Take photo"};
+    private static final int[] SRC_ICONS = {R.drawable.ic_pdf, R.drawable.ic_camera};
     private static final int REQUIRED = 6;
     /** True once a document was saved to the General Document Vault: case fields are then optional. */
     private boolean vaultSaved = false;
@@ -1068,7 +1067,7 @@ public class NewCaseActivity extends BaseActivity {
                 t1.setGravity(Gravity.CENTER);
                 t1.setPadding(0, dp(8), 0, dp(2));
                 drop.addView(t1);
-                TextView t2 = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or scan with camera",
+                TextView t2 = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or take photos",
                         11, AppTheme.sub(this), false);
                 t2.setGravity(Gravity.CENTER);
                 drop.addView(t2);
@@ -1114,8 +1113,7 @@ public class NewCaseActivity extends BaseActivity {
                                             i -> {
                                                 dlgReplaceIdx = idx;
                                                 if (i == 0) pickFile();
-                                                else if (i == 1) takePhoto();
-                                                else startScan();
+                                                else takePhoto();
                                             }))), dlgBtnLp(true));
                     btns.addView(dlgBtn(R.drawable.ic_delete, RoundEdit.RED, "Delete", () ->
                             PickerDialogs.confirm(this, "Delete file?",
@@ -1134,8 +1132,7 @@ public class NewCaseActivity extends BaseActivity {
                     SRC_ICONS,
                     i -> {
                         if (i == 0) pickFile();
-                        else if (i == 1) takePhoto();
-                                                else startScan();
+                        else takePhoto();
                     }));
             else drop.setOnClickListener(null);
             drop.setClickable(!has);
@@ -1214,13 +1211,13 @@ public class NewCaseActivity extends BaseActivity {
                 SRC_ICONS,
                 i -> {
                     if (i == 0) pickFile();
-                    else if (i == 1) takePhoto();
-                                                else startScan();
+                    else takePhoto();
                 });
     }
 
+    /** Camera: any number of photos in a row, then the user picks PDF or image. */
     private void takePhoto() {
-        shoot(REQ_CAMERA);
+        startScan();
     }
 
     private void shoot(int req) {
@@ -1241,7 +1238,7 @@ public class NewCaseActivity extends BaseActivity {
         }
     }
 
-    // ---------- multi-shot page scan: several camera photos become ONE PDF ----------
+    // ---------- camera: several photos in a row, saved as one PDF or as separate images ----------
 
     private void startScan() {
         for (File f : scanFiles) f.delete();
@@ -1252,17 +1249,51 @@ public class NewCaseActivity extends BaseActivity {
     private void scanPrompt() {
         int n = scanFiles.size();
         new AlertDialog.Builder(this)
-                .setTitle(n + (n == 1 ? " page captured" : " pages captured"))
-                .setMessage("Add the next page of this document, or finish to make one PDF.")
+                .setTitle(n + (n == 1 ? " photo taken" : " photos taken"))
+                .setMessage("Take another photo, or press Done.")
                 .setCancelable(false)
-                .setPositiveButton("Finish PDF", (d, w) -> buildScanPdf())
-                .setNegativeButton("Add page", (d, w) -> shoot(REQ_SCAN))
+                .setPositiveButton("Done", (d, w) -> formatPrompt())
+                .setNegativeButton("Add more", (d, w) -> shoot(REQ_SCAN))
                 .setNeutralButton("Discard", (d, w) -> {
                     for (File f : scanFiles) f.delete();
                     scanFiles.clear();
                     dlgReplaceIdx = -1;
                 })
                 .show();
+    }
+
+    /** After the photos: keep them as images, or make a PDF. */
+    private void formatPrompt() {
+        final boolean one = scanFiles.size() == 1;
+        String[] items = one
+                ? new String[]{"Save as PDF", "Save as image (JPG)"}
+                : new String[]{"One PDF (each photo is a page)", "Images (each photo separate)"};
+        new AlertDialog.Builder(this)
+                .setTitle("Save as")
+                .setItems(items, (d, which) -> {
+                    if (which == 0) {
+                        buildScanPdf();
+                    } else {
+                        List<Uri> uris = new ArrayList<>();
+                        for (File f : scanFiles) {
+                            uris.add(FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f));
+                        }
+                        scanFiles.clear();
+                        deliverAll(uris);
+                    }
+                })
+                .setOnCancelListener(d -> scanPrompt())
+                .show();
+    }
+
+    private void deliverAll(List<Uri> uris) {
+        if (dlgRefresh != null && replaceIdx < 0) {
+            for (Uri u : uris) dlgAdd(u);
+            dlgRefresh.run();
+        } else {
+            for (Uri u : uris) addPicked(u);
+            renderFiles();
+        }
     }
 
     private void buildScanPdf() {
@@ -1309,15 +1340,7 @@ public class NewCaseActivity extends BaseActivity {
                 }
                 for (File f : shots) f.delete();
                 final Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
-                runOnUiThread(() -> {
-                    if (dlgRefresh != null && replaceIdx < 0) {
-                        dlgAdd(uri);
-                        dlgRefresh.run();
-                    } else {
-                        addPicked(uri);
-                        renderFiles();
-                    }
-                });
+                runOnUiThread(() -> deliverAll(java.util.Collections.singletonList(uri)));
             } catch (Exception | OutOfMemoryError e) {
                 if (out != null) out.delete();
                 runOnUiThread(() -> {
