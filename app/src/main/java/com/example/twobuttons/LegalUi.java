@@ -106,7 +106,17 @@ final class LegalUi {
         e.setInputType(type);
         e.setText(value);
         e.setTextSize(15);
-        f.addView(e);
+        boolean multi = (type & InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0;
+        if (!multi) {
+            // identical box for every field (text, caps, number): one line, shared height, full width
+            e.setSingleLine(true);
+            e.setMaxLines(1);
+            f.addView(e, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, FieldStyle.heightPx(c)));
+        } else {
+            f.addView(e, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
         return e;
     }
 

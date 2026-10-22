@@ -145,51 +145,88 @@ public class DocumentsActivity extends BaseActivity {
         if (shown == 0) list.addView(CaseViews.emptyNote(this, "No documents"));
     }
 
+    private static final int REQ_REPLACE = 61, REQ_SAVE = 62;
+    private LegalStore.Doc replacing;
+
     private LinearLayout row(LegalStore.Doc d) {
-        LinearLayout row = LegalUi.card(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-
-        String ext = d.name.contains(".")
-                ? d.name.substring(d.name.lastIndexOf('.') + 1).toLowerCase(Locale.US) : "";
-        String label;
-        int color;
-        if (ext.equals("pdf")) { label = "PDF"; color = 0xFFD32F2F; }
-        else if (ext.equals("doc") || ext.equals("docx")) { label = "DOC"; color = 0xFF1976D2; }
-        else if (ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png")) { label = ext.equals("png") ? "PNG" : "JPG"; color = 0xFF2E7D32; }
-        else { label = ext.isEmpty() ? "FILE" : ext.toUpperCase(Locale.US); color = 0xFF6B6F80; }
-        TextView badge = CaseViews.text(this, label, 12, color, true);
-        badge.setGravity(Gravity.CENTER);
-        badge.setBackground(CaseViews.box(this, (color & 0x00FFFFFF) | 0x22000000, 10, 0, 0));
-        row.addView(badge, new LinearLayout.LayoutParams(LegalUi.dp(this, 52), LegalUi.dp(this, 52)));
-
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(LegalUi.dp(this, 14), 0, LegalUi.dp(this, 6), 0);
-        col.addView(CaseViews.text(this, d.name, 15, AppTheme.text(this), true));
-        col.addView(CaseViews.text(this, d.category + "  \u2022  " + d.caseName, 13, AppTheme.sub(this), false));
-        col.addView(CaseViews.text(this, d.size + "  \u2022  " + d.date, 13, AppTheme.sub(this), false));
-        row.addView(col, LegalUi.weight());
-
-        TextView more = CaseViews.text(this, "\u22EE", 24, AppTheme.text(this), true);
-        more.setPadding(LegalUi.dp(this, 12), LegalUi.dp(this, 6), LegalUi.dp(this, 4), LegalUi.dp(this, 6));
-        more.setOnClickListener(v -> {
-            PopupMenu pm = new PopupMenu(this, v);
-            pm.getMenu().add(0, 1, 0, "Edit");
-            pm.getMenu().add(0, 2, 1, "Delete");
-            pm.setOnMenuItemClickListener(mi -> {
-                if (mi.getItemId() == 1) editDoc(d);
-                else LegalUi.confirm(this, "Delete " + d.name + "?", "This cannot be undone.", () -> {
-                    store.deleteDoc(d.id);
-                    renderList();
+        final android.net.Uri uri = d.uri.isEmpty() ? null : android.net.Uri.parse(d.uri);
+        DocFileCard.Info info = new DocFileCard.Info();
+        info.name = d.name;
+        info.category = d.category;
+        info.matter = d.caseName;
+        info.stage = d.stage;
+        info.size = d.size;
+        info.date = d.date;
+        info.uri = uri;
+        DocFileCard.Actions act = new DocFileCard.Actions();
+        act.open = () -> DocFileCard.open(this, uri, d.name);
+        act.save = () -> DocFileCard.startSave(this, REQ_SAVE, uri, d.name);
+        act.share = () -> DocFileCard.share(this, uri, d.name);
+        act.replace = () -> LegalUi.confirm(this, "Replace " + d.name + "?",
+                "The stored file will be swapped for the one you pick.", () -> {
+                    replacing = d;
+                    android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+                    i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    i.putExtra(android.content.Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf",
+                            "application/msword",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/*"});
+                    i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            | android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    try {
+                        startActivityForResult(i, REQ_REPLACE);
+                    } catch (Exception e) {
+                        android.widget.Toast.makeText(this, "No file picker available", android.widget.Toast.LENGTH_LONG).show();
+                    }
                 });
-                return true;
-            });
-            pm.show();
+        act.delete = () -> LegalUi.confirm(this, "Delete " + d.name + "?", "This cannot be undone.", () -> {
+            store.deleteDoc(d.id);
+            renderList();
         });
-        row.addView(more);
-        row.setOnClickListener(v -> editDoc(d));
-        return row;
+        LinearLayout card = DocFileCard.build(this, info, act);
+        card.setOnLongClickListener(v -> {      // long press = edit caption / category / matter
+            editDoc(d);
+            return true;
+        });
+        return card;
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == REQ_SAVE) {
+            DocFileCard.finishSave(this, res, data);
+            return;
+        }
+        if (req == REQ_REPLACE && res == RESULT_OK && data != null && data.getData() != null && replacing != null) {
+            android.net.Uri u = data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(u, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignored) {
+                // not every provider offers a persistable grant
+            }
+            String nm = null;
+            long sz = 0;
+            try (android.database.Cursor c = getContentResolver().query(u, null, null, null, null)) {
+                if (c != null && c.moveToFirst()) {
+                    int ni = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    int si = c.getColumnIndex(android.provider.OpenableColumns.SIZE);
+                    if (ni >= 0) nm = c.getString(ni);
+                    if (si >= 0 && !c.isNull(si)) sz = c.getLong(si);
+                }
+            } catch (Exception ignored) {
+                // keep old name / size
+            }
+            String ext = nm != null && nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.')) : "";
+            replacing.name = DocFileCard.stem(replacing.name) + ext;
+            replacing.uri = u.toString();
+            if (sz > 0) replacing.size = sz < 1024 * 1024 ? String.format(Locale.US, "%.1f KB", sz / 1024.0)
+                    : String.format(Locale.US, "%.1f MB", sz / (1024.0 * 1024.0));
+            replacing.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
+            store.saveDoc(replacing);
+            replacing = null;
+            renderList();
+        }
     }
 
     private void editDoc(LegalStore.Doc existing) {

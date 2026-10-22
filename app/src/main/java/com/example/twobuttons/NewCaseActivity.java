@@ -51,6 +51,7 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQ_CLIENT = 51;
     private static final int REQ_FILE = 52;
     private static final int REQ_CAMERA = 53;
+    private static final int REQ_SAVE = 54;
     private static final int REQUIRED = 6;
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
@@ -100,7 +101,7 @@ public class NewCaseActivity extends BaseActivity {
     private EditText firYearEdit;
     private final List<Uri> pickedUris = new ArrayList<>();
     private final List<String> pickedNames = new ArrayList<>();
-    private final List<String> pickedInfo = new ArrayList<>();   // "Category  •  Matter" per file ("" = none)
+    private final List<String[]> pickedMeta = new ArrayList<>();   // per file: category, matter, stage, size, date
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
     // upload dialog state: files chosen inside the open dialog, and a callback that redraws its drop area
@@ -581,6 +582,10 @@ public class NewCaseActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_SAVE) {
+            DocFileCard.finishSave(this, res, data);
+            return;
+        }
         if (req == REQ_CLIENT && res == RESULT_OK && data != null) {
             String id = data.getStringExtra("client_id");
             if (id != null) {
@@ -1005,10 +1010,36 @@ public class NewCaseActivity extends BaseActivity {
         drop.setBackground(dash);
         f.addView(drop, lpTop(16));
 
+        final int[] shown = {0};
         final Runnable draw = () -> {
             drop.removeAllViews();
-            drop.addView(CaseViews.icon(this, R.drawable.ic_upload, AppTheme.accent(this), 34));
-            if (dlgUris.isEmpty()) {
+            final boolean has = !dlgUris.isEmpty();
+            final int ok = AppTheme.topics(this);
+            // file chosen: solid green frame + soft green fill; empty: dashed accent frame
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setCornerRadius(dp(14));
+            if (has) {
+                g.setColor((ok & 0x00FFFFFF) | 0x1A000000);
+                g.setStroke(dp(2), ok);
+            } else {
+                g.setColor(AppTheme.field(this));
+                g.setStroke(dp(2), AppTheme.accent(this), dp(6), dp(4));
+            }
+            drop.setBackground(g);
+            ImageView top = CaseViews.icon(this, has ? R.drawable.ic_check_circle : R.drawable.ic_upload,
+                    has ? ok : AppTheme.accent(this), has ? 40 : 34);
+            drop.addView(top);
+            if (has && dlgUris.size() > shown[0]) {          // a new file just landed: pop the tick
+                top.setScaleX(0.3f);
+                top.setScaleY(0.3f);
+                top.animate().scaleX(1f).scaleY(1f).setDuration(380)
+                        .setInterpolator(new android.view.animation.OvershootInterpolator(2.2f)).start();
+                drop.setAlpha(0.6f);
+                drop.animate().alpha(1f).setDuration(300).start();
+                drop.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+            }
+            shown[0] = dlgUris.size();
+            if (!has) {
                 TextView t1 = CaseViews.text(this, "Tap to choose PDF, Word or image file", 13.5f, AppTheme.accent(this), true);
                 t1.setGravity(Gravity.CENTER);
                 t1.setPadding(0, dp(8), 0, dp(2));
@@ -1018,15 +1049,34 @@ public class NewCaseActivity extends BaseActivity {
                 t2.setGravity(Gravity.CENTER);
                 drop.addView(t2);
             } else {
+                TextView ready = CaseViews.text(this, dlgUris.size() == 1 ? "File ready" : dlgUris.size() + " files ready",
+                        13.5f, ok, true);
+                ready.setGravity(Gravity.CENTER);
+                ready.setPadding(0, dp(6), 0, dp(4));
+                drop.addView(ready);
                 for (int fi = 0; fi < dlgUris.size(); fi++) {
                     final int idx = fi;
-                    TextView t1 = CaseViews.text(this, displayName(dlgUris.get(fi)), 13.5f, AppTheme.text(this), true);
-                    t1.setGravity(Gravity.CENTER);
+                    final String fname = displayName(dlgUris.get(fi));
+                    final int kind = DocFileCard.kind(fname);
+                    LinearLayout nameRow = new LinearLayout(this);
+                    nameRow.setOrientation(LinearLayout.HORIZONTAL);
+                    nameRow.setGravity(Gravity.CENTER);
+                    nameRow.setPadding(0, dp(fi == 0 ? 4 : 14), 0, dp(2));
+                    nameRow.addView(CaseViews.icon(this, DocFileCard.kindIcon(kind), DocFileCard.kindColor(this, kind), 22));
+                    TextView t1 = CaseViews.text(this, fname, 13.5f, AppTheme.text(this), true);
                     t1.setSingleLine(true);
                     t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-                    t1.setPadding(0, dp(fi == 0 ? 8 : 16), 0, dp(8));
-                    drop.addView(t1, new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    t1.setPadding(dp(8), 0, 0, 0);
+                    nameRow.addView(t1, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    drop.addView(nameRow, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    String sz = sizeText(fileSize(dlgUris.get(fi)));
+                    TextView t2 = CaseViews.text(this, DocFileCard.kindLabel(kind, fname) + (sz.isEmpty() ? "" : "  \u2022  " + sz),
+                            11, AppTheme.sub(this), false);
+                    t2.setGravity(Gravity.CENTER);
+                    t2.setPadding(0, 0, 0, dp(8));
+                    drop.addView(t2);
                     LinearLayout btns = new LinearLayout(this);
                     btns.setOrientation(LinearLayout.HORIZONTAL);
                     btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> openUri(dlgUris.get(idx))),
@@ -1054,7 +1104,7 @@ public class NewCaseActivity extends BaseActivity {
                 }
             }
             // empty box: tap to choose. With files: only the View / Replace / Delete buttons act.
-            if (dlgUris.isEmpty()) drop.setOnClickListener(v -> PickerDialogs.actions(this, "Upload file",
+            if (!has) drop.setOnClickListener(v -> PickerDialogs.actions(this, "Upload file",
                     new String[]{"Upload PDF / Word / image", "Take photo"},
                     new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
                     i -> {
@@ -1062,7 +1112,7 @@ public class NewCaseActivity extends BaseActivity {
                         else takePhoto();
                     }));
             else drop.setOnClickListener(null);
-            drop.setClickable(dlgUris.isEmpty());
+            drop.setClickable(!has);
         };
         draw.run();
         dlgRefresh = draw;
@@ -1083,12 +1133,14 @@ public class NewCaseActivity extends BaseActivity {
                 String shown = label + extOf(displayName(u));
                 pickedUris.add(u);
                 pickedNames.add(shown);
-                pickedInfo.add(catSel[0] + "  \u2022  " + matterName);
+                String today = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
+                pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], sizeText(fileSize(u)), today});
                 LegalStore.Doc d = new LegalStore.Doc();
                 d.name = shown;
                 d.caseName = matterName;
                 d.category = catSel[0];
                 d.stage = stageSel[0];
+                d.uri = u.toString();
                 d.size = sizeText(fileSize(u));
                 d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
                 ls.saveDoc(d);
@@ -1194,14 +1246,20 @@ public class NewCaseActivity extends BaseActivity {
         }
         if (replaceIdx >= 0 && replaceIdx < pickedUris.size()) {
             pickedUris.set(replaceIdx, uri);
-            pickedNames.set(replaceIdx, displayName(uri));
+            // keep the caption the user typed, take the new file's extension and size
+            String oldCap = DocFileCard.stem(pickedNames.get(replaceIdx));
+            pickedNames.set(replaceIdx, oldCap + extOf(displayName(uri)));
+            String[] m = pickedMeta.get(replaceIdx);
+            m[3] = sizeText(fileSize(uri));
+            m[4] = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
             replaceIdx = -1;
             return;
         }
         if (pickedUris.contains(uri)) return;
         pickedUris.add(uri);
         pickedNames.add(displayName(uri));
-        pickedInfo.add("");
+        pickedMeta.add(new String[]{"", "", "", sizeText(fileSize(uri)),
+                new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date())});
     }
 
     private String displayName(Uri uri) {
@@ -1229,7 +1287,7 @@ public class NewCaseActivity extends BaseActivity {
     private void swapFiles(int a, int b) {
         Collections.swap(pickedUris, a, b);
         Collections.swap(pickedNames, a, b);
-        Collections.swap(pickedInfo, a, b);
+        Collections.swap(pickedMeta, a, b);
     }
 
     private void renderFiles() {
@@ -1243,51 +1301,31 @@ public class NewCaseActivity extends BaseActivity {
         }
         for (int i = 0; i < pickedUris.size(); i++) {
             final int idx = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(8), dp(6), dp(2), dp(6));
-            row.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
-            String lowName = pickedNames.get(i).toLowerCase(Locale.ROOT);
-            boolean pdf = !(lowName.endsWith(".jpg") || lowName.endsWith(".jpeg") || lowName.endsWith(".png")
-                    || lowName.endsWith(".webp"));
-
-            ImageView grip = CaseViews.icon(this, R.drawable.ic_drag, AppTheme.sub(this), 18);
-            grip.setContentDescription("Press and hold to move");
-            row.addView(grip, new LinearLayout.LayoutParams(dp(26), dp(26)));
-            ImageView kind = CaseViews.icon(this, pdf ? R.drawable.ic_pdf : R.drawable.ic_camera,
-                    AppTheme.accent(this), 22);
-            row.addView(kind);
-            LinearLayout nameCol = new LinearLayout(this);
-            nameCol.setOrientation(LinearLayout.VERTICAL);
-            nameCol.setPadding(dp(10), 0, dp(4), 0);
-            TextView n = CaseViews.text(this, pickedNames.get(i), 13, AppTheme.text(this), false);
-            n.setSingleLine(true);
-            n.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-            nameCol.addView(n);
-            if (i < pickedInfo.size() && !pickedInfo.get(i).isEmpty()) {
-                TextView info = CaseViews.text(this, pickedInfo.get(i), 11, AppTheme.sub(this), false);
-                info.setSingleLine(true);
-                info.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                nameCol.addView(info);
-            }
-            row.addView(nameCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-            row.addView(fileAction(R.drawable.ic_eye, AppTheme.accent(this), "View file",
-                    v -> openFile(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
-            row.addView(fileAction(R.drawable.ic_replace, AppTheme.accent(this), "Replace file",
-                    v -> PickerDialogs.confirm(this, "Replace file?",
-                            "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
-                            "Replace", () -> chooseSource(idx))), new LinearLayout.LayoutParams(dp(36), dp(36)));
-            row.addView(fileAction(R.drawable.ic_delete, RoundEdit.RED, "Remove file",
-                    v -> PickerDialogs.confirm(this, "Delete file?",
-                            "\"" + pickedNames.get(idx) + "\" will be removed from this case.",
-                            "Delete", () -> {
-                                pickedUris.remove(idx);
-                                pickedNames.remove(idx);
-                                pickedInfo.remove(idx);
-                                renderFiles();
-                            })), new LinearLayout.LayoutParams(dp(36), dp(36)));
+            String[] m = i < pickedMeta.size() ? pickedMeta.get(i) : new String[]{"", "", "", "", ""};
+            DocFileCard.Info info = new DocFileCard.Info();
+            info.name = pickedNames.get(i);
+            info.category = m[0];
+            info.matter = m[1];
+            info.stage = m[2];
+            info.size = m[3];
+            info.date = m[4];
+            info.uri = pickedUris.get(i);
+            DocFileCard.Actions act = new DocFileCard.Actions();
+            act.open = () -> openFile(idx);
+            act.save = () -> DocFileCard.startSave(this, REQ_SAVE, pickedUris.get(idx), pickedNames.get(idx));
+            act.share = () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
+            act.replace = () -> PickerDialogs.confirm(this, "Replace file?",
+                    "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
+                    "Replace", () -> chooseSource(idx));
+            act.delete = () -> PickerDialogs.confirm(this, "Delete file?",
+                    "\"" + pickedNames.get(idx) + "\" will be removed from this case.",
+                    "Delete", () -> {
+                        pickedUris.remove(idx);
+                        pickedNames.remove(idx);
+                        pickedMeta.remove(idx);
+                        renderFiles();
+                    });
+            LinearLayout row = DocFileCard.build(this, info, act);
 
             // long press -> drag up / down to reorder
             row.setOnLongClickListener(v -> {
