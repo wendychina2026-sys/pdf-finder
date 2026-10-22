@@ -77,7 +77,7 @@ final class DocFileCard {
 
         LinearLayout card = new LinearLayout(a);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(a, 14), dp(a, 14), dp(a, 14), dp(a, 14));
+        card.setPadding(dp(a, 12), dp(a, 10), dp(a, 12), dp(a, 10));
         card.setBackground(CaseViews.box(a, AppTheme.field(a), 14, AppTheme.fieldStroke(a), 1));
 
         LinearLayout top = new LinearLayout(a);
@@ -109,28 +109,38 @@ final class DocFileCard {
         LinearLayout title = new LinearLayout(a);
         title.setOrientation(LinearLayout.HORIZONTAL);
         title.setGravity(Gravity.CENTER_VERTICAL);
-        title.setPadding(0, dp(a, 12), 0, 0);
-        title.addView(CaseViews.icon(a, kindIcon(k), kc, 24));
-        TextView nm = CaseViews.text(a, stem(in.name), 15, AppTheme.text(a), true);
+        title.setPadding(0, dp(a, 6), 0, 0);
+        title.addView(CaseViews.icon(a, kindIcon(k), kc, 20));
+        TextView nm = CaseViews.text(a, stem(in.name), 14, AppTheme.text(a), true);
         nm.setSingleLine(true);
         nm.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-        nm.setPadding(dp(a, 10), 0, 0, 0);
+        nm.setPadding(dp(a, 8), 0, 0, 0);
         title.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         top.addView(title);
 
-        TextView at = CaseViews.text(a, "Attached to:", 12, AppTheme.sub(a), true);
-        at.setPadding(0, dp(a, 10), 0, 0);
-        top.addView(at);
+        LinearLayout att = new LinearLayout(a);
+        att.setOrientation(LinearLayout.HORIZONTAL);
+        att.setGravity(Gravity.CENTER_VERTICAL);
+        att.setPadding(0, dp(a, 4), 0, 0);
+        att.addView(CaseViews.text(a, "Attached to: ", 11, AppTheme.sub(a), true));
         String matter = in.matter.isEmpty() ? "This case" : in.matter;
-        top.addView(CaseViews.text(a, matter, 14, AppTheme.text(a), false));
+        TextView mt = CaseViews.text(a, matter, 12, AppTheme.text(a), false);
+        mt.setSingleLine(true);
+        mt.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        att.addView(mt, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        if (!in.date.isEmpty()) {
+            TextView d = CaseViews.text(a, in.date, 11, AppTheme.sub(a), false);
+            d.setPadding(dp(a, 8), 0, 0, 0);
+            att.addView(d);
+        }
+        top.addView(att);
 
         // full details, hidden until the arrow is tapped
         final LinearLayout details = new LinearLayout(a);
         details.setOrientation(LinearLayout.VERTICAL);
         details.setVisibility(View.GONE);
-        details.setPadding(0, dp(a, 10), 0, 0);
+        details.setPadding(0, dp(a, 6), 0, 0);
         // category, size, type and date already show on the card: only what is not visible
-        detail(a, details, "Document name", stem(in.name));
         detail(a, details, "File name", in.fileName.isEmpty() ? in.name : in.fileName);
         detail(a, details, "Stage", in.stage);
         card.addView(details);
@@ -144,14 +154,8 @@ final class DocFileCard {
         View line = new View(a);
         line.setBackgroundColor(AppTheme.cardStroke(a));
         LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
-        llp.topMargin = dp(a, 12);
+        llp.topMargin = dp(a, 8);
         card.addView(line, llp);
-
-        if (!in.date.isEmpty()) {
-            TextView d = CaseViews.text(a, in.date, 12, AppTheme.sub(a), false);
-            d.setPadding(0, dp(a, 10), 0, 0);
-            card.addView(d);
-        }
 
         LinearLayout row = new LinearLayout(a);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -164,7 +168,7 @@ final class DocFileCard {
         if (act.delete != null) row.addView(iconBtn(a, R.drawable.ic_delete, RoundEdit.RED, "Delete file", act.delete), ilp(a));
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rlp.topMargin = dp(a, 10);
+        rlp.topMargin = dp(a, 8);
         card.addView(row, rlp);
         return card;
     }
@@ -175,19 +179,19 @@ final class DocFileCard {
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setPadding(0, dp(a, 3), 0, dp(a, 3));
         TextView l = CaseViews.text(a, label, 12, AppTheme.sub(a), true);
-        r.addView(l, new LinearLayout.LayoutParams(dp(a, 96), LinearLayout.LayoutParams.WRAP_CONTENT));
+        r.addView(l, new LinearLayout.LayoutParams(dp(a, 84), LinearLayout.LayoutParams.WRAP_CONTENT));
         r.addView(CaseViews.text(a, value, 13, AppTheme.text(a), false), LegalUi.weight());
         box.addView(r);
     }
 
     private static LinearLayout.LayoutParams wlp(Activity a, int left) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(a, 38), 1f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(a, 32), 1f);
         lp.leftMargin = dp(a, left);
         return lp;
     }
 
     private static LinearLayout.LayoutParams ilp(Activity a) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(a, 38), dp(a, 38));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(a, 32), dp(a, 32));
         lp.leftMargin = dp(a, 8);
         return lp;
     }
@@ -197,9 +201,9 @@ final class DocFileCard {
         b.setOrientation(LinearLayout.HORIZONTAL);
         b.setGravity(Gravity.CENTER);
         b.setBackground(CaseViews.box(a, (color & 0x00FFFFFF) | 0x1A000000, 10, (color & 0x00FFFFFF) | 0x66000000, 1));
-        b.addView(CaseViews.icon(a, icon, color, 16));
-        TextView t = CaseViews.text(a, label, 13, color, true);
-        t.setPadding(dp(a, 6), 0, 0, 0);
+        b.addView(CaseViews.icon(a, icon, color, 14));
+        TextView t = CaseViews.text(a, label, 12, color, true);
+        t.setPadding(dp(a, 5), 0, 0, 0);
         b.addView(t);
         b.setOnClickListener(v -> click.run());
         return b;
@@ -209,7 +213,7 @@ final class DocFileCard {
         LinearLayout b = new LinearLayout(a);
         b.setGravity(Gravity.CENTER);
         b.setBackground(CaseViews.box(a, (color & 0x00FFFFFF) | 0x1A000000, 10, 0, 0));
-        ImageView i = CaseViews.icon(a, icon, color, 18);
+        ImageView i = CaseViews.icon(a, icon, color, 16);
         b.addView(i);
         b.setContentDescription(desc);
         b.setOnClickListener(v -> click.run());
