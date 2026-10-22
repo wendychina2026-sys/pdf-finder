@@ -52,6 +52,10 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQ_FILE = 52;
     private static final int REQ_CAMERA = 53;
     private static final int REQ_SAVE = 54;
+    private static final int REQ_SCAN = 55;
+    private static final String[] SRC_LABELS = {"Upload PDF / Word / image", "Take photo",
+            "Scan pages with camera (one PDF)"};
+    private static final int[] SRC_ICONS = {R.drawable.ic_pdf, R.drawable.ic_camera, R.drawable.ic_scanner};
     private static final int REQUIRED = 6;
     /** True once a document was saved to the General Document Vault: case fields are then optional. */
     private boolean vaultSaved = false;
@@ -107,6 +111,8 @@ public class NewCaseActivity extends BaseActivity {
     private final List<String[]> pickedMeta = new ArrayList<>();   // per file: category, matter, stage, size, date
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
+    private File cameraFile;
+    private final List<File> scanFiles = new ArrayList<>();   // camera shots of the page-scan in progress
     // upload dialog state: files chosen inside the open dialog, and a callback that redraws its drop area
     private final List<Uri> dlgUris = new ArrayList<>();
     private Runnable dlgRefresh = null;
@@ -605,6 +611,13 @@ public class NewCaseActivity extends BaseActivity {
             DocFileCard.finishSave(this, res, data);
             return;
         }
+        if (req == REQ_SCAN) {
+            if (res == RESULT_OK && cameraFile != null && cameraFile.length() > 0) scanFiles.add(cameraFile);
+            else if (cameraFile != null) cameraFile.delete();
+            if (scanFiles.isEmpty()) dlgReplaceIdx = -1;
+            else scanPrompt();
+            return;
+        }
         if (req == REQ_CLIENT && res == RESULT_OK && data != null) {
             String id = data.getStringExtra("client_id");
             if (id != null) {
@@ -1055,7 +1068,7 @@ public class NewCaseActivity extends BaseActivity {
                 t1.setGravity(Gravity.CENTER);
                 t1.setPadding(0, dp(8), 0, dp(2));
                 drop.addView(t1);
-                TextView t2 = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or take a photo",
+                TextView t2 = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or scan with camera",
                         11, AppTheme.sub(this), false);
                 t2.setGravity(Gravity.CENTER);
                 drop.addView(t2);
@@ -1096,12 +1109,13 @@ public class NewCaseActivity extends BaseActivity {
                             PickerDialogs.confirm(this, "Replace file?",
                                     "\"" + displayName(dlgUris.get(idx)) + "\" will be replaced by a new file.",
                                     "Replace", () -> PickerDialogs.actions(this, "Replace file",
-                                            new String[]{"Upload PDF / Word / image", "Take photo"},
-                                            new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                                            SRC_LABELS,
+                                            SRC_ICONS,
                                             i -> {
                                                 dlgReplaceIdx = idx;
                                                 if (i == 0) pickFile();
-                                                else takePhoto();
+                                                else if (i == 1) takePhoto();
+                                                else startScan();
                                             }))), dlgBtnLp(true));
                     btns.addView(dlgBtn(R.drawable.ic_delete, RoundEdit.RED, "Delete", () ->
                             PickerDialogs.confirm(this, "Delete file?",
@@ -1116,11 +1130,12 @@ public class NewCaseActivity extends BaseActivity {
             }
             // empty box: tap to choose. With files: only the View / Replace / Delete buttons act.
             if (!has) drop.setOnClickListener(v -> PickerDialogs.actions(this, "Upload file",
-                    new String[]{"Upload PDF / Word / image", "Take photo"},
-                    new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                    SRC_LABELS,
+                    SRC_ICONS,
                     i -> {
                         if (i == 0) pickFile();
-                        else takePhoto();
+                        else if (i == 1) takePhoto();
+                                                else startScan();
                     }));
             else drop.setOnClickListener(null);
             drop.setClickable(!has);
@@ -1195,29 +1210,147 @@ public class NewCaseActivity extends BaseActivity {
     private void chooseSource(int replaceAt) {
         replaceIdx = replaceAt;
         PickerDialogs.actions(this, replaceAt >= 0 ? "Replace file" : "Upload file",
-                new String[]{"Upload PDF / Word / image", "Take photo"},
-                new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                SRC_LABELS,
+                SRC_ICONS,
                 i -> {
                     if (i == 0) pickFile();
-                    else takePhoto();
+                    else if (i == 1) takePhoto();
+                                                else startScan();
                 });
     }
 
     private void takePhoto() {
+        shoot(REQ_CAMERA);
+    }
+
+    private void shoot(int req) {
         try {
             File dir = getExternalFilesDir("case_photos");
             if (dir == null) dir = getCacheDir();
             dir.mkdirs();
-            File f = new File(dir, "Photo_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+            File f = new File(dir, "Photo_" + new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
                     .format(new Date()) + ".jpg");
+            cameraFile = f;
             cameraUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", f);
             Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
             i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivityForResult(i, REQ_CAMERA);
+            startActivityForResult(i, req);
         } catch (Exception e) {
             Toast.makeText(this, "Camera not available", Toast.LENGTH_LONG).show();
         }
+    }
+
+    // ---------- multi-shot page scan: several camera photos become ONE PDF ----------
+
+    private void startScan() {
+        for (File f : scanFiles) f.delete();
+        scanFiles.clear();
+        shoot(REQ_SCAN);
+    }
+
+    private void scanPrompt() {
+        int n = scanFiles.size();
+        new AlertDialog.Builder(this)
+                .setTitle(n + (n == 1 ? " page captured" : " pages captured"))
+                .setMessage("Add the next page of this document, or finish to make one PDF.")
+                .setCancelable(false)
+                .setPositiveButton("Finish PDF", (d, w) -> buildScanPdf())
+                .setNegativeButton("Add page", (d, w) -> shoot(REQ_SCAN))
+                .setNeutralButton("Discard", (d, w) -> {
+                    for (File f : scanFiles) f.delete();
+                    scanFiles.clear();
+                    dlgReplaceIdx = -1;
+                })
+                .show();
+    }
+
+    private void buildScanPdf() {
+        final List<File> shots = new ArrayList<>(scanFiles);
+        scanFiles.clear();
+        Toast.makeText(this, "Making PDF...", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            File out = null;
+            try {
+                File dir = getExternalFilesDir("case_photos");
+                if (dir == null) dir = getCacheDir();
+                out = new File(dir, "Scan_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                        .format(new Date()) + ".pdf");
+                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
+                com.tom_roush.pdfbox.pdmodel.PDDocument doc = new com.tom_roush.pdfbox.pdmodel.PDDocument();
+                try {
+                    for (File shot : shots) {
+                        android.graphics.Bitmap bmp = decodeShot(shot);
+                        if (bmp == null) continue;
+                        boolean land = bmp.getWidth() > bmp.getHeight();
+                        com.tom_roush.pdfbox.pdmodel.common.PDRectangle a4 =
+                                com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4;
+                        com.tom_roush.pdfbox.pdmodel.common.PDRectangle size = land
+                                ? new com.tom_roush.pdfbox.pdmodel.common.PDRectangle(a4.getHeight(), a4.getWidth())
+                                : a4;
+                        com.tom_roush.pdfbox.pdmodel.PDPage page = new com.tom_roush.pdfbox.pdmodel.PDPage(size);
+                        doc.addPage(page);
+                        float m = 18f;
+                        float aw = size.getWidth() - 2 * m, ah = size.getHeight() - 2 * m;
+                        float sc = Math.min(aw / bmp.getWidth(), ah / bmp.getHeight());
+                        float w = bmp.getWidth() * sc, h = bmp.getHeight() * sc;
+                        com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject img =
+                                com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromImage(doc, bmp, 0.8f);
+                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream cs =
+                                new com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page);
+                        cs.drawImage(img, (size.getWidth() - w) / 2f, (size.getHeight() - h) / 2f, w, h);
+                        cs.close();
+                        bmp.recycle();
+                    }
+                    if (doc.getNumberOfPages() == 0) throw new java.io.IOException("no pages");
+                    doc.save(out);
+                } finally {
+                    doc.close();
+                }
+                for (File f : shots) f.delete();
+                final Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
+                runOnUiThread(() -> {
+                    if (dlgRefresh != null && replaceIdx < 0) {
+                        dlgAdd(uri);
+                        dlgRefresh.run();
+                    } else {
+                        addPicked(uri);
+                        renderFiles();
+                    }
+                });
+            } catch (Exception | OutOfMemoryError e) {
+                if (out != null) out.delete();
+                runOnUiThread(() -> {
+                    dlgReplaceIdx = -1;
+                    Toast.makeText(this, "Could not make the PDF. Try again.", Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    /** Decode a camera shot at a sane size and turn it upright using its EXIF rotation. */
+    private static android.graphics.Bitmap decodeShot(File f) throws java.io.IOException {
+        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+        int big = Math.max(o.outWidth, o.outHeight), ss = 1;
+        while (big / ss > 2400) ss *= 2;
+        o = new android.graphics.BitmapFactory.Options();
+        o.inSampleSize = ss;
+        android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+        if (b == null) return null;
+        int deg = 0;
+        int ori = new android.media.ExifInterface(f.getAbsolutePath())
+                .getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
+        if (ori == 6) deg = 90;
+        else if (ori == 3) deg = 180;
+        else if (ori == 8) deg = 270;
+        if (deg == 0) return b;
+        android.graphics.Matrix mx = new android.graphics.Matrix();
+        mx.postRotate(deg);
+        android.graphics.Bitmap r = android.graphics.Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mx, true);
+        if (r != b) b.recycle();
+        return r;
     }
 
     private void openFile(int idx) {
