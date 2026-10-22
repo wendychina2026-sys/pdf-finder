@@ -93,6 +93,8 @@ class CaseViews {
         e.setTextColor(AppTheme.text(c));
         e.setHintTextColor(AppTheme.sub(c));
         e.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+        e.setTypeface(android.graphics.Typeface.DEFAULT);
+        e.setIncludeFontPadding(false);
         e.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
         e.setGravity(android.view.Gravity.CENTER_VERTICAL);
         e.setMinHeight(dp(c, RoundEdit.HEIGHT_DP));

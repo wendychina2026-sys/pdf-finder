@@ -57,6 +57,15 @@ public class RoundSpinner extends Spinner {
             android.widget.TextView tv = (android.widget.TextView) v;
             Context c = getContext();
             int pad = CaseViews.dp(c, 8);
+            String shownText = String.valueOf(tv.getText());
+            boolean holder = shownText.isEmpty() || shownText.startsWith("--") || shownText.startsWith("Select")
+                    || shownText.equals("All") || shownText.startsWith("All ");
+            int wantColor = holder ? AppTheme.sub(c) : AppTheme.text(c);
+            if (tv.getCurrentTextColor() != wantColor) tv.setTextColor(wantColor);
+            if (tv.getTypeface() != android.graphics.Typeface.DEFAULT) {
+                tv.setTypeface(android.graphics.Typeface.DEFAULT);
+                tv.setIncludeFontPadding(false);
+            }
             float want = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 15,
                     c.getResources().getDisplayMetrics());
             if (Math.abs(tv.getTextSize() - want) > 0.5f || tv.getPaddingLeft() != pad
@@ -66,7 +75,6 @@ public class RoundSpinner extends Spinner {
                 tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 tv.setPadding(pad, 0, 0, 0);
                 tv.setGravity(Gravity.CENTER_VERTICAL);
-                tv.setTextColor(AppTheme.text(c));
             }
         }
     }

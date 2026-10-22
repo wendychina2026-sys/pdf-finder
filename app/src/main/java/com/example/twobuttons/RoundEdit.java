@@ -42,6 +42,8 @@ public class RoundEdit extends EditText {
         int h = CaseViews.dp(c, 16), v = CaseViews.dp(c, 12);
         setPadding(h, v, h, v);
         setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+        setTypeface(android.graphics.Typeface.DEFAULT);       // same face / weight as dropdown text
+        setIncludeFontPadding(false);
         setGravity(Gravity.CENTER_VERTICAL);
         minPx = CaseViews.dp(c, HEIGHT_DP);
         setMinHeight(minPx);

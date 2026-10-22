@@ -229,6 +229,7 @@ public class NewCaseActivity extends BaseActivity {
         box.setBackground(dropBg(false));
         box.setMinimumHeight(dp(RoundEdit.HEIGHT_DP));
         TextView t = CaseViews.text(this, placeholder, 15, AppTheme.sub(this), false);
+        t.setIncludeFontPadding(false);
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setTag(box);
