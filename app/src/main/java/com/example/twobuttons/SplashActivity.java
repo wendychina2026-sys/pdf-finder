@@ -12,15 +12,15 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.OvershootInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Launch screen: the Lady Justice logo rises and fades in, a line draws under it, the app name
- * fades in, short hold, then the whole screen fades into MainActivity (~2 s). Always white.
+ * Launch screen: blank white, logo grows slowly (3 s), stays 2 s, then line + app name come in,
+ * stays 2 s, then fades into MainActivity. Tap skips. Always white.
  */
 public class SplashActivity extends Activity {
 
@@ -68,40 +68,40 @@ public class SplashActivity extends Activity {
         root.addView(col, cl);
         setContentView(root);
 
-        // start states
+        // start states: logo small and invisible, name + line hidden
         logo.setAlpha(0f);
-        logo.setScaleX(0.82f);
-        logo.setScaleY(0.82f);
-        logo.setTranslationY(CaseViews.dp(this, 36));
+        logo.setScaleX(0.45f);
+        logo.setScaleY(0.45f);
         line.setPivotX(CaseViews.dp(this, 60));
         line.setScaleX(0f);
         name.setAlpha(0f);
         name.setTranslationY(CaseViews.dp(this, 10));
 
-        ObjectAnimator a1 = ObjectAnimator.ofFloat(logo, View.ALPHA, 0f, 1f).setDuration(650);
-        ObjectAnimator a2 = ObjectAnimator.ofFloat(logo, View.SCALE_X, 0.82f, 1f).setDuration(800);
-        ObjectAnimator a3 = ObjectAnimator.ofFloat(logo, View.SCALE_Y, 0.82f, 1f).setDuration(800);
-        a2.setInterpolator(new OvershootInterpolator(1.2f));
-        a3.setInterpolator(new OvershootInterpolator(1.2f));
-        ObjectAnimator a4 = ObjectAnimator.ofFloat(logo, View.TRANSLATION_Y, CaseViews.dp(this, 36), 0f).setDuration(800);
-        a4.setInterpolator(new DecelerateInterpolator(2f));
-        AnimatorSet logoIn = new AnimatorSet();
-        logoIn.playTogether(a1, a2, a3, a4);
+        // 1. logo grows slowly (3 s), fades in during the first second, no overshoot
+        ObjectAnimator g1 = ObjectAnimator.ofFloat(logo, View.SCALE_X, 0.45f, 1f).setDuration(3000);
+        ObjectAnimator g2 = ObjectAnimator.ofFloat(logo, View.SCALE_Y, 0.45f, 1f).setDuration(3000);
+        ObjectAnimator g3 = ObjectAnimator.ofFloat(logo, View.ALPHA, 0f, 1f).setDuration(1000);
+        g1.setInterpolator(new LinearInterpolator());
+        g2.setInterpolator(new LinearInterpolator());
+        AnimatorSet grow = new AnimatorSet();
+        grow.playTogether(g1, g2, g3);
 
-        ObjectAnimator l1 = ObjectAnimator.ofFloat(line, View.SCALE_X, 0f, 1f).setDuration(450);
+        // 2. logo stays 2 s, then 3. name + line come in
+        ObjectAnimator l1 = ObjectAnimator.ofFloat(line, View.SCALE_X, 0f, 1f).setDuration(700);
         l1.setInterpolator(new DecelerateInterpolator());
-
-        ObjectAnimator n1 = ObjectAnimator.ofFloat(name, View.ALPHA, 0f, 1f).setDuration(450);
-        ObjectAnimator n2 = ObjectAnimator.ofFloat(name, View.TRANSLATION_Y, CaseViews.dp(this, 10), 0f).setDuration(450);
+        ObjectAnimator n1 = ObjectAnimator.ofFloat(name, View.ALPHA, 0f, 1f).setDuration(700);
+        ObjectAnimator n2 = ObjectAnimator.ofFloat(name, View.TRANSLATION_Y, CaseViews.dp(this, 10), 0f).setDuration(700);
         AnimatorSet nameIn = new AnimatorSet();
-        nameIn.playTogether(n1, n2);
+        nameIn.playTogether(l1, n1, n2);
+        nameIn.setStartDelay(2000);
 
+        // 4. everything stays 2 s, then fade out into the app
         ObjectAnimator out = ObjectAnimator.ofFloat(root, View.ALPHA, 1f, 0f).setDuration(300);
-        out.setStartDelay(450);                    // hold on the finished frame
+        out.setStartDelay(2000);
         out.setInterpolator(new AccelerateInterpolator());
 
         anim = new AnimatorSet();
-        anim.playSequentially(logoIn, l1, nameIn, out);
+        anim.playSequentially(grow, nameIn, out);
         anim.addListener(new AnimatorListenerAdapter() {
             private boolean cancelled;
             @Override public void onAnimationCancel(Animator a) { cancelled = true; }
