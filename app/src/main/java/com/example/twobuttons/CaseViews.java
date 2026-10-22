@@ -76,6 +76,13 @@ class CaseViews {
         return g;
     }
 
+    /** Fractional sp, for sizes that must match a 0.9-scaled page (e.g. 10.8). */
+    static TextView text(Context c, String s, float sp, int color, boolean bold) {
+        TextView t = text(c, s, 1, color, bold);
+        t.setTextSize(sp);
+        return t;
+    }
+
     static TextView text(Context c, String s, int sp, int color, boolean bold) {
         TextView t = new TextView(c);
         t.setText(s);

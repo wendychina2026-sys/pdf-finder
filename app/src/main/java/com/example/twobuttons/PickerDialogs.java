@@ -165,6 +165,55 @@ final class PickerDialogs {
         }
     }
 
+    // ---------- form sheet (same look as the other round dialogs) ----------
+
+    /**
+     * Round themed dialog: title + subtitle + close, form body, then Cancel and a gold-outlined
+     * save button. onSave returns true to close. onClose runs whenever the dialog goes away.
+     */
+    static Dialog formSheet(Activity a, String title, String subtitle, View body, String saveLabel,
+                            java.util.function.BooleanSupplier onSave, Runnable onClose) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackground(panel(a, 28, 28, false));
+
+        LinearLayout head = titleRow(a, d, title, subtitle);
+        head.setPadding(dp(a, 22), dp(a, 18), dp(a, 14), dp(a, 14));
+        root.addView(head);
+        root.addView(hairline(a));
+
+        MaxScroll sc = new MaxScroll(a, 0.62f);
+        body.setPadding(dp(a, 22), dp(a, 4), dp(a, 22), dp(a, 8));
+        sc.addView(body);
+        root.addView(sc);
+        root.addView(hairline(a));
+
+        LinearLayout foot = new LinearLayout(a);
+        foot.setOrientation(LinearLayout.HORIZONTAL);
+        foot.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        foot.setPadding(dp(a, 22), dp(a, 14), dp(a, 22), dp(a, 18));
+        TextView cancel = CaseViews.text(a, "Cancel", 15, soft(a), false);
+        cancel.setPadding(dp(a, 16), dp(a, 12), dp(a, 20), dp(a, 12));
+        cancel.setOnClickListener(v -> d.dismiss());
+        foot.addView(cancel);
+        TextView save = CaseViews.text(a, saveLabel, 15, ink(a), true);
+        save.setGravity(Gravity.CENTER);
+        save.setPadding(dp(a, 22), 0, dp(a, 22), 0);
+        save.setBackground(CaseViews.box(a, dark(a) ? 0xFF0F1B3D : 0xFFFFFFFF, 14, AppTheme.accent(a), 1));
+        save.setOnClickListener(v -> {
+            if (onSave.getAsBoolean()) d.dismiss();
+        });
+        foot.addView(save, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(a, RoundEdit.HEIGHT_DP)));
+        root.addView(foot);
+
+        if (onClose != null) d.setOnDismissListener(x -> onClose.run());
+        present(d, a, root, false);
+        Window w = d.getWindow();
+        if (w != null) w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        return d;
+    }
+
     // ---------- court chooser (bottom sheet) ----------
 
     static void courtSheet(Activity a, String[] names, int[] icons, String selected, Consumer<String> pick) {

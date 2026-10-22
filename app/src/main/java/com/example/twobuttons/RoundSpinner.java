@@ -30,7 +30,7 @@ public class RoundSpinner extends Spinner {
         ld.setLayerGravity(1, Gravity.END | Gravity.CENTER_VERTICAL);
         ld.setLayerInsetRight(1, CaseViews.dp(c, 14));
         setBackground(ld);
-        setPadding(CaseViews.dp(c, 8), CaseViews.dp(c, 8), CaseViews.dp(c, 44), CaseViews.dp(c, 8));
+        setPadding(CaseViews.dp(c, 6), CaseViews.dp(c, 8), CaseViews.dp(c, 44), CaseViews.dp(c, 8));   // + 8dp text pad = 14dp, same as New Case dropdowns
         setMinimumHeight(CaseViews.dp(c, RoundEdit.HEIGHT_DP));
     }
 

@@ -924,22 +924,78 @@ public class NewCaseActivity extends BaseActivity {
         return dot > 0 && dot >= name.length() - 6 ? name.substring(dot) : "";
     }
 
-    /** Document name + category + matter, then "Tap to choose" (upload PDF / Word / image, or take a photo). */
+    /** Document name + category + matter (+ stage), then "Tap to choose" (PDF / Word / image, or a photo). */
     private void uploadDialog() {
         dlgUris.clear();
         replaceIdx = -1;
-        LinearLayout f = LegalUi.form(this);
-        EditText name = LegalUi.text(this, f, "Document Name / Caption *", "");
+        final String general = "-- General Document Vault --";
+        final String[] catSel = {"Other"};
+        final String[] matterSel = {general};
+        final String[] stageSel = {""};
+        final List<DiaryStore.HCase> cases = store.cases();
+
+        LinearLayout f = new LinearLayout(this);
+        f.setOrientation(LinearLayout.VERTICAL);
+
+        // all labels / boxes use the same helpers and scale as the New Case page
+        f.addView(dlgLbl("Document Name / Caption *"));
+        EditText name = new RoundEdit(this);
         name.setHint("e.g. Interim Injunction Application Under Order 39");
-        Spinner cat = LegalUi.spinner(this, f, "Document Category", LegalStore.DOC_CATEGORIES, "Other");
+        name.setSingleLine(true);
+        f.addView(name, lpTop(0));
 
-        List<String> matters = new ArrayList<>();
-        matters.add("-- General Document Vault --");
-        for (CaseEntry ce : new CaseStore(this).load()) matters.add(ce.title);
-        Spinner matter = LegalUi.spinner(this, f, "Attach to Matter (Optional)",
-                matters.toArray(new String[0]), matters.get(0));
+        f.addView(dlgLbl("Document Category"));
+        TextView catTv = dropdown(f, "Select category", null);
+        setChosen(catTv, catSel[0], "Select category");
+        ((View) catTv.getTag()).setOnClickListener(v -> {
+            List<String> items = Arrays.asList(LegalStore.DOC_CATEGORIES);
+            PickerDialogs.optionSheet(this, "Document Category", null, items, items.indexOf(catSel[0]), i -> {
+                catSel[0] = items.get(i);
+                setChosen(catTv, catSel[0], "Select category");
+            });
+        });
 
-        // dashed "tap to choose" area
+        f.addView(dlgLbl("Attach to Matter (Optional)"));
+        TextView matterTv = dropdown(f, general, null);
+        setChosen(matterTv, matterSel[0], general);
+
+        // Stage only appears once a saved case is picked
+        final TextView stageLbl = dlgLbl("Stage");
+        final LinearLayout stageBox = new LinearLayout(this);
+        stageBox.setOrientation(LinearLayout.VERTICAL);
+        stageBox.addView(stageLbl);
+        TextView stageTv = dropdown(stageBox, "Select stage", null);
+        stageBox.setVisibility(View.GONE);
+        ((View) stageTv.getTag()).setOnClickListener(v -> {
+            List<String> items = stages.list();
+            PickerDialogs.optionSheet(this, "Stage", null, items, items.indexOf(stageSel[0]), i -> {
+                stageSel[0] = items.get(i);
+                setChosen(stageTv, stageSel[0], "Select stage");
+            });
+        });
+
+        ((View) matterTv.getTag()).setOnClickListener(v -> {
+            List<String> items = new ArrayList<>();
+            items.add(general);
+            for (DiaryStore.HCase hc : cases) items.add(hc.title());
+            PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", items,
+                    items.indexOf(matterSel[0]), i -> {
+                        matterSel[0] = items.get(i);
+                        setChosen(matterTv, matterSel[0], general);
+                        if (i == 0) {
+                            stageSel[0] = "";
+                            stageBox.setVisibility(View.GONE);
+                        } else {
+                            String cur = cases.get(i - 1).proceeding;     // start from the case's own stage
+                            stageSel[0] = cur == null ? "" : cur;
+                            setChosen(stageTv, stageSel[0], "Select stage");
+                            stageBox.setVisibility(View.VISIBLE);
+                        }
+                    });
+        });
+        f.addView(stageBox);
+
+        // dashed "tap to choose" area (accent colour, upload icon)
         final LinearLayout drop = new LinearLayout(this);
         drop.setOrientation(LinearLayout.VERTICAL);
         drop.setGravity(Gravity.CENTER);
@@ -949,59 +1005,54 @@ public class NewCaseActivity extends BaseActivity {
         dash.setCornerRadius(dp(14));
         dash.setStroke(dp(2), AppTheme.accent(this), dp(6), dp(4));
         drop.setBackground(dash);
-        LinearLayout.LayoutParams dlp = lpTop(16);
-        f.addView(drop, dlp);
+        f.addView(drop, lpTop(16));
 
-        final Runnable[] draw = new Runnable[1];
-        draw[0] = () -> {
+        final Runnable draw = () -> {
             drop.removeAllViews();
-            drop.addView(CaseViews.icon(this, dlgUris.isEmpty() ? R.drawable.ic_add_circle : R.drawable.ic_pdf,
-                    AppTheme.accent(this), 34));
+            drop.addView(CaseViews.icon(this, R.drawable.ic_upload, AppTheme.accent(this), 34));
             if (dlgUris.isEmpty()) {
-                TextView a = CaseViews.text(this, "Tap to choose PDF, Word or image file", 14, AppTheme.accent(this), true);
-                a.setGravity(Gravity.CENTER);
-                a.setPadding(0, dp(8), 0, 0);
-                drop.addView(a);
-                TextView b = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or take a photo",
-                        12, AppTheme.sub(this), false);
-                b.setGravity(Gravity.CENTER);
-                drop.addView(b);
+                TextView t1 = CaseViews.text(this, "Tap to choose PDF, Word or image file", 13.5f, AppTheme.accent(this), true);
+                t1.setGravity(Gravity.CENTER);
+                t1.setPadding(0, dp(8), 0, dp(2));
+                drop.addView(t1);
+                TextView t2 = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or take a photo",
+                        11, AppTheme.sub(this), false);
+                t2.setGravity(Gravity.CENTER);
+                drop.addView(t2);
             } else {
                 String first = displayName(dlgUris.get(0));
-                TextView a = CaseViews.text(this, dlgUris.size() == 1 ? first
-                        : first + "  +" + (dlgUris.size() - 1) + " more", 14, AppTheme.text(this), true);
-                a.setGravity(Gravity.CENTER);
-                a.setSingleLine(true);
-                a.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-                a.setPadding(0, dp(8), 0, 0);
-                drop.addView(a);
-                TextView b = CaseViews.text(this, "Tap to change", 12, AppTheme.accent(this), true);
-                drop.addView(b);
+                TextView t1 = CaseViews.text(this, dlgUris.size() == 1 ? first
+                        : first + "  +" + (dlgUris.size() - 1) + " more", 13.5f, AppTheme.text(this), true);
+                t1.setGravity(Gravity.CENTER);
+                t1.setSingleLine(true);
+                t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                t1.setPadding(0, dp(8), 0, dp(2));
+                drop.addView(t1);
+                drop.addView(CaseViews.text(this, "Tap to change", 11, AppTheme.accent(this), true));
             }
         };
-        draw[0].run();
-        dlgRefresh = draw[0];
+        draw.run();
+        dlgRefresh = draw;
         drop.setOnClickListener(v -> {
-            if (!dlgUris.isEmpty()) dlgUris.clear();   // choosing again replaces what was picked in this dialog
             PickerDialogs.actions(this, "Upload file",
                     new String[]{"Upload PDF / Word / image", "Take photo"},
                     new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
                     i -> {
+                        dlgUris.clear();            // choosing again replaces what was picked here
                         if (i == 0) pickFile();
                         else takePhoto();
                     });
         });
 
-        LegalUi.formDialog(this, "Upload Legal Document", f, () -> {
+        PickerDialogs.formSheet(this, "Upload Legal Document",
+                "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault", () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             if (dlgUris.isEmpty()) {
                 Toast.makeText(this, "Choose a file first", Toast.LENGTH_SHORT).show();
                 return false;
             }
             String base = LegalUi.str(name);
-            String catName = (String) cat.getSelectedItem();
-            String matterName = matter.getSelectedItemPosition() == 0 ? "General Document Vault"
-                    : (String) matter.getSelectedItem();
+            String matterName = matterSel[0].equals(general) ? "General Document Vault" : matterSel[0];
             LegalStore ls = new LegalStore(this);
             for (int i = 0; i < dlgUris.size(); i++) {
                 Uri u = dlgUris.get(i);
@@ -1012,16 +1063,23 @@ public class NewCaseActivity extends BaseActivity {
                 LegalStore.Doc d = new LegalStore.Doc();
                 d.name = shown;
                 d.caseName = matterName;
-                d.category = catName;
+                d.category = catSel[0];
+                d.stage = stageSel[0];
                 d.size = sizeText(fileSize(u));
                 d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
                 ls.saveDoc(d);
             }
             dlgUris.clear();
-            dlgRefresh = null;
             renderFiles();
             return true;
-        }, null);
+        }, () -> dlgRefresh = null);
+    }
+
+    /** Label with the New Case look (12sp bold grey, scaled 0.9 like every label on that page). */
+    private TextView dlgLbl(String s) {
+        TextView t = CaseViews.text(this, s, 10.8f, AppTheme.sub(this), true);
+        t.setPadding(0, dp(10), 0, dp(4));
+        return t;
     }
 
     /** Ask: PDF from the phone, or a camera photo. replaceAt >= 0 swaps that file instead of adding. */

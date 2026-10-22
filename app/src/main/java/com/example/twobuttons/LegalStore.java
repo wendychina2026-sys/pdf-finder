@@ -34,7 +34,7 @@ final class LegalStore {
 
     static final class Doc {
         String id = UUID.randomUUID().toString();
-        String name = "", caseName = "", size = "", date = "", category = "Other";
+        String name = "", caseName = "", size = "", date = "", category = "Other", stage = "";
     }
 
     static final class Reminder {
@@ -186,6 +186,7 @@ final class LegalStore {
                 d.size = o.optString("size");
                 d.date = o.optString("date");
                 d.category = o.optString("category", "Other");
+                d.stage = o.optString("stage");
                 out.add(d);
             }
         } catch (JSONException ignored) {
@@ -223,6 +224,7 @@ final class LegalStore {
                 o.put("size", d.size);
                 o.put("date", d.date);
                 o.put("category", d.category);
+                o.put("stage", d.stage);
                 a.put(o);
             }
         } catch (JSONException e) {
