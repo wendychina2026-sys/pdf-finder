@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 final class CategoryPicker {
     static final String SEP = " \u203a ";
     private String value;
-    private final TextView tv;
+    private TextView tv;
 
     /** Dropdown for the Edit document dialogs. */
     CategoryPicker(Activity a, LinearLayout f, String current) {
