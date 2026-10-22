@@ -167,7 +167,7 @@ public class DocumentsActivity extends BaseActivity {
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(LegalUi.dp(this, 14), 0, LegalUi.dp(this, 6), 0);
         col.addView(CaseViews.text(this, d.name, 15, AppTheme.text(this), true));
-        col.addView(CaseViews.text(this, d.caseName, 13, AppTheme.sub(this), false));
+        col.addView(CaseViews.text(this, d.category + "  \u2022  " + d.caseName, 13, AppTheme.sub(this), false));
         col.addView(CaseViews.text(this, d.size + "  \u2022  " + d.date, 13, AppTheme.sub(this), false));
         row.addView(col, LegalUi.weight());
 

@@ -100,11 +100,13 @@ public class NewCaseActivity extends BaseActivity {
     private EditText firYearEdit;
     private final List<Uri> pickedUris = new ArrayList<>();
     private final List<String> pickedNames = new ArrayList<>();
+    private final List<String> pickedInfo = new ArrayList<>();   // "Category  •  Matter" per file ("" = none)
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
     // upload dialog state: files chosen inside the open dialog, and a callback that redraws its drop area
     private final List<Uri> dlgUris = new ArrayList<>();
     private Runnable dlgRefresh = null;
+    private int dlgReplaceIdx = -1;       // >= 0 while a file in the upload dialog is being replaced
     private int dragCur = -1;             // row being dragged, -1 = none
     private float dragDownY, dragShift;
     private LinearLayout filesBox;
@@ -596,6 +598,7 @@ public class NewCaseActivity extends BaseActivity {
                     dlgAdd(data.getData());
                 }
             }
+            dlgReplaceIdx = -1;
             dlgRefresh.run();
             return;
         }
@@ -873,6 +876,11 @@ public class NewCaseActivity extends BaseActivity {
         } catch (Exception ignored) {
             // not every provider offers a persistable grant
         }
+        if (dlgReplaceIdx >= 0 && dlgReplaceIdx < dlgUris.size()) {
+            dlgUris.set(dlgReplaceIdx, uri);
+            dlgReplaceIdx = -1;
+            return;
+        }
         dlgUris.add(uri);
     }
 
@@ -903,6 +911,7 @@ public class NewCaseActivity extends BaseActivity {
     private void uploadDialog() {
         dlgUris.clear();
         replaceIdx = -1;
+        dlgReplaceIdx = -1;
         final String general = "-- General Document Vault --";
         final String[] catSel = {"Other"};
         final String[] matterSel = {general};
@@ -1009,29 +1018,54 @@ public class NewCaseActivity extends BaseActivity {
                 t2.setGravity(Gravity.CENTER);
                 drop.addView(t2);
             } else {
-                String first = displayName(dlgUris.get(0));
-                TextView t1 = CaseViews.text(this, dlgUris.size() == 1 ? first
-                        : first + "  +" + (dlgUris.size() - 1) + " more", 13.5f, AppTheme.text(this), true);
-                t1.setGravity(Gravity.CENTER);
-                t1.setSingleLine(true);
-                t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-                t1.setPadding(0, dp(8), 0, dp(2));
-                drop.addView(t1);
-                drop.addView(CaseViews.text(this, "Tap to change", 11, AppTheme.accent(this), true));
+                for (int fi = 0; fi < dlgUris.size(); fi++) {
+                    final int idx = fi;
+                    TextView t1 = CaseViews.text(this, displayName(dlgUris.get(fi)), 13.5f, AppTheme.text(this), true);
+                    t1.setGravity(Gravity.CENTER);
+                    t1.setSingleLine(true);
+                    t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                    t1.setPadding(0, dp(fi == 0 ? 8 : 16), 0, dp(8));
+                    drop.addView(t1, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    LinearLayout btns = new LinearLayout(this);
+                    btns.setOrientation(LinearLayout.HORIZONTAL);
+                    btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> openUri(dlgUris.get(idx))),
+                            dlgBtnLp(false));
+                    btns.addView(dlgBtn(R.drawable.ic_replace, AppTheme.accent(this), "Replace", () ->
+                            PickerDialogs.confirm(this, "Replace file?",
+                                    "\"" + displayName(dlgUris.get(idx)) + "\" will be replaced by a new file.",
+                                    "Replace", () -> PickerDialogs.actions(this, "Replace file",
+                                            new String[]{"Upload PDF / Word / image", "Take photo"},
+                                            new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                                            i -> {
+                                                dlgReplaceIdx = idx;
+                                                if (i == 0) pickFile();
+                                                else takePhoto();
+                                            }))), dlgBtnLp(true));
+                    btns.addView(dlgBtn(R.drawable.ic_delete, RoundEdit.RED, "Delete", () ->
+                            PickerDialogs.confirm(this, "Delete file?",
+                                    "\"" + displayName(dlgUris.get(idx)) + "\" will be removed from this upload.",
+                                    "Delete", () -> {
+                                        dlgUris.remove(idx);
+                                        dlgRefresh.run();
+                                    })), dlgBtnLp(true));
+                    drop.addView(btns, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                }
             }
-        };
-        draw.run();
-        dlgRefresh = draw;
-        drop.setOnClickListener(v -> {
-            PickerDialogs.actions(this, "Upload file",
+            // empty box: tap to choose. With files: only the View / Replace / Delete buttons act.
+            if (dlgUris.isEmpty()) drop.setOnClickListener(v -> PickerDialogs.actions(this, "Upload file",
                     new String[]{"Upload PDF / Word / image", "Take photo"},
                     new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
                     i -> {
-                        dlgUris.clear();            // choosing again replaces what was picked here
                         if (i == 0) pickFile();
                         else takePhoto();
-                    });
-        });
+                    }));
+            else drop.setOnClickListener(null);
+            drop.setClickable(dlgUris.isEmpty());
+        };
+        draw.run();
+        dlgRefresh = draw;
 
         PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault", () -> {
@@ -1049,6 +1083,7 @@ public class NewCaseActivity extends BaseActivity {
                 String shown = label + extOf(displayName(u));
                 pickedUris.add(u);
                 pickedNames.add(shown);
+                pickedInfo.add(catSel[0] + "  \u2022  " + matterName);
                 LegalStore.Doc d = new LegalStore.Doc();
                 d.name = shown;
                 d.caseName = matterName;
@@ -1062,6 +1097,27 @@ public class NewCaseActivity extends BaseActivity {
             renderFiles();
             return true;
         }, () -> dlgRefresh = null);
+    }
+
+    /** Small labelled button (icon + text) used under a chosen file in the upload dialog. */
+    private View dlgBtn(int icon, int color, String label, Runnable click) {
+        LinearLayout b = new LinearLayout(this);
+        b.setOrientation(LinearLayout.HORIZONTAL);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(6), dp(8), dp(6), dp(8));
+        b.setBackground(CaseViews.box(this, AppTheme.field(this), 10, color, 1));
+        b.addView(CaseViews.icon(this, icon, color, 16));
+        TextView t = CaseViews.text(this, label, 12, color, true);
+        t.setPadding(dp(5), 0, 0, 0);
+        b.addView(t);
+        b.setOnClickListener(v -> click.run());
+        return b;
+    }
+
+    private LinearLayout.LayoutParams dlgBtnLp(boolean gap) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        if (gap) lp.leftMargin = dp(8);
+        return lp;
     }
 
     /** Label with the New Case look (12sp bold grey, scaled 0.9 like every label on that page). */
@@ -1099,7 +1155,10 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private void openFile(int idx) {
-        Uri u = pickedUris.get(idx);
+        openUri(pickedUris.get(idx));
+    }
+
+    private void openUri(Uri u) {
         String type = getContentResolver().getType(u);
         Intent i = new Intent(Intent.ACTION_VIEW);
         i.setDataAndType(u, type == null ? "*/*" : type);
@@ -1142,6 +1201,7 @@ public class NewCaseActivity extends BaseActivity {
         if (pickedUris.contains(uri)) return;
         pickedUris.add(uri);
         pickedNames.add(displayName(uri));
+        pickedInfo.add("");
     }
 
     private String displayName(Uri uri) {
@@ -1169,6 +1229,7 @@ public class NewCaseActivity extends BaseActivity {
     private void swapFiles(int a, int b) {
         Collections.swap(pickedUris, a, b);
         Collections.swap(pickedNames, a, b);
+        Collections.swap(pickedInfo, a, b);
     }
 
     private void renderFiles() {
@@ -1197,11 +1258,20 @@ public class NewCaseActivity extends BaseActivity {
             ImageView kind = CaseViews.icon(this, pdf ? R.drawable.ic_pdf : R.drawable.ic_camera,
                     AppTheme.accent(this), 22);
             row.addView(kind);
+            LinearLayout nameCol = new LinearLayout(this);
+            nameCol.setOrientation(LinearLayout.VERTICAL);
+            nameCol.setPadding(dp(10), 0, dp(4), 0);
             TextView n = CaseViews.text(this, pickedNames.get(i), 13, AppTheme.text(this), false);
             n.setSingleLine(true);
             n.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-            n.setPadding(dp(10), 0, dp(4), 0);
-            row.addView(n, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            nameCol.addView(n);
+            if (i < pickedInfo.size() && !pickedInfo.get(i).isEmpty()) {
+                TextView info = CaseViews.text(this, pickedInfo.get(i), 11, AppTheme.sub(this), false);
+                info.setSingleLine(true);
+                info.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                nameCol.addView(info);
+            }
+            row.addView(nameCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
             row.addView(fileAction(R.drawable.ic_eye, AppTheme.accent(this), "View file",
                     v -> openFile(idx)), new LinearLayout.LayoutParams(dp(36), dp(36)));
@@ -1215,6 +1285,7 @@ public class NewCaseActivity extends BaseActivity {
                             "Delete", () -> {
                                 pickedUris.remove(idx);
                                 pickedNames.remove(idx);
+                                pickedInfo.remove(idx);
                                 renderFiles();
                             })), new LinearLayout.LayoutParams(dp(36), dp(36)));
 
