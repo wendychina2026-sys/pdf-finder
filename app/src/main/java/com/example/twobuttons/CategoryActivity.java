@@ -106,11 +106,7 @@ public class CategoryActivity extends BaseActivity {
     }
 
     private TextView label(String text) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextSize(12);
-        t.setPadding(0, 12, 0, 0);
-        return t;
+        return CaseViews.fieldLabel(this, text);
     }
 
     private void reload() {

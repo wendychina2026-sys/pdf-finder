@@ -97,9 +97,7 @@ final class LegalUi {
     }
 
     private static void label(Context c, LinearLayout f, String s) {
-        TextView t = CaseViews.text(c, s, 12, AppTheme.sub(c), true);
-        t.setPadding(0, dp(c, 10), 0, 0);
-        f.addView(t);
+        f.addView(CaseViews.fieldLabel(c, s));
     }
 
     static EditText input(Context c, LinearLayout f, String label, String value, int type) {

@@ -55,6 +55,13 @@ public class RoundEdit extends EditText {
         paint();
     }
 
+    /** Single-line box = exactly the shared height, the same number RoundSpinner and the dropdown boxes use. */
+    @Override
+    protected void onMeasure(int w, int h) {
+        super.onMeasure(w, h);
+        if (getMaxLines() == 1) setMeasuredDimension(getMeasuredWidth(), minPx);
+    }
+
     /** Mark / unmark as failed validation (red border). */
     public void setInvalid(boolean bad) {
         invalid = bad;

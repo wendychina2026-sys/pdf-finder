@@ -157,7 +157,7 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Scales every text on this page down a little; views added later call this for themselves. */
     private void shrink(View v) {
-        if (v instanceof TextView && !(v.getTag() instanceof View)) {   // dropdown text stays 15sp like the boxes
+        if (v instanceof TextView && !(v.getTag() instanceof View) && !"keep".equals(v.getTag())) {   // dropdown text / labels stay as set
             TextView t = (TextView) v;
             t.setTextSize(TypedValue.COMPLEX_UNIT_PX, t.getTextSize() * TEXT_SCALE);
         }
@@ -201,9 +201,7 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private TextView lbl(String s) {
-        TextView t = CaseViews.text(this, s, 12, AppTheme.sub(this), true);
-        t.setPadding(0, dp(10), 0, dp(4));
-        return t;
+        return CaseViews.fieldLabel(this, s);
     }
 
     private LinearLayout col(String title, int titleSp, String sub) {
@@ -1090,9 +1088,7 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Label with the New Case look (12sp bold grey, scaled 0.9 like every label on that page). */
     private TextView dlgLbl(String s) {
-        TextView t = CaseViews.text(this, s, 10.8f, AppTheme.sub(this), true);
-        t.setPadding(0, dp(10), 0, dp(4));
-        return t;
+        return CaseViews.fieldLabel(this, s);
     }
 
     /** Ask: PDF from the phone, or a camera photo. replaceAt >= 0 swaps that file instead of adding. */
@@ -1307,9 +1303,7 @@ public class NewCaseActivity extends BaseActivity {
     // ---------- parties: field + chip look ----------
 
     private TextView partyLabel(String s) {
-        TextView t = CaseViews.text(this, s, 14, AppTheme.text(this), false);
-        t.setPadding(0, dp(16), 0, 0);
-        return t;
+        return CaseViews.fieldLabel(this, s);
     }
 
     private static final String[] CLIENT_SIDES = {"Petitioner", "Respondent", "Complainant", "Accused",

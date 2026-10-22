@@ -76,6 +76,30 @@ class CaseViews {
         return g;
     }
 
+    /** THE label size for every text box / dropdown in the app (12sp x the 0.9 New Case scale). */
+    static final float LABEL_SP = 10.8f;
+
+    /** The one label above a text box or dropdown. Tagged "keep" so page scalers leave it alone. */
+    static TextView fieldLabel(Context c, String s) {
+        TextView t = text(c, s, LABEL_SP, AppTheme.sub(c), true);
+        t.setPadding(0, dp(c, 10), 0, dp(c, 4));
+        t.setTag("keep");
+        return t;
+    }
+
+    /** Give a plain AutoCompleteTextView the exact RoundEdit look, size and font. */
+    static void styleAuto(android.widget.EditText e) {
+        Context c = e.getContext();
+        e.setTextColor(AppTheme.text(c));
+        e.setHintTextColor(AppTheme.sub(c));
+        e.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+        e.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
+        e.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        e.setMinHeight(dp(c, RoundEdit.HEIGHT_DP));
+        e.setHeight(dp(c, RoundEdit.HEIGHT_DP));
+        e.setBackground(box(c, AppTheme.field(c), 14, AppTheme.text(c), 1));
+    }
+
     /** Fractional sp, for sizes that must match a 0.9-scaled page (e.g. 10.8). */
     static TextView text(Context c, String s, float sp, int color, boolean bold) {
         TextView t = text(c, s, 1, color, bold);

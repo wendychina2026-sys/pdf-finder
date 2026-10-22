@@ -210,7 +210,7 @@ public class AddClientActivity extends BaseActivity {
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setPadding(0, dp(10), 0, dp(4));
         r.addView(CaseViews.icon(this, icon, AppTheme.accent(this), 16));
-        TextView t = CaseViews.text(this, text, 12, AppTheme.sub(this), true);
+        TextView t = CaseViews.fieldLabel(this, text);
         t.setPadding(dp(8), 0, 0, 0);
         r.addView(t);
         return r;

@@ -208,6 +208,7 @@ public class AdvancedSearchActivity extends BaseActivity {
         final AutoCompleteTextView lawyer = new AutoCompleteTextView(this);
         lawyer.setHint("Lawyer name");
         lawyer.setSingleLine(true);
+        CaseViews.styleAuto(lawyer);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, details.lawyers()));
@@ -481,11 +482,7 @@ public class AdvancedSearchActivity extends BaseActivity {
     }
 
     private TextView label(String text) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextSize(12);
-        t.setPadding(0, 16, 0, 0);
-        return t;
+        return CaseViews.fieldLabel(this, text);
     }
 
     private String val(Spinner s) {

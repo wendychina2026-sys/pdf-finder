@@ -145,14 +145,12 @@ public class AddCaseActivity extends BaseActivity {
     }
 
     private TextView label(String s) {
-        TextView t = CaseViews.text(this, s, 17, AppTheme.text(this), true);
-        t.setPadding(0, LegalUi.dp(this, 18), 0, LegalUi.dp(this, 8));
-        return t;
+        return CaseViews.fieldLabel(this, s);
     }
 
     private TextView helper(String s) {
-        TextView t = CaseViews.text(this, s, 14, AppTheme.sub(this), false);
-        t.setPadding(0, LegalUi.dp(this, 6), 0, 0);
+        TextView t = CaseViews.text(this, s, CaseViews.LABEL_SP, AppTheme.sub(this), false);
+        t.setPadding(0, 0, 0, LegalUi.dp(this, 4));
         return t;
     }
 

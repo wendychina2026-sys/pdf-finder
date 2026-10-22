@@ -111,6 +111,7 @@ public class CaseDetailsActivity extends BaseActivity {
         lawyer = new AutoCompleteTextView(this);
         lawyer.setHint("Lawyer name");
         lawyer.setSingleLine(true);
+        CaseViews.styleAuto(lawyer);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_dropdown_item_1line, store.lawyers()));
@@ -220,11 +221,7 @@ public class CaseDetailsActivity extends BaseActivity {
     }
 
     private TextView label(String text) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextSize(12);
-        t.setPadding(0, 20, 0, 0);
-        return t;
+        return CaseViews.fieldLabel(this, text);
     }
 
     private void select(Spinner s, String value) {
