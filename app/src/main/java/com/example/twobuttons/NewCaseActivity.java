@@ -551,6 +551,14 @@ public class NewCaseActivity extends BaseActivity {
         lv.setAdapter(ad);
         box.addView(lv, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(280)));
+        if (all.isEmpty()) {
+            search.setVisibility(View.GONE);
+            lv.setVisibility(View.GONE);
+            TextView none = CaseViews.text(this, "No earlier client saved", 15, AppTheme.sub(this), false);
+            none.setGravity(Gravity.CENTER);
+            none.setPadding(0, dp(24), 0, dp(8));
+            box.addView(none, 0);
+        }
 
         fill[0] = () -> {
             String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
@@ -787,11 +795,11 @@ public class NewCaseActivity extends BaseActivity {
         // parties
         LinearLayout f2 = subForm();
         multiNames(f2, "Petitioner / Plaintiff / First Party", "Add petitioner",
-                "Enter Petitioner / First Party", petRows);
+                "Enter Petitioner / First Party", petRows, 0xFF1565C0, 0xFF64B5F6);
         multiNames(f2, "Respondent / Defendant / Opposite Party", "Add respondent",
-                "Enter Respondent / Opposite Party", resRows);
+                "Enter Respondent / Opposite Party", resRows, 0xFFE65100, 0xFFFFB74D);
         multiNames(f2, "Opposing Advocate", "Add opposing advocate",
-                "Enter Opposing Advocate Name", advRows);
+                "Enter Opposing Advocate Name", advRows, 0xFF6A1B9A, 0xFFCE93D8);
         extra.addView(section(R.drawable.ic_contacts, "Parties & representation",
                 "Petitioners, respondents and opposing advocates", f2));
 
@@ -940,7 +948,7 @@ public class NewCaseActivity extends BaseActivity {
         // all labels / boxes use the same helpers and scale as the New Case page
         f.addView(dlgLbl("Document Name / Caption *"));
         EditText name = new RoundEdit(this);
-        name.setHint("e.g. Interim Injunction Application Under Order 39");
+        FieldStyle.smallHint(name, "e.g. Interim Injunction Application");
         name.setSingleLine(true);
         f.addView(name, lpTop(0));
 
@@ -1546,14 +1554,19 @@ public class NewCaseActivity extends BaseActivity {
 
     // ---------- several names: petitioners, respondents, opposing advocates ----------
 
-    private void multiNames(LinearLayout f, String label, String addLabel, String hint, List<EditText> rows) {
+    private void multiNames(LinearLayout f, String label, String addLabel, String hint, List<EditText> rows,
+                            int lightColor, int darkColor) {
         f.addView(partyLabel(label));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         f.addView(box, lpTop(8));
-        android.widget.Button add = LegalUi.outlineButton(this, "+ " + addLabel);
+        int col = IconPalette.pick(this, lightColor, darkColor);
+        LinearLayout add = LegalUi.chipButton(this, addLabel, col);
         add.setOnClickListener(v -> addNameRow(box, rows, hint));
-        f.addView(add, lpTop(10));
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        alp.topMargin = dp(6);
+        f.addView(add, alp);
         addNameRow(box, rows, hint);
     }
 

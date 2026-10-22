@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -217,6 +218,23 @@ final class LegalUi {
         b.setTextColor(AppTheme.accent(c));
         b.setTextSize(15);
         b.setBackground(CaseViews.box(c, Color.TRANSPARENT, 10, AppTheme.accent(c), 1));
+        return b;
+    }
+
+    /** Small tinted pill: coloured person-add icon + label. Wraps its content, so it takes little room. */
+    static LinearLayout chipButton(Context c, String label, int color) {
+        LinearLayout b = new LinearLayout(c);
+        b.setOrientation(LinearLayout.HORIZONTAL);
+        b.setGravity(Gravity.CENTER_VERTICAL);
+        b.setPadding(CaseViews.dp(c, 10), CaseViews.dp(c, 5), CaseViews.dp(c, 12), CaseViews.dp(c, 5));
+        b.setBackground(CaseViews.box(c, (color & 0x00FFFFFF) | 0x1F000000, 16, color, 1));
+        ImageView ic = CaseViews.iconPlain(c, R.drawable.ic_person_add, color, 16);
+        b.addView(ic);
+        TextView t = CaseViews.text(c, label, 12.5f, color, true);
+        t.setPadding(CaseViews.dp(c, 6), 0, 0, 0);
+        b.addView(t);
+        b.setClickable(true);
+        b.setFocusable(true);
         return b;
     }
 

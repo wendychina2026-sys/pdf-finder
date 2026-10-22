@@ -156,7 +156,7 @@ final class BottomBar {
         g.setStroke(dp(3), accent);
         circle.setBackground(g);
         circle.setElevation(dp(4));
-        circle.addView(CaseViews.icon(c, e.icon, accent, 24));
+        circle.addView(CaseViews.iconPlain(c, e.icon, accent, 24));
         TextView t = CaseViews.text(c, e.label, 10, accent, true);
         t.setSingleLine(true);
         t.setGravity(Gravity.CENTER);

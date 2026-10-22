@@ -106,8 +106,15 @@ class CaseViews {
     static ImageView icon(Context c, int res, int color, int sizeDp) {
         ImageView v = new ImageView(c);
         v.setImageResource(res);
-        v.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+        v.setColorFilter(IconPalette.color(c, res, color), PorterDuff.Mode.SRC_IN);
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(c, sizeDp), dp(c, sizeDp)));
+        return v;
+    }
+
+    /** Same as icon() but always the exact colour asked for (no palette). */
+    static ImageView iconPlain(Context c, int res, int color, int sizeDp) {
+        ImageView v = icon(c, res, color, sizeDp);
+        v.setColorFilter(color, PorterDuff.Mode.SRC_IN);
         return v;
     }
 

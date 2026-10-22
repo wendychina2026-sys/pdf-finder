@@ -107,8 +107,27 @@ final class FieldStyle {
 
     static void setDropdownValue(TextView t, String value, String placeholder) {
         boolean has = value != null && !value.isEmpty();
-        t.setText(has ? value : placeholder);
+        String shown = has ? value : placeholder;
+        t.setText(shown);
         t.setTextColor(has ? textColor(t.getContext()) : hintColor(t.getContext()));
+        // long values (e.g. Complaint > Return Complaint > Sent via Speed Post): smaller, two lines
+        int n = shown == null ? 0 : shown.length();
+        if (n > 26) {
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, n > 60 ? 10.5f : 12f);
+            t.setSingleLine(false);
+            t.setMaxLines(2);
+        } else {
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+            t.setSingleLine(true);
+        }
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    }
+
+    /** Placeholder text in a smaller size than what the user types. */
+    static void smallHint(android.widget.EditText e, String hint) {
+        android.text.SpannableString sp = new android.text.SpannableString(hint);
+        sp.setSpan(new android.text.style.AbsoluteSizeSpan(12, true), 0, hint.length(), 0);
+        e.setHint(sp);
     }
 
     static void setDropdownInvalid(TextView t, boolean invalid) {
