@@ -168,6 +168,12 @@ public class ClientDetailsActivity extends BaseActivity {
         call.setOnClickListener(v -> dial(Intent.ACTION_DIAL, "tel:", c.mobile));
         Button sms = LegalUi.outlineButton(this, "SMS");
         sms.setOnClickListener(v -> dial(Intent.ACTION_SENDTO, "smsto:", c.mobile));
+        if (c.mobile.isEmpty()) {
+            call.setEnabled(false);
+            sms.setEnabled(false);
+            call.setAlpha(0.4f);
+            sms.setAlpha(0.4f);
+        }
         LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, LegalUi.dp(this, 48), 1f);
         l1.rightMargin = LegalUi.dp(this, 6);
         LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(0, LegalUi.dp(this, 48), 1f);
@@ -180,7 +186,7 @@ public class ClientDetailsActivity extends BaseActivity {
         // contact & reference
         box.addView(LegalUi.sectionTitle(this, "Contact & Reference"));
         LinearLayout contact = LegalUi.card(this);
-        contact.addView(infoRow("Mobile", c.mobile));
+        if (!c.mobile.isEmpty()) contact.addView(infoRow("Mobile", c.mobile));
         if (!c.landline.isEmpty()) contact.addView(infoRow("Landline", c.landline));
         if (!c.email.isEmpty()) contact.addView(infoRow("Email", c.email));
         contact.addView(infoRow("Address", c.address));

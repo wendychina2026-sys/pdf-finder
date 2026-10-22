@@ -22,8 +22,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Add New Client page. Save turns on only when a name and a valid mobile number (with country
- * code) are filled in, typed or picked from the phone's contacts.
+ * Add New Client page. Save turns on when a name is filled in. Phone is optional, but if typed it must be valid
+ * for the chosen country code. Fields match the New Case page look.
  */
 public class AddClientActivity extends BaseActivity {
 
@@ -97,23 +97,22 @@ public class AddClientActivity extends BaseActivity {
         nameEdit = edit("Enter client's full name",
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS, 0);
         ((RoundEdit) nameEdit).setRequired(true);
-        card.addView(wrap(nameEdit, null), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(nameEdit, null), CaseViews.lp(this, 0, 0));
 
         // email
         card.addView(label(R.drawable.ic_mail, "Email (Optional)"));
         emailEdit = edit("Enter email address",
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 0);
-        card.addView(wrap(emailEdit, null), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(emailEdit, null), CaseViews.lp(this, 0, 0));
         emailErr = errorText();
         card.addView(emailErr);
 
         // mobile (country code mandatory)
-        card.addView(label(R.drawable.ic_phone, "Phone Number *"));
+        card.addView(label(R.drawable.ic_phone, "Phone Number (Optional)"));
         mobileCode = codeChip(true);
         mobileEdit = edit("Enter phone number", InputType.TYPE_CLASS_NUMBER, 0);
-        ((RoundEdit) mobileEdit).setRequired(true);
         mobileEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
-        card.addView(wrap(mobileEdit, mobileCode), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(mobileEdit, mobileCode), CaseViews.lp(this, 0, 0));
         mobileErr = errorText();
         card.addView(mobileErr);
 
@@ -122,7 +121,7 @@ public class AddClientActivity extends BaseActivity {
         landCode = codeChip(false);
         landEdit = edit("Area code + number", InputType.TYPE_CLASS_NUMBER, 0);
         landEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
-        card.addView(wrap(landEdit, landCode), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(landEdit, landCode), CaseViews.lp(this, 0, 0));
         landErr = errorText();
         card.addView(landErr);
 
@@ -130,13 +129,13 @@ public class AddClientActivity extends BaseActivity {
         card.addView(label(R.drawable.ic_location, "Address"));
         addrEdit = edit("Enter address", InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 3);
-        card.addView(wrap(addrEdit, null), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(addrEdit, null), CaseViews.lp(this, 0, 0));
 
         // notes
         card.addView(label(R.drawable.ic_notes, "Notes"));
         notesEdit = edit("Add any additional notes", InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 3);
-        card.addView(wrap(notesEdit, null), CaseViews.lp(this, 6, 0));
+        card.addView(wrap(notesEdit, null), CaseViews.lp(this, 0, 0));
 
         TextWatcher w = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -149,7 +148,20 @@ public class AddClientActivity extends BaseActivity {
         landEdit.addTextChangedListener(w);
 
         setContentView(root);
+        shrink(root);
         validate();
+    }
+
+    /** Same 0.9 text scale as the New Case page; RoundEdit and "keep"-tagged views stay 15sp. */
+    private void shrink(View v) {
+        if (v instanceof TextView && !(v instanceof RoundEdit) && !"keep".equals(v.getTag())) {
+            TextView t = (TextView) v;
+            t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, t.getTextSize() * 0.9f);
+        }
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) shrink(g.getChildAt(i));
+        }
     }
 
     // ---------- views ----------
@@ -186,9 +198,9 @@ public class AddClientActivity extends BaseActivity {
         LinearLayout r = new LinearLayout(this);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(0, dp(16), 0, 0);
-        r.addView(CaseViews.icon(this, icon, AppTheme.accent(this), 18));
-        TextView t = CaseViews.text(this, text, 15, AppTheme.text(this), false);
+        r.setPadding(0, dp(10), 0, dp(4));
+        r.addView(CaseViews.icon(this, icon, AppTheme.accent(this), 16));
+        TextView t = CaseViews.text(this, text, 12, AppTheme.sub(this), true);
         t.setPadding(dp(8), 0, 0, 0);
         r.addView(t);
         return r;
@@ -205,10 +217,10 @@ public class AddClientActivity extends BaseActivity {
         if (minLines > 0) {
             e.setMinLines(minLines);
             e.setGravity(Gravity.TOP);
-            e.setPadding(0, dp(14), 0, dp(14));
+            e.setPadding(0, dp(12), 0, dp(12));
         } else {
             e.setSingleLine(true);
-            e.setPadding(0, dp(14), 0, dp(14));
+            e.setPadding(0, dp(12), 0, dp(12));
         }
         return e;
     }
@@ -223,7 +235,7 @@ public class AddClientActivity extends BaseActivity {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.HORIZONTAL);
         c.setGravity(Gravity.CENTER_VERTICAL);
-        c.setPadding(dp(14), 0, dp(14), 0);
+        c.setPadding(dp(16), 0, dp(16), 0);
         c.setBackground(fieldBg(false));
         if (leading != null) {
             c.addView(leading, new LinearLayout.LayoutParams(
@@ -242,7 +254,8 @@ public class AddClientActivity extends BaseActivity {
     private TextView codeChip(boolean mobile) {
         TextView t = CaseViews.text(this, CountryCodes.label(CountryCodes.DEFAULT_DIAL) + " \u25BE",
                 15, AppTheme.text(this), true);
-        t.setPadding(0, dp(14), 0, dp(14));
+        t.setPadding(0, dp(12), 0, dp(12));
+        t.setTag("keep");
         t.setOnClickListener(v -> CountryCodes.pick(this, mobile ? mobileDial : landDial, dial -> {
             if (mobile) mobileDial = dial; else landDial = dial;
             t.setText(CountryCodes.label(dial) + " \u25BE");
@@ -286,7 +299,7 @@ public class AddClientActivity extends BaseActivity {
         ((RoundEdit) landEdit).setInvalid(le != null);
         ((RoundEdit) emailEdit).setInvalid(ee != null);
 
-        canSave = !name.isEmpty() && !mob.isEmpty() && me == null && le == null && ee == null;
+        canSave = !name.isEmpty() && me == null && le == null && ee == null;
         saveBtn.setEnabled(canSave);
         saveBtn.setAlpha(canSave ? 1f : 0.4f);
     }
@@ -297,7 +310,8 @@ public class AddClientActivity extends BaseActivity {
         LegalStore.Client c = new LegalStore.Client();
         c.code = store.nextClientCode();
         c.name = nameEdit.getText().toString().trim();
-        c.mobile = mobileDial + mobileEdit.getText().toString().trim();
+        String mob = mobileEdit.getText().toString().trim();
+        c.mobile = mob.isEmpty() ? "" : mobileDial + mob;
         c.fromContacts = pickedName != null && c.name.equals(pickedName) && c.mobile.equals(pickedMobile);
         c.landline = land.isEmpty() ? "" : landDial + land;
         c.email = emailEdit.getText().toString().trim();
