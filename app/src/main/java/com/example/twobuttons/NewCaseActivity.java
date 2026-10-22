@@ -53,6 +53,9 @@ public class NewCaseActivity extends BaseActivity {
     private static final int REQ_CAMERA = 53;
     private static final int REQ_SAVE = 54;
     private static final int REQUIRED = 6;
+    /** True once a document was saved to the General Document Vault: case fields are then optional. */
+    private boolean vaultSaved = false;
+    private TextView createBtn;
     /** Everything on this page is drawn a little smaller than the shared default sizes. */
     private static final float TEXT_SCALE = 0.9f;
     private static final String[] COURT_KINDS = {"District Court", "High Court", "Supreme Court",
@@ -309,6 +312,14 @@ public class NewCaseActivity extends BaseActivity {
         ((LinearLayout.LayoutParams) progRest.getLayoutParams()).weight = REQUIRED - done;
         progFill.requestLayout();
         progRest.requestLayout();
+        if (vaultSaved) {                       // reference document saved: nothing is mandatory any more
+            boolean none = done == 0;
+            progressText.setText("Document saved to Vault");
+            remainText.setText(none ? "Case details are optional - tap Done to finish"
+                    : "Case details are optional");
+            if (createBtn != null) createBtn.setText(none ? "Done" : "+  Create Case");
+            return;
+        }
         int left = REQUIRED - done;
         remainText.setText(left == 0 ? "All required fields complete"
                 : left + " required field" + (left == 1 ? "" : "s") + " remaining");
@@ -1146,8 +1157,10 @@ public class NewCaseActivity extends BaseActivity {
                 d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
                 ls.saveDoc(d);
             }
+            if (matterSel[0].equals(general)) { vaultSaved = true; missing(); }
             dlgUris.clear();
             renderFiles();
+            refresh();
             return true;
         }, () -> dlgRefresh = null);
     }
@@ -1790,12 +1803,22 @@ public class NewCaseActivity extends BaseActivity {
         create.setPadding(dp(16), dp(13), dp(16), dp(13));
         create.setBackground(CaseViews.box(this, YELLOW, 30, 0, 0));
         create.setOnClickListener(v -> create());
+        createBtn = create;
         b.addView(create, lpTop(10));
         return b;
     }
 
     private List<String> missing() {
         List<String> m = new ArrayList<>();
+        if (vaultSaved) {                       // vault-only: clear every red "required" mark, require nothing
+            ((RoundEdit) titleEdit).setInvalid(false);
+            ((RoundEdit) regEdit).setInvalid(false);
+            ((RoundEdit) caseNoEdit).setInvalid(false);
+            dropInvalid(courtNameText, false);
+            dropInvalid(caseTypeText, false);
+            clientSideInvalid(false);
+            return m;
+        }
         boolean noTitle = LegalUi.str(titleEdit).isEmpty();
         boolean noReg = LegalUi.str(regEdit).isEmpty();
         boolean noNo = LegalUi.str(caseNoEdit).isEmpty();
@@ -1865,10 +1888,15 @@ public class NewCaseActivity extends BaseActivity {
                     Toast.LENGTH_LONG).show();
             return;
         }
+        if (vaultSaved && doneCount() == 0) {   // only a reference document: it is already in the Vault
+            Toast.makeText(this, "Document saved in Document Vault", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         LegalStore.Client cl = clientId.isEmpty() ? null : legal.client(clientId);
 
         DiaryStore.HCase c = new DiaryStore.HCase();
-        c.caseTitle = LegalUi.str(titleEdit);
+        c.caseTitle = LegalUi.str(titleEdit).isEmpty() ? "Untitled case" : LegalUi.str(titleEdit);
         c.regDate = LegalUi.str(regEdit);
         c.courtKind = courtKind;
         c.court = courtName;
