@@ -34,6 +34,43 @@ public class RoundSpinner extends Spinner {
         setMinimumHeight(CaseViews.dp(c, RoundEdit.HEIGHT_DP));
     }
 
+    /**
+     * One size for every dropdown in the app: exactly the text box height, full width.
+     * Layout params that ask for wrap_content (or a different height) are overridden here.
+     */
+    @Override
+    protected void onMeasure(int widthSpec, int heightSpec) {
+        int h = CaseViews.dp(getContext(), RoundEdit.HEIGHT_DP);
+        int w = MeasureSpec.getMode(widthSpec) == MeasureSpec.UNSPECIFIED
+                ? widthSpec
+                : MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthSpec), MeasureSpec.EXACTLY);
+        super.onMeasure(w, MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        setMeasuredDimension(getMeasuredWidth(), h);
+    }
+
+    /** Closed box text: same 15sp, one line, same inner padding for every dropdown. */
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        android.view.View v = getChildCount() > 0 ? getChildAt(0) : null;
+        if (v instanceof android.widget.TextView) {
+            android.widget.TextView tv = (android.widget.TextView) v;
+            Context c = getContext();
+            int pad = CaseViews.dp(c, 8);
+            float want = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 15,
+                    c.getResources().getDisplayMetrics());
+            if (Math.abs(tv.getTextSize() - want) > 0.5f || tv.getPaddingLeft() != pad
+                    || tv.getEllipsize() != android.text.TextUtils.TruncateAt.END) {
+                tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+                tv.setSingleLine(true);
+                tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                tv.setPadding(pad, 0, 0, 0);
+                tv.setGravity(Gravity.CENTER_VERTICAL);
+                tv.setTextColor(AppTheme.text(c));
+            }
+        }
+    }
+
     /** Heading of the option sheet. */
     public RoundSpinner setTitle(String t) {
         title = t;

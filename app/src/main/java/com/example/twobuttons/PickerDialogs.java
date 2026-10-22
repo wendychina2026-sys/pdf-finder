@@ -882,8 +882,15 @@ final class PickerDialogs {
                         });
                     }
                     FrameLayout cell = new FrameLayout(a);
-                    cell.addView(t, new FrameLayout.LayoutParams(dp(a, 40), dp(a, 40), Gravity.CENTER));
-                    row.addView(cell, new LinearLayout.LayoutParams(0, dp(a, 46), 1f));
+                    cell.addView(t, new FrameLayout.LayoutParams(dp(a, 40), dp(a, 40), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+                    if (sameDay(day, today)) {              // "Today" sits just above the circled date
+                        TextView tl = CaseViews.text(a, "Today", 10, DAY_BLUE, true);
+                        tl.setGravity(Gravity.CENTER);
+                        tl.setSingleLine(true);
+                        cell.addView(tl, new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, dp(a, 12), Gravity.TOP));
+                    }
+                    row.addView(cell, new LinearLayout.LayoutParams(0, dp(a, 54), 1f));
                     cur.add(Calendar.DAY_OF_MONTH, 1);
                 }
                 grid.addView(row);
