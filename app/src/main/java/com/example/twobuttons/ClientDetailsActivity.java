@@ -187,6 +187,7 @@ public class ClientDetailsActivity extends BaseActivity {
         box.addView(LegalUi.sectionTitle(this, "Contact & Reference"));
         LinearLayout contact = LegalUi.card(this);
         if (!c.mobile.isEmpty()) contact.addView(infoRow("Mobile", c.mobile));
+        if (!c.whatsapp.isEmpty()) contact.addView(infoRow("WhatsApp", c.whatsapp));
         if (!c.landline.isEmpty()) contact.addView(infoRow("Landline", c.landline));
         if (!c.email.isEmpty()) contact.addView(infoRow("Email", c.email));
         contact.addView(infoRow("Address", c.address));

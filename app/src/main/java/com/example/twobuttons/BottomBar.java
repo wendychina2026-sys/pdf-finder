@@ -46,13 +46,13 @@ final class BottomBar {
     BottomBar(Context c) { this.c = c; }
 
     /**
-     * The app's five tabs. selected: 0 Home, 1 Find PDF, 2 Marked, 3 Search, 4 Settings.
+     * The app's five tabs. selected: 0 Home, 1 Find PDF, 2 Document Vault, 3 Search, 4 Settings.
      * Tapping another tab opens it; tab pages close themselves so Back returns to Home.
      */
     static View tabs(Activity a, int selected, View.OnClickListener onHome) {
         Class<?>[] pages = {MainActivity.class, FindPdfsActivity.class, MarkedFilesActivity.class,
                 AdvancedSearchActivity.class, SettingsActivity.class};
-        String[] labels = {"Home", "Find PDF", "Marked", "Search", "Settings"};
+        String[] labels = {"Home", "Find PDF", "Doc Vault", "Search", "Settings"};
         int[] icons = {R.drawable.ic_home, R.drawable.ic_pdf, R.drawable.ic_marked,
                 R.drawable.ic_advsearch, R.drawable.ic_settings};
         BottomBar b = new BottomBar(a);

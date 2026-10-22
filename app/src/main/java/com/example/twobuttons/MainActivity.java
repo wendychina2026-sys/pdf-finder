@@ -213,7 +213,7 @@ public class MainActivity extends BaseActivity {
         else super.onBackPressed();
     }
 
-    // ---------- bottom nav: Home | Find PDF | Marked PDF | Advanced Search ----------
+    // ---------- bottom nav: Home | Find PDF | Document Vault | Advanced Search ----------
 
     private View buildNav() {
         return BottomBar.tabs(this, 0, v -> scroll.smoothScrollTo(0, 0));

@@ -102,6 +102,9 @@ public class NewCaseActivity extends BaseActivity {
     private final List<String> pickedNames = new ArrayList<>();
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
+    // upload dialog state: files chosen inside the open dialog, and a callback that redraws its drop area
+    private final List<Uri> dlgUris = new ArrayList<>();
+    private Runnable dlgRefresh = null;
     private int dragCur = -1;             // row being dragged, -1 = none
     private float dragDownY, dragShift;
     private LinearLayout filesBox;
@@ -608,6 +611,19 @@ public class NewCaseActivity extends BaseActivity {
                 renderClient();
             }
         }
+        if (dlgRefresh != null && replaceIdx < 0) {       // the upload dialog is open: collect there
+            if (req == REQ_CAMERA && res == RESULT_OK && cameraUri != null) dlgAdd(cameraUri);
+            if (req == REQ_FILE && res == RESULT_OK && data != null) {
+                ClipData clip = data.getClipData();
+                if (clip != null) {
+                    for (int i = 0; i < clip.getItemCount(); i++) dlgAdd(clip.getItemAt(i).getUri());
+                } else {
+                    dlgAdd(data.getData());
+                }
+            }
+            dlgRefresh.run();
+            return;
+        }
         if (req == REQ_CAMERA && res == RESULT_OK && cameraUri != null) {
             addPicked(cameraUri);
             renderFiles();
@@ -858,12 +874,12 @@ public class NewCaseActivity extends BaseActivity {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(16), dp(16), dp(16), dp(16));
-        LinearLayout t = col("Upload File", 15, "Upload case file here");
+        LinearLayout t = col("Upload Legal Document/File", 15, "Upload case file here");
         head.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         ImageView plus = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 30);
-        plus.setContentDescription("Upload a PDF or take a photo");
+        plus.setContentDescription("Upload legal document or file");
         head.addView(plus);
-        head.setOnClickListener(v -> chooseSource(-1));
+        head.setOnClickListener(v -> uploadDialog());
         c.addView(head);
 
         filesBox = new LinearLayout(this);
@@ -873,11 +889,146 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
+    // ---------- upload legal document dialog ----------
+
+    private void dlgAdd(Uri uri) {
+        if (uri == null || dlgUris.contains(uri)) return;
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {
+            // not every provider offers a persistable grant
+        }
+        dlgUris.add(uri);
+    }
+
+    private long fileSize(Uri uri) {
+        try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int col = c.getColumnIndex(OpenableColumns.SIZE);
+                if (col >= 0 && !c.isNull(col)) return c.getLong(col);
+            }
+        } catch (Exception ignored) {
+            // size stays unknown
+        }
+        return 0;
+    }
+
+    private static String sizeText(long b) {
+        if (b <= 0) return "";
+        if (b < 1024 * 1024) return String.format(Locale.US, "%.1f KB", b / 1024.0);
+        return String.format(Locale.US, "%.1f MB", b / (1024.0 * 1024.0));
+    }
+
+    private static String extOf(String name) {
+        int dot = name.lastIndexOf('.');
+        return dot > 0 && dot >= name.length() - 6 ? name.substring(dot) : "";
+    }
+
+    /** Document name + category + matter, then "Tap to choose" (upload PDF / Word / image, or take a photo). */
+    private void uploadDialog() {
+        dlgUris.clear();
+        replaceIdx = -1;
+        LinearLayout f = LegalUi.form(this);
+        EditText name = LegalUi.text(this, f, "Document Name / Caption *", "");
+        name.setHint("e.g. Interim Injunction Application Under Order 39");
+        Spinner cat = LegalUi.spinner(this, f, "Document Category", LegalStore.DOC_CATEGORIES, "Other");
+
+        List<String> matters = new ArrayList<>();
+        matters.add("-- General Document Vault --");
+        for (CaseEntry ce : new CaseStore(this).load()) matters.add(ce.title);
+        Spinner matter = LegalUi.spinner(this, f, "Attach to Matter (Optional)",
+                matters.toArray(new String[0]), matters.get(0));
+
+        // dashed "tap to choose" area
+        final LinearLayout drop = new LinearLayout(this);
+        drop.setOrientation(LinearLayout.VERTICAL);
+        drop.setGravity(Gravity.CENTER);
+        drop.setPadding(dp(16), dp(22), dp(16), dp(22));
+        android.graphics.drawable.GradientDrawable dash = new android.graphics.drawable.GradientDrawable();
+        dash.setColor(AppTheme.field(this));
+        dash.setCornerRadius(dp(14));
+        dash.setStroke(dp(2), AppTheme.accent(this), dp(6), dp(4));
+        drop.setBackground(dash);
+        LinearLayout.LayoutParams dlp = lpTop(16);
+        f.addView(drop, dlp);
+
+        final Runnable[] draw = new Runnable[1];
+        draw[0] = () -> {
+            drop.removeAllViews();
+            drop.addView(CaseViews.icon(this, dlgUris.isEmpty() ? R.drawable.ic_add_circle : R.drawable.ic_pdf,
+                    AppTheme.accent(this), 34));
+            if (dlgUris.isEmpty()) {
+                TextView a = CaseViews.text(this, "Tap to choose PDF, Word or image file", 14, AppTheme.accent(this), true);
+                a.setGravity(Gravity.CENTER);
+                a.setPadding(0, dp(8), 0, 0);
+                drop.addView(a);
+                TextView b = CaseViews.text(this, "Supports .pdf, .doc, .docx, .jpg, .png files, or take a photo",
+                        12, AppTheme.sub(this), false);
+                b.setGravity(Gravity.CENTER);
+                drop.addView(b);
+            } else {
+                String first = displayName(dlgUris.get(0));
+                TextView a = CaseViews.text(this, dlgUris.size() == 1 ? first
+                        : first + "  +" + (dlgUris.size() - 1) + " more", 14, AppTheme.text(this), true);
+                a.setGravity(Gravity.CENTER);
+                a.setSingleLine(true);
+                a.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                a.setPadding(0, dp(8), 0, 0);
+                drop.addView(a);
+                TextView b = CaseViews.text(this, "Tap to change", 12, AppTheme.accent(this), true);
+                drop.addView(b);
+            }
+        };
+        draw[0].run();
+        dlgRefresh = draw[0];
+        drop.setOnClickListener(v -> {
+            if (!dlgUris.isEmpty()) dlgUris.clear();   // choosing again replaces what was picked in this dialog
+            PickerDialogs.actions(this, "Upload file",
+                    new String[]{"Upload PDF / Word / image", "Take photo"},
+                    new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
+                    i -> {
+                        if (i == 0) pickFile();
+                        else takePhoto();
+                    });
+        });
+
+        LegalUi.formDialog(this, "Upload Legal Document", f, () -> {
+            if (!LegalUi.need(this, name, "Document name")) return false;
+            if (dlgUris.isEmpty()) {
+                Toast.makeText(this, "Choose a file first", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            String base = LegalUi.str(name);
+            String catName = (String) cat.getSelectedItem();
+            String matterName = matter.getSelectedItemPosition() == 0 ? "General Document Vault"
+                    : (String) matter.getSelectedItem();
+            LegalStore ls = new LegalStore(this);
+            for (int i = 0; i < dlgUris.size(); i++) {
+                Uri u = dlgUris.get(i);
+                String label = dlgUris.size() == 1 ? base : base + " (" + (i + 1) + ")";
+                String shown = label + extOf(displayName(u));
+                pickedUris.add(u);
+                pickedNames.add(shown);
+                LegalStore.Doc d = new LegalStore.Doc();
+                d.name = shown;
+                d.caseName = matterName;
+                d.category = catName;
+                d.size = sizeText(fileSize(u));
+                d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
+                ls.saveDoc(d);
+            }
+            dlgUris.clear();
+            dlgRefresh = null;
+            renderFiles();
+            return true;
+        }, null);
+    }
+
     /** Ask: PDF from the phone, or a camera photo. replaceAt >= 0 swaps that file instead of adding. */
     private void chooseSource(int replaceAt) {
         replaceIdx = replaceAt;
         PickerDialogs.actions(this, replaceAt >= 0 ? "Replace file" : "Upload file",
-                new String[]{"Upload PDF", "Take photo"},
+                new String[]{"Upload PDF / Word / image", "Take photo"},
                 new int[]{R.drawable.ic_pdf, R.drawable.ic_camera},
                 i -> {
                     if (i == 0) pickFile();
@@ -918,7 +1069,9 @@ public class NewCaseActivity extends BaseActivity {
     private void pickFile() {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("application/pdf");
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/*"});
         i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, replaceIdx < 0);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try {
@@ -989,7 +1142,9 @@ public class NewCaseActivity extends BaseActivity {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(8), dp(6), dp(2), dp(6));
             row.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
-            boolean pdf = pickedNames.get(i).toLowerCase(Locale.ROOT).endsWith(".pdf");
+            String lowName = pickedNames.get(i).toLowerCase(Locale.ROOT);
+            boolean pdf = !(lowName.endsWith(".jpg") || lowName.endsWith(".jpeg") || lowName.endsWith(".png")
+                    || lowName.endsWith(".webp"));
 
             ImageView grip = CaseViews.icon(this, R.drawable.ic_drag, AppTheme.sub(this), 18);
             grip.setContentDescription("Press and hold to move");

@@ -55,7 +55,7 @@ public class MarkedFilesActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("Marked PDFs");
+        setTitle("Document Vault");
         store = new MarkStore(this);
 
         LinearLayout root = new LinearLayout(this);

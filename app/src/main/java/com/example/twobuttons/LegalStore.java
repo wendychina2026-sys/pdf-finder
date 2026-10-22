@@ -24,7 +24,7 @@ final class LegalStore {
     static final class Client {
         String id = UUID.randomUUID().toString();
         String code = "", name = "", mobile = "", address = "", reference = "";
-        String email = "", landline = "", notes = "";   // mobile / landline hold the full number with country code, e.g. +918595810571
+        String email = "", landline = "", notes = "", whatsapp = "";   // mobile / landline hold the full number with country code, e.g. +918595810571
         String docsNote = "NID, agreements, evidence and other client files";
         long total = 0, paid = 0;
         boolean fromContacts = false;   // name + number came from the phone's contacts (false = typed in, i.e. custom)
@@ -72,6 +72,7 @@ final class LegalStore {
                 c.reference = o.optString("reference");
                 c.email = o.optString("email");
                 c.landline = o.optString("landline");
+                c.whatsapp = o.optString("whatsapp");
                 c.notes = o.optString("notes");
                 c.docsNote = o.optString("docsNote", c.docsNote);
                 c.total = o.optLong("total");
@@ -146,6 +147,7 @@ final class LegalStore {
                 o.put("reference", c.reference);
                 o.put("email", c.email);
                 o.put("landline", c.landline);
+                o.put("whatsapp", c.whatsapp);
                 o.put("notes", c.notes);
                 o.put("docsNote", c.docsNote);
                 o.put("total", c.total);

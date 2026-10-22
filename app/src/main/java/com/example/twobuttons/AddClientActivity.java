@@ -29,12 +29,12 @@ public class AddClientActivity extends BaseActivity {
 
     private static final int REQ_PERM = 31, REQ_CONTACT = 32;
 
-    private EditText nameEdit, emailEdit, mobileEdit, landEdit, addrEdit, notesEdit;
-    private TextView mobileCode, landCode, mobileErr, landErr, emailErr, saveBtn;
+    private EditText nameEdit, emailEdit, mobileEdit, waEdit, landEdit, addrEdit, notesEdit;
+    private TextView mobileCode, waCode, landCode, mobileErr, waErr, landErr, emailErr, saveBtn;
     private String mobileDial = CountryCodes.DEFAULT_DIAL;
     // what "Choose from Contacts" filled in; if the user edits either, the client counts as custom
     private String pickedName = null, pickedMobile = null;
-    private String landDial = CountryCodes.DEFAULT_DIAL;
+    private String landDial = CountryCodes.DEFAULT_DIAL, waDial = CountryCodes.DEFAULT_DIAL;
     private boolean canSave = false;
     private LegalStore store;
 
@@ -109,16 +109,25 @@ public class AddClientActivity extends BaseActivity {
 
         // mobile (country code mandatory)
         card.addView(label(R.drawable.ic_phone, "Phone Number (Optional)"));
-        mobileCode = codeChip(true);
+        mobileCode = codeChip(0);
         mobileEdit = edit("Enter phone number", InputType.TYPE_CLASS_NUMBER, 0);
         mobileEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
         card.addView(wrap(mobileEdit, mobileCode), CaseViews.lp(this, 0, 0));
         mobileErr = errorText();
         card.addView(mobileErr);
 
+        // whatsapp (optional, same validity rule as the phone number)
+        card.addView(label(R.drawable.ic_phone, "WhatsApp Number (Optional)"));
+        waCode = codeChip(2);
+        waEdit = edit("Enter WhatsApp number", InputType.TYPE_CLASS_NUMBER, 0);
+        waEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
+        card.addView(wrap(waEdit, waCode), CaseViews.lp(this, 0, 0));
+        waErr = errorText();
+        card.addView(waErr);
+
         // fixed phone / landline
         card.addView(label(R.drawable.ic_call, "Landline / Fixed Phone (Optional)"));
-        landCode = codeChip(false);
+        landCode = codeChip(1);
         landEdit = edit("Area code + number", InputType.TYPE_CLASS_NUMBER, 0);
         landEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(15)});
         card.addView(wrap(landEdit, landCode), CaseViews.lp(this, 0, 0));
@@ -145,6 +154,7 @@ public class AddClientActivity extends BaseActivity {
         nameEdit.addTextChangedListener(w);
         emailEdit.addTextChangedListener(w);
         mobileEdit.addTextChangedListener(w);
+        waEdit.addTextChangedListener(w);
         landEdit.addTextChangedListener(w);
 
         setContentView(root);
@@ -251,13 +261,14 @@ public class AddClientActivity extends BaseActivity {
         return c;
     }
 
-    private TextView codeChip(boolean mobile) {
+    /** kind: 0 mobile, 1 landline, 2 WhatsApp. */
+    private TextView codeChip(int kind) {
         TextView t = CaseViews.text(this, CountryCodes.label(CountryCodes.DEFAULT_DIAL) + " \u25BE",
                 15, AppTheme.text(this), true);
         t.setPadding(0, dp(12), 0, dp(12));
         t.setTag("keep");
-        t.setOnClickListener(v -> CountryCodes.pick(this, mobile ? mobileDial : landDial, dial -> {
-            if (mobile) mobileDial = dial; else landDial = dial;
+        t.setOnClickListener(v -> CountryCodes.pick(this, kind == 0 ? mobileDial : kind == 1 ? landDial : waDial, dial -> {
+            if (kind == 0) mobileDial = dial; else if (kind == 1) landDial = dial; else waDial = dial;
             t.setText(CountryCodes.label(dial) + " \u25BE");
             validate();
         }));
@@ -286,20 +297,24 @@ public class AddClientActivity extends BaseActivity {
         String name = nameEdit.getText().toString().trim();
         String mob = mobileEdit.getText().toString().trim();
         String land = landEdit.getText().toString().trim();
+        String wa = waEdit.getText().toString().trim();
         String email = emailEdit.getText().toString().trim();
 
         String me = mob.isEmpty() ? null : CountryCodes.mobileError(mobileDial, mob);
         String le = land.isEmpty() ? null : CountryCodes.landlineError(land);
+        String we = wa.isEmpty() ? null : CountryCodes.mobileError(waDial, wa);
         String ee = (email.isEmpty() || Patterns.EMAIL_ADDRESS.matcher(email).matches())
                 ? null : "Enter a valid email address";
         show(mobileErr, me);
+        show(waErr, we);
         show(landErr, le);
         show(emailErr, ee);
         ((RoundEdit) mobileEdit).setInvalid(me != null);
+        ((RoundEdit) waEdit).setInvalid(we != null);
         ((RoundEdit) landEdit).setInvalid(le != null);
         ((RoundEdit) emailEdit).setInvalid(ee != null);
 
-        canSave = !name.isEmpty() && me == null && le == null && ee == null;
+        canSave = !name.isEmpty() && me == null && we == null && le == null && ee == null;
         saveBtn.setEnabled(canSave);
         saveBtn.setAlpha(canSave ? 1f : 0.4f);
     }
@@ -313,6 +328,8 @@ public class AddClientActivity extends BaseActivity {
         String mob = mobileEdit.getText().toString().trim();
         c.mobile = mob.isEmpty() ? "" : mobileDial + mob;
         c.fromContacts = pickedName != null && c.name.equals(pickedName) && c.mobile.equals(pickedMobile);
+        String wa = waEdit.getText().toString().trim();
+        c.whatsapp = wa.isEmpty() ? "" : waDial + wa;
         c.landline = land.isEmpty() ? "" : landDial + land;
         c.email = emailEdit.getText().toString().trim();
         c.address = addrEdit.getText().toString().trim();
