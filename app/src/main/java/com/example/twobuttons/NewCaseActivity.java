@@ -955,17 +955,12 @@ public class NewCaseActivity extends BaseActivity {
             });
         });
 
-        f.addView(dlgLbl("Attach to Matter (Optional)"));
-        TextView matterTv = dropdown(f, general, null);
-        setChosen(matterTv, matterSel[0], general);
-
-        // Stage only appears once a saved case is picked
+        // Stage sits under Document Category and is always available
         final TextView stageLbl = dlgLbl("Stage");
         final LinearLayout stageBox = new LinearLayout(this);
         stageBox.setOrientation(LinearLayout.VERTICAL);
         stageBox.addView(stageLbl);
         TextView stageTv = dropdown(stageBox, "Select stage", null);
-        stageBox.setVisibility(View.GONE);
         // hearing stages: same list as Filter cases > Hearing stage and New Case > Current Stage
         final StageStore docStages = new StageStore(this);
         ((View) stageTv.getTag()).setOnClickListener(v ->
@@ -990,6 +985,12 @@ public class NewCaseActivity extends BaseActivity {
                             }
                         },
                         (i, j) -> docStages.swap(i, j)));
+        f.addView(stageBox);
+
+        f.addView(dlgLbl("Attach to Matter (Optional)"));
+        TextView matterTv = dropdown(f, general, null);
+        setChosen(matterTv, matterSel[0], general);
+
 
         ((View) matterTv.getTag()).setOnClickListener(v -> {
             List<String> items = new ArrayList<>();
@@ -999,16 +1000,8 @@ public class NewCaseActivity extends BaseActivity {
                     items.indexOf(matterSel[0]), i -> {
                         matterSel[0] = items.get(i);
                         setChosen(matterTv, matterSel[0], general);
-                        if (i == 0) {
-                            stageSel[0] = "";
-                            stageBox.setVisibility(View.GONE);
-                        } else {
-                            stageBox.setVisibility(View.VISIBLE);
-                        }
                     });
         });
-        f.addView(stageBox);
-
         // dashed "tap to choose" area (accent colour, upload icon)
         final LinearLayout drop = new LinearLayout(this);
         drop.setOrientation(LinearLayout.VERTICAL);

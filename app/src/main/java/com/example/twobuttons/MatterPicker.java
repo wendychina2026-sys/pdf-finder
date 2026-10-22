@@ -34,16 +34,6 @@ final class MatterPicker {
         }
         stage = savedStage == null ? "" : savedStage;
 
-        LegalUi.label(a, f, "Attach to Matter (Optional)");
-        matterTv = FieldStyle.dropdown(a, f, VAULT, v ->
-                PickerDialogs.optionSheet(a, "Attach to Matter", "Saved cases", items,
-                        items.indexOf(matter), i -> {
-                            matter = items.get(i);
-                            if (i == 0) stage = "";
-                            refresh();
-                        }), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
         stageBox = new LinearLayout(a);
         stageBox.setOrientation(LinearLayout.VERTICAL);
         f.addView(stageBox);
@@ -69,13 +59,21 @@ final class MatterPicker {
                         (i, j) -> stages.swap(i, j)),
                 new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LegalUi.label(a, f, "Attach to Matter (Optional)");
+        matterTv = FieldStyle.dropdown(a, f, VAULT, v ->
+                PickerDialogs.optionSheet(a, "Attach to Matter", "Saved cases", items,
+                        items.indexOf(matter), i -> {
+                            matter = items.get(i);
+                            refresh();
+                        }), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         refresh();
     }
 
     private void refresh() {
         FieldStyle.setDropdownValue(matterTv, matter, VAULT);
         FieldStyle.setDropdownValue(stageTv, stage, "Select stage");
-        stageBox.setVisibility(matter.equals(VAULT) ? View.GONE : View.VISIBLE);
     }
 
     /** Text saved on the document. */
@@ -84,7 +82,7 @@ final class MatterPicker {
     }
 
     String stage() {
-        return matter.equals(VAULT) ? "" : stage;
+        return stage;
     }
 
     boolean valid() {

@@ -48,7 +48,9 @@ final class LegalStore {
     /** Former "document stages": now extra document categories (shown before "Other"). */
     static final String[] DOC_CATEGORIES_EXTRA = {"Pleadings (Plaint / Revision / WS)",
             "Applications (Bail / Interim / Exemption)", "Judicial Orders", "Final Judgments",
-            "Evidence & Deposition", "Vakalatnama", "Annexures & Exhibits"};
+            "Evidence & Deposition", "Vakalatnama", "Annexures & Exhibits",
+            "Complaint", "Complaint › Return Complaint",
+            "Complaint › Return Complaint › Sent via Speed Post"};
 
     /** Every document category, in pick order: the original ones, then the extra ones, "Other" last. */
     static String[] allDocCategories() {
