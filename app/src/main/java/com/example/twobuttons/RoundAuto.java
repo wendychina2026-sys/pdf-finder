@@ -75,8 +75,6 @@ public class RoundAuto extends AutoCompleteTextView {
     @Override public void setTypeface(android.graphics.Typeface tf, int style) { if (st == null || !st.locked) super.setTypeface(tf, style); }
     @Override public void setTextColor(int color) { if (st == null || !st.locked) super.setTextColor(color); }
     @Override public void setTextColor(android.content.res.ColorStateList colors) { if (st == null || !st.locked) super.setTextColor(colors); }
-    @Override public void setHintTextColor(int color) { if (st == null || !st.locked) super.setHintTextColor(color); }
-    @Override public void setHintTextColor(android.content.res.ColorStateList colors) { if (st == null || !st.locked) super.setHintTextColor(colors); }
 
     @Override
     protected void onAttachedToWindow() {
