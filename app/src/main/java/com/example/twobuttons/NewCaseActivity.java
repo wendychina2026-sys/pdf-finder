@@ -807,7 +807,6 @@ public class NewCaseActivity extends BaseActivity {
         c.addView(extra);
         extraBox = extra;
         extraHead = head;
-        idForm = f1;
         head.setOnClickListener(v -> {
             boolean open = extra.getVisibility() != View.VISIBLE;
             extra.setVisibility(open ? View.VISIBLE : View.GONE);
@@ -816,6 +815,7 @@ public class NewCaseActivity extends BaseActivity {
 
         // case identifiers
         LinearLayout f1 = subForm();
+        idForm = f1;
         EditText[] fl = numberYear(f1, "Filing\\Diary number", "Year");
         filingEdit = fl[0];
         filingYearEdit = fl[1];
