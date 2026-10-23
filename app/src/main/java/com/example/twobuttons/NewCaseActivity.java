@@ -820,14 +820,12 @@ public class NewCaseActivity extends BaseActivity {
 
         // case identifiers
         LinearLayout f1 = subForm();
-        filingEdit = LegalUi.text(this, f1, "Filing number", "");
-        filingYearEdit = LegalUi.input(this, f1, "Filing year", "", InputType.TYPE_CLASS_NUMBER);
-        FieldStyle.hint(filingYearEdit, "e.g. 2024");
-        filingYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
-        diaryEdit = LegalUi.text(this, f1, "Diary number", "");
-        diaryYearEdit = LegalUi.input(this, f1, "Diary year", "", InputType.TYPE_CLASS_NUMBER);
-        FieldStyle.hint(diaryYearEdit, "e.g. 2024");
-        diaryYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
+        EditText[] fl = numberYear(f1, "Filing number", "Filing year");
+        filingEdit = fl[0];
+        filingYearEdit = fl[1];
+        EditText[] dy = numberYear(f1, "Diary number", "Diary year");
+        diaryEdit = dy[0];
+        diaryYearEdit = dy[1];
         cnrId = LegalUi.input(this, f1, "CNR number", "", CAPS);
         extra.addView(section(R.drawable.ic_tag, "Case identifiers",
                 "Filing / diary number and year, CNR", f1));
@@ -873,10 +871,9 @@ public class NewCaseActivity extends BaseActivity {
         // FIR
         LinearLayout f5 = subForm();
         stationEdit = LegalUi.text(this, f5, "Police station", "");
-        firNoEdit = LegalUi.text(this, f5, "FIR number", "");
-        firYearEdit = LegalUi.input(this, f5, "FIR year", "", InputType.TYPE_CLASS_NUMBER);
-        FieldStyle.hint(firYearEdit, "e.g. 2024");
-        firYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
+        EditText[] fir = numberYear(f5, "FIR number", "FIR year");
+        firNoEdit = fir[0];
+        firYearEdit = fir[1];
         TextView secLabel = CaseViews.text(this, "Under section(s)", 12, AppTheme.sub(this), true);
         secLabel.setPadding(0, dp(10), 0, 0);
         f5.addView(secLabel);
@@ -2063,6 +2060,27 @@ public class NewCaseActivity extends BaseActivity {
                     }
                 },
                 (i, j) -> stages.swap(i, j));
+    }
+
+    /** Number box (takes the free width) and a narrow 4-digit year box side by side, labels above each. */
+    private EditText[] numberYear(LinearLayout parent, String numLabel, String yearLabel) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        EditText num = LegalUi.text(this, left, numLabel, "");
+        EditText year = LegalUi.input(this, right, yearLabel, "", InputType.TYPE_CLASS_NUMBER);
+        FieldStyle.hint(year, "2024");
+        year.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
+        row.addView(left, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(dp(104), LinearLayout.LayoutParams.WRAP_CONTENT);
+        rlp.leftMargin = dp(10);
+        row.addView(right, rlp);
+        parent.addView(row, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return new EditText[]{num, year};
     }
 
     private LinearLayout subForm() {
