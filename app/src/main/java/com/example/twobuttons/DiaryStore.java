@@ -30,7 +30,6 @@ final class DiaryStore {
         String prev = "", next = "";           // dd/MM/yyyy
         // fields from the New Case page
         String caseTitle = "", regDate = "", courtKind = "", clientId = "", cnr = "";
-        String highCourt = "", state = "", district = "", complex = "";   // court sub-lists
         String filingNo = "", diaryNo = "", feeNotes = "", priority = "", notes = "";
         String firStation = "", firNo = "", firYear = "", firSections = "", firDate = "", acts = "";
         String nextStatus = "", clientRole = "";   // status expected at next hearing; my client: Appellant / Respondent
@@ -109,8 +108,6 @@ final class DiaryStore {
                 c.completed = o.optBoolean("completed");
                 c.caseTitle = o.optString("caseTitle"); c.regDate = o.optString("regDate");
                 c.courtKind = o.optString("courtKind"); c.clientId = o.optString("clientId");
-                c.highCourt = o.optString("highCourt"); c.state = o.optString("state");
-                c.district = o.optString("district"); c.complex = o.optString("complex");
                 c.appearingFor = o.optString("appearingFor"); c.opposingAdvocate = o.optString("opposingAdvocate");
                 c.cnr = o.optString("cnr"); c.filingNo = o.optString("filingNo");
                 c.diaryNo = o.optString("diaryNo"); c.feeNotes = o.optString("feeNotes");
@@ -167,8 +164,6 @@ final class DiaryStore {
                 o.put("completed", c.completed);
                 o.put("caseTitle", c.caseTitle); o.put("regDate", c.regDate);
                 o.put("courtKind", c.courtKind); o.put("clientId", c.clientId);
-                o.put("highCourt", c.highCourt); o.put("state", c.state);
-                o.put("district", c.district); o.put("complex", c.complex);
                 o.put("appearingFor", c.appearingFor); o.put("opposingAdvocate", c.opposingAdvocate);
                 o.put("cnr", c.cnr); o.put("filingNo", c.filingNo);
                 o.put("diaryNo", c.diaryNo); o.put("feeNotes", c.feeNotes);

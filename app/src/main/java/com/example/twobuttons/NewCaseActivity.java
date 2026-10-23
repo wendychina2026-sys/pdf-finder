@@ -83,10 +83,6 @@ public class NewCaseActivity extends BaseActivity {
 
     private String courtKind = "";
     private String courtName = "";
-    private String highCourt = "", stateName = "", stateCode = "", distName = "", distCode = "",
-            complexName = "";
-    private TextView hcText, stText, diText, cxText;
-    private View hcWrap, dcWrap, diWrap, cxWrap;
     private String caseType = "";
     private String clientId = "";
     private boolean autoMode = false;   // opens on "Enter manually"
@@ -679,18 +675,13 @@ public class NewCaseActivity extends BaseActivity {
 
         f.addView(lbl("Court"));
         kindText = dropdown(f, CHOOSE_COURT, v ->
-                PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, courtKind, s -> {
-                    courtKind = s;
-                    setChosen(kindText, s, CHOOSE_COURT);
-                    cnrTitle.setText(cnrHeading());
-                    updateSubs();
-                }));
+                PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, CourtPicker.base(courtKind),
+                        s -> CourtPicker.pick(this, s, path -> {
+                            courtKind = path;
+                            setChosen(kindText, path, CHOOSE_COURT);
+                            cnrTitle.setText(cnrHeading());
+                        })));
         setChosen(kindText, courtKind, CHOOSE_COURT);
-
-        LinearLayout hcIn = subBox(f);                 // sub-list: only for High Court
-        hcWrap = (View) hcIn.getParent();
-        hcIn.addView(lbl("High Court"));
-        hcText = dropdown(hcIn, "Select High Court", v -> pickHighCourt());
 
         f.addView(lbl("Court name / type *"));
         courtNameText = dropdown(f, "Select Court Type", v ->
@@ -698,24 +689,8 @@ public class NewCaseActivity extends BaseActivity {
                         this::isCustomCourt, this::deleteCourtType, s -> {
                             courtName = s;
                             setChosen(courtNameText, s, "Select Court Type");
-                            updateSubs();
                             refresh();
                         }));
-
-        LinearLayout dcIn = subBox(f);                 // sub: State -> sub: District -> sub: Court complex
-        dcWrap = (View) dcIn.getParent();
-        dcIn.addView(lbl("State"));
-        stText = dropdown(dcIn, "Select State", v -> pickState());
-        LinearLayout diIn = subBox(dcIn);
-        diIn.addView(lbl("District"));
-        diWrap = (View) diIn.getParent();
-        diText = dropdown(diIn, "Select District", v -> pickDistrict());
-        LinearLayout cxIn = subBox(diIn);
-        cxIn.addView(lbl("Court complex"));
-        cxWrap = (View) cxIn.getParent();
-        cxText = dropdown(cxIn, "Select Court complex", v -> pickComplex());
-        updateSubs();
-
         f.addView(lbl("Case type*"));
         caseTypeText = dropdown(f, "Select Particular", v ->
                 choose("Case type", Arrays.asList(DiaryStore.CASE_TYPES), s -> {
@@ -740,139 +715,8 @@ public class NewCaseActivity extends BaseActivity {
         return c;
     }
 
-    // ---------- court sub-lists ----------
-
-    /** Indented box with an accent line on its left; returns the inner column. Starts hidden. */
-    private LinearLayout subBox(LinearLayout parent) {
-        LinearLayout wrap = new LinearLayout(this);
-        wrap.setOrientation(LinearLayout.HORIZONTAL);
-        wrap.setVisibility(View.GONE);
-        View line = new View(this);
-        line.setBackgroundColor(AppTheme.accent(this));
-        wrap.addView(line, new LinearLayout.LayoutParams(dp(2), ViewGroup.LayoutParams.MATCH_PARENT));
-        LinearLayout in = new LinearLayout(this);
-        in.setOrientation(LinearLayout.VERTICAL);
-        in.setPadding(dp(12), 0, 0, 0);
-        wrap.addView(in, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        parent.addView(wrap, lpTop(0));
-        return in;
-    }
-
-    private boolean isHighCourt() { return "High Court".equals(courtKind); }
-
-    private boolean needsDistrictChain() {
-        return "District Court".equals(courtKind)
-                || courtName.toLowerCase(Locale.ROOT).contains("district and session");
-    }
-
-    private void updateSubs() {
-        if (hcWrap == null || dcWrap == null || cxWrap == null) return;
-        boolean hc = isHighCourt(), dc = needsDistrictChain();
-        if (!hc) highCourt = "";
-        if (!dc) { stateName = ""; stateCode = ""; distName = ""; distCode = ""; complexName = ""; }
-        hcWrap.setVisibility(hc ? View.VISIBLE : View.GONE);
-        dcWrap.setVisibility(dc ? View.VISIBLE : View.GONE);
-        // nested boxes show as soon as their parent shows
-        diWrap.setVisibility(View.VISIBLE);
-        cxWrap.setVisibility(View.VISIBLE);
-        setChosen(hcText, highCourt, "Select High Court");
-        setChosen(stText, stateName, "Select State");
-        setChosen(diText, distName, "Select District");
-        setChosen(cxText, complexName, "Select Court complex");
-    }
-
-    private void pickHighCourt() {
-        List<String> l = Arrays.asList(CourtDirectory.HIGH_COURTS);
-        PickerDialogs.optionSheet(this, "Choose High Court", null, l, l.indexOf(highCourt), i -> {
-            highCourt = l.get(i);
-            setChosen(hcText, highCourt, "Select High Court");
-        });
-    }
-
-    private void showItems(String title, List<CourtDirectory.Item> items, String current,
-                           Consumer<CourtDirectory.Item> cb) {
-        List<String> names = new ArrayList<>();
-        for (CourtDirectory.Item it : items) names.add(it.name);
-        PickerDialogs.optionSheet(this, title, null, names, names.indexOf(current),
-                i -> cb.accept(items.get(i)));
-    }
-
-    private void pickState() {
-        Toast.makeText(this, "Loading states...", Toast.LENGTH_SHORT).show();
-        CourtDirectory.states(this, list -> showItems("Choose State", list, stateName, it -> {
-            stateName = it.name;
-            stateCode = it.code;
-            distName = ""; distCode = ""; complexName = "";
-            updateSubs();
-        }));
-    }
-
-    private void pickDistrict() {
-        if (stateName.isEmpty()) {
-            Toast.makeText(this, "Choose State first", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (stateCode.isEmpty()) {
-            Toast.makeText(this, "State list was offline. Go online and pick State again.",
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        Toast.makeText(this, "Loading districts...", Toast.LENGTH_SHORT).show();
-        CourtDirectory.districts(this, stateCode,
-                list -> showItems("Choose District", list, distName, it -> {
-                    distName = it.name;
-                    distCode = it.code;
-                    complexName = "";
-                    updateSubs();
-                }),
-                err -> typeManually("District", err, s -> {
-                    distName = s; distCode = ""; complexName = "";
-                    updateSubs();
-                }));
-    }
-
-    private void pickComplex() {
-        if (distName.isEmpty()) {
-            Toast.makeText(this, "Choose District first", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (distCode.isEmpty()) {
-            typeManually("Court complex", "District was typed by hand.", s -> {
-                complexName = s;
-                updateSubs();
-            });
-            return;
-        }
-        Toast.makeText(this, "Loading court complexes...", Toast.LENGTH_SHORT).show();
-        CourtDirectory.complexes(this, stateCode, distCode,
-                list -> showItems("Choose Court complex", list, complexName, it -> {
-                    complexName = it.name;
-                    updateSubs();
-                }),
-                err -> typeManually("Court complex", err, s -> {
-                    complexName = s;
-                    updateSubs();
-                }));
-    }
-
-    private void typeManually(String what, String why, Consumer<String> cb) {
-        EditText e = new EditText(this);
-        e.setHint(what);
-        e.setSingleLine(true);
-        new AlertDialog.Builder(this)
-                .setTitle(what)
-                .setMessage(why + " Type it instead.")
-                .setView(e)
-                .setPositiveButton("OK", (d, w) -> {
-                    String s = e.getText().toString().trim();
-                    if (!s.isEmpty()) cb.accept(s);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
     private String cnrHeading() {
-        return courtKind.isEmpty() ? "Case Search & Auto-Fill" : courtKind + " CNR Lookup";
+        return courtKind.isEmpty() ? "Case Search & Auto-Fill" : CourtPicker.base(courtKind) + " CNR Lookup";
     }
 
     private static boolean isDefaultCourt(String name) {
@@ -2110,10 +1954,6 @@ public class NewCaseActivity extends BaseActivity {
         LegalStore.Client cl = clientId.isEmpty() ? null : legal.client(clientId);
         StringBuilder sb = new StringBuilder();
         line(sb, "Court", courtKind);
-        line(sb, "High Court", highCourt);
-        line(sb, "State", stateName);
-        line(sb, "District", distName);
-        line(sb, "Court complex", complexName);
         line(sb, "Client", cl == null ? "" : cl.name);
         line(sb, "Case title", LegalUi.str(titleEdit));
         line(sb, "Registration date", LegalUi.str(regEdit));
@@ -2173,10 +2013,6 @@ public class NewCaseActivity extends BaseActivity {
         c.regDate = LegalUi.str(regEdit);
         c.courtKind = courtKind;
         c.court = courtName;
-        c.highCourt = highCourt;
-        c.state = stateName;
-        c.district = distName;
-        c.complex = complexName;
         c.type = caseType;
         c.number = LegalUi.str(caseNoEdit);
         c.clientId = clientId;
