@@ -128,6 +128,12 @@ final class PickerDialogs {
     }
 
     private static LinearLayout titleRow(Activity a, Dialog d, String title, String subtitle) {
+        return titleRow(a, d, title, subtitle, null);
+    }
+
+    /** onX (may be null) runs after the cross closes the sheet, e.g. to reopen the level above. */
+    private static LinearLayout titleRow(Activity a, Dialog d, String title, String subtitle,
+                                         Runnable onX) {
         LinearLayout row = new LinearLayout(a);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -145,7 +151,10 @@ final class PickerDialogs {
         ImageView x = CaseViews.icon(a, R.drawable.ic_close, ink(a), 40);
         x.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
         x.setContentDescription("Close");
-        x.setOnClickListener(v -> d.dismiss());
+        x.setOnClickListener(v -> {
+            d.dismiss();
+            if (onX != null) onX.run();
+        });
         row.addView(x);
         return row;
     }
@@ -327,12 +336,19 @@ final class PickerDialogs {
     /** The app's one option list: round cards, check on the chosen one. onPick gets the index. */
     static void optionSheet(Activity a, String title, String subtitle, List<String> items, int selected,
                             Consumer<Integer> onPick) {
+        optionSheet(a, title, subtitle, items, selected, onPick, null);
+    }
+
+    /** onBack (may be null): cross or system back reopens the level above instead of leaving. */
+    static void optionSheet(Activity a, String title, String subtitle, List<String> items, int selected,
+                            Consumer<Integer> onPick, Runnable onBack) {
         final Dialog d = shell(a);
+        if (onBack != null) d.setOnCancelListener(x -> onBack.run());
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
         root.setBackground(panel(a, 28, 0, true));
-        root.addView(titleRow(a, d, title, subtitle));
+        root.addView(titleRow(a, d, title, subtitle, onBack));
         final MaxScroll sc = new MaxScroll(a, 0.62f);
         LinearLayout list = new LinearLayout(a);
         list.setOrientation(LinearLayout.VERTICAL);

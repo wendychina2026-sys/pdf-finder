@@ -674,13 +674,7 @@ public class NewCaseActivity extends BaseActivity {
                 PickerDialogs.calendar(this, "Select Registration Date", regEdit));
 
         f.addView(lbl("Court"));
-        kindText = dropdown(f, CHOOSE_COURT, v ->
-                PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, CourtPicker.base(courtKind),
-                        s -> CourtPicker.pick(this, s, path -> {
-                            courtKind = path;
-                            setChosen(kindText, path, CHOOSE_COURT);
-                            cnrTitle.setText(cnrHeading());
-                        })));
+        kindText = dropdown(f, CHOOSE_COURT, v -> openCourtKinds());
         setChosen(kindText, courtKind, CHOOSE_COURT);
 
         f.addView(lbl("Court name / type *"));
@@ -713,6 +707,16 @@ public class NewCaseActivity extends BaseActivity {
         regEdit.addTextChangedListener(watcher);
         caseNoEdit.addTextChangedListener(watcher);
         return c;
+    }
+
+    /** First court list. A sub-level's cross comes back here. */
+    private void openCourtKinds() {
+        PickerDialogs.courtSheet(this, COURT_KINDS, COURT_ICONS, CourtPicker.base(courtKind),
+                s -> CourtPicker.pick(this, s, this::openCourtKinds, path -> {
+                    courtKind = path;
+                    setChosen(kindText, path, CHOOSE_COURT);
+                    cnrTitle.setText(cnrHeading());
+                }));
     }
 
     private String cnrHeading() {
