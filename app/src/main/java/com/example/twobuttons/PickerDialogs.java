@@ -373,6 +373,94 @@ final class PickerDialogs {
     }
 
     /**
+     * Option list with a search bar and, when onAdd is set, an "Add New" card on top. The added name is
+     * kept in the list for this sheet; onAdd must persist it. Back / cross goes to onBack when given.
+     */
+    static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
+                            String addLabel, String addFieldLabel, Consumer<String> onAdd,
+                            Consumer<String> onPick, Runnable onBack) {
+        final Dialog d = shell(a);
+        if (onBack != null) d.setOnCancelListener(x -> onBack.run());
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
+        root.setBackground(panel(a, 28, 0, true));
+        root.addView(titleRow(a, d, title, subtitle, onBack));
+        final EditText search = new RoundEdit(a);
+        {
+            LinearLayout pill = new LinearLayout(a);
+            pill.setOrientation(LinearLayout.HORIZONTAL);
+            pill.setGravity(Gravity.CENTER_VERTICAL);
+            pill.setPadding(dp(a, 14), 0, dp(a, 14), 0);
+            pill.setBackground(CaseViews.box(a, chip(a), 28, hair(a), 1));
+            pill.addView(CaseViews.icon(a, R.drawable.ic_search, ink(a), 22));
+            FieldStyle.hint(search, "Search...");
+            search.setHintTextColor(soft(a));
+            search.setTextColor(ink(a));
+            search.setTextSize(15);
+            search.setSingleLine(true);
+            search.setBackground(null);
+            search.setPadding(dp(a, 12), dp(a, 14), 0, dp(a, 14));
+            pill.addView(search, weight());
+            root.addView(pill, topMargin(a, 16));
+        }
+        final List<String> items = new ArrayList<>(source);
+        final MaxScroll sv = new MaxScroll(a, 0.55f);
+        final LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sv.addView(list);
+        final Runnable[] fill = new Runnable[1];
+        if (onAdd != null) {
+            root.addView(addCard(a, addLabel, () -> customName(a, addLabel, addFieldLabel + "*",
+                    "Enter name", "Name is required", s -> {
+                        if (hasName(items, s, null)) {
+                            Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        onAdd.accept(s);
+                        int at = items.size() > 0 && items.get(items.size() - 1).equals("Other")
+                                ? items.size() - 1 : items.size();
+                        items.add(at, s);
+                        search.setText("");
+                        fill[0].run();
+                    })), topMargin(a, 16));
+        }
+        root.addView(sv);
+        fill[0] = () -> {
+            list.removeAllViews();
+            String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            View selRow = null;
+            for (int i = 0; i < items.size(); i++) {
+                final String it = items.get(i);
+                if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
+                boolean on = it.equals(selected);
+                LinearLayout r = optionRow(a, it, on);
+                r.addView(selMark(a, on));
+                r.setOnClickListener(v -> {
+                    d.dismiss();
+                    onPick.accept(it);
+                });
+                list.addView(r, topMargin(a, list.getChildCount() == 0 ? 14 : 8));
+                if (on) selRow = r;
+            }
+            if (list.getChildCount() == 0) {
+                TextView none = CaseViews.text(a, "No matches", 14, soft(a), false);
+                none.setPadding(dp(a, 14), dp(a, 18), dp(a, 14), dp(a, 18));
+                list.addView(none);
+            }
+            final View sel = selRow;
+            if (sel != null && q.isEmpty()) sv.post(() -> sv.scrollTo(0, Math.max(0, sel.getTop() - dp(a, 60))));
+        };
+        fill[0].run();
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int x, int y, int z) {}
+            @Override public void onTextChanged(CharSequence s, int x, int y, int z) {}
+            @Override public void afterTextChanged(Editable s) { fill[0].run(); }
+        });
+        present(d, a, root, true);
+    }
+
+    /**
      * Option list the user edits: round cards, "Add New" card on top, rename and delete icons on
      * every row, press-and-hold a row to drag it up or down. Rename and delete ask first.
      * onMove(i, j) swaps the stages at positions i and j (always neighbours).
@@ -387,6 +475,24 @@ final class PickerDialogs {
         root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
         root.setBackground(panel(a, 28, 0, true));
         root.addView(titleRow(a, d, title, "Pick a stage. Add, rename or delete. Press and hold to reorder."));
+        final EditText search = new RoundEdit(a);
+        {
+            LinearLayout pill = new LinearLayout(a);
+            pill.setOrientation(LinearLayout.HORIZONTAL);
+            pill.setGravity(Gravity.CENTER_VERTICAL);
+            pill.setPadding(dp(a, 14), 0, dp(a, 14), 0);
+            pill.setBackground(CaseViews.box(a, chip(a), 28, hair(a), 1));
+            pill.addView(CaseViews.icon(a, R.drawable.ic_search, ink(a), 22));
+            FieldStyle.hint(search, "Search stages...");
+            search.setHintTextColor(soft(a));
+            search.setTextColor(ink(a));
+            search.setTextSize(15);
+            search.setSingleLine(true);
+            search.setBackground(null);
+            search.setPadding(dp(a, 12), dp(a, 14), 0, dp(a, 14));
+            pill.addView(search, weight());
+            root.addView(pill, topMargin(a, 16));
+        }
 
         final String[] sel = {selected == null ? "" : selected};
         final MaxScroll sc = new MaxScroll(a, 0.55f);
@@ -476,8 +582,11 @@ final class PickerDialogs {
             list.removeAllViews();
             dragCur[0] = -1;
             List<String> items = source.get();
+            final String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            final boolean filtering = !q.isEmpty();       // reordering only on the full list
             for (int i = 0; i < items.size(); i++) {
                 final String name = items.get(i);
+                if (filtering && !name.toLowerCase(Locale.ROOT).contains(q)) continue;
                 boolean on = name.equals(sel[0]);
                 LinearLayout r = optionRow(a, name, on);
                 ImageView grip = CaseViews.icon(a, R.drawable.ic_drag, soft(a), 18);
@@ -521,7 +630,7 @@ final class PickerDialogs {
                 });
 
                 // press and hold -> drag up / down; near the top / bottom edge the list scrolls itself
-                r.setOnLongClickListener(v -> {
+                if (!filtering) r.setOnLongClickListener(v -> {
                     dragCur[0] = list.indexOfChild(v);
                     dragView[0] = v;
                     dragY[1] = 0;
@@ -557,15 +666,20 @@ final class PickerDialogs {
                             return true;
                     }
                 });
-                list.addView(r, topMargin(a, i == 0 ? 8 : 8));
+                list.addView(r, topMargin(a, 8));
             }
-            if (items.isEmpty()) {
-                TextView none = CaseViews.text(a, "No stages. Add one above.", 14, soft(a), false);
+            if (list.getChildCount() == 0) {
+                TextView none = CaseViews.text(a, filtering ? "No matches" : "No stages. Add one above.", 14, soft(a), false);
                 none.setPadding(dp(a, 6), dp(a, 18), dp(a, 6), dp(a, 6));
                 list.addView(none);
             }
         };
         fill[0].run();
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int x, int y, int z) {}
+            @Override public void onTextChanged(CharSequence s, int x, int y, int z) {}
+            @Override public void afterTextChanged(Editable s) { fill[0].run(); }
+        });
         present(d, a, root, true);
     }
 

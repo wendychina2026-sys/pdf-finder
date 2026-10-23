@@ -822,10 +822,11 @@ public class NewCaseActivity extends BaseActivity {
         cnrId = LegalUi.input(this, f1, "CNR number", "", CAPS);
         f1.addView(lbl("Sub-case type"));
         subTypeText = dropdown(f1, "Select Sub-case type", v ->
-                choose("Sub-case type", Arrays.asList(SubCaseTypes.ALL), s -> {
-                    subTypeVal = s;
-                    setChosen(subTypeText, s, "Select Sub-case type");
-                }));
+                PickerDialogs.searchSheet(this, "Sub-case type", null, Arrays.asList(SubCaseTypes.ALL),
+                        subTypeVal, null, null, null, s -> {
+                            subTypeVal = s;
+                            setChosen(subTypeText, s, "Select Sub-case type");
+                        }, null));
         EditText[] cn = numberYear(f1, "Case No.*", "Case year");
         caseNoEdit = cn[0];
         caseYearEdit = cn[1];
@@ -983,6 +984,7 @@ public class NewCaseActivity extends BaseActivity {
         final String[] catSel = {"Other"};
         final String[] matterSel = {general};
         final String[] stageSel = {""};
+        final boolean[] dupOk = {false};
         final List<DiaryStore.HCase> cases = store.cases();
 
         LinearLayout f = new LinearLayout(this);
@@ -1193,8 +1195,9 @@ public class NewCaseActivity extends BaseActivity {
         draw.run();
         dlgRefresh = draw;
 
-        PickerDialogs.formSheet(this, "Upload Legal Document",
-                "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault", () -> {
+        final java.util.function.BooleanSupplier[] saver = new java.util.function.BooleanSupplier[1];
+        final android.app.Dialog[] dlg = new android.app.Dialog[1];
+        saver[0] = () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             if (dlgUris.isEmpty()) {
                 Toast.makeText(this, "Choose a file first", Toast.LENGTH_SHORT).show();
@@ -1203,6 +1206,19 @@ public class NewCaseActivity extends BaseActivity {
             String base = LegalUi.str(name);
             String matterName = matterSel[0].equals(general) ? "General Document Vault" : matterSel[0];
             LegalStore ls = new LegalStore(this);
+            LegalStore.Doc dup = matterSel[0].equals(general) ? null
+                    : sameCategoryDoc(ls, cases, matterSel[0], catSel[0]);
+            if (dup != null && !dupOk[0]) {
+                PickerDialogs.confirm(this, "Already uploaded",
+                        "\"" + dup.name + "\" (" + dup.date + ") is already saved under category \""
+                                + catSel[0] + "\" for " + matterName + ". Upload another file in the same category?",
+                        "Upload anyway", () -> {
+                            dupOk[0] = true;
+                            if (saver[0].getAsBoolean() && dlg[0] != null) dlg[0].dismiss();
+                        });
+                return false;
+            }
+            dupOk[0] = false;
             // all files chosen in this dialog belong to ONE group: one card, one Vault entry
             List<Uri> group = new ArrayList<>(dlgUris);
             Uri first = group.get(0);
@@ -1231,7 +1247,27 @@ public class NewCaseActivity extends BaseActivity {
             renderFiles();
             refresh();
             return true;
-        }, () -> dlgRefresh = null);
+        };
+        dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
+                "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
+                () -> saver[0].getAsBoolean(), () -> dlgRefresh = null);
+    }
+
+    /**
+     * An earlier upload with the same Document Category for this matter, when the matter is a saved case
+     * that belongs to a person (client). Null for the General Document Vault or a case with no client.
+     */
+    private LegalStore.Doc sameCategoryDoc(LegalStore ls, List<DiaryStore.HCase> cases, String matter, String cat) {
+        boolean person = false;
+        for (DiaryStore.HCase hc : cases) {
+            if (hc.title().equals(matter) && !hc.clientId.isEmpty()) person = true;
+        }
+        if (!person) return null;
+        LegalStore.Doc hit = null;
+        for (LegalStore.Doc d : ls.docs()) {
+            if (d.caseName.equals(matter) && d.category.equalsIgnoreCase(cat)) { hit = d; break; }   // newest first
+        }
+        return hit;
     }
 
     /** Small labelled button (icon + text) used under a chosen file in the upload dialog. */
@@ -1996,18 +2032,28 @@ public class NewCaseActivity extends BaseActivity {
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
         x.setContentDescription("Remove");
         rows.add(e);
-        if (first) {
-            x.setVisibility(View.INVISIBLE);      // nothing to remove yet: only added rows get a cross
-        } else {
-            x.setOnClickListener(v -> {
-                box.removeView(row);
-                rows.remove(e);
-            });
-        }
+        x.setOnClickListener(v -> {               // any row can go, first included; the next one moves up
+            if (rows.size() < 2) return;
+            box.removeView(row);
+            rows.remove(e);
+            crossesFor(box);
+        });
         row.addView(e, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
         box.addView(row, lpTop(first ? 0 : 8));
         if (scaled) shrink(row);
+        crossesFor(box);
+    }
+
+    /** Cross on every row as soon as there are two or more; a single row has none. */
+    private void crossesFor(LinearLayout box) {
+        int n = box.getChildCount();
+        for (int i = 0; i < n; i++) {
+            LinearLayout row = (LinearLayout) box.getChildAt(i);
+            row.getChildAt(1).setVisibility(n > 1 ? View.VISIBLE : View.INVISIBLE);
+            ((LinearLayout.LayoutParams) row.getLayoutParams()).topMargin = i == 0 ? 0 : dp(8);
+            row.requestLayout();
+        }
     }
 
     /** All filled names joined with ", ". */

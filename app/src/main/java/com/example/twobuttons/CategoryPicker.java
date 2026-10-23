@@ -41,13 +41,38 @@ final class CategoryPicker {
      * Every sub-level shows the path so far as its subtitle.
      */
     static void pick(Activity a, String current, Consumer<String> onDone) {
-        List<String> top = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
-        String top0 = current == null ? "" : current.split(SEP)[0];
+        final List<String> top = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
+        final List<String> mine = custom(a);
+        for (String c : mine) if (!top.contains(c)) top.add(Math.max(0, top.size() - 1), c);   // before "Other"
+        final String top0 = current == null ? "" : current.split(SEP)[0];
         if (!top0.isEmpty() && !top.contains(top0)) top.add(0, top0);
         Runnable[] again = new Runnable[1];
-        again[0] = () -> PickerDialogs.optionSheet(a, "Document Category", null, top, top.indexOf(top0),
-                i -> drill(a, top.get(i), onDone, again[0]));
+        again[0] = () -> PickerDialogs.searchSheet(a, "Document Category", null, top, top0,
+                "Add New Category", "Category Name", s -> saveCustom(a, s),
+                s -> drill(a, s, onDone, again[0]), null);
         again[0].run();
+    }
+
+    private static final String PREF = "legal_diary", KEY = "custom_doc_cats";
+
+    /** Categories the user added (kept on the device, shown before "Other"). */
+    static List<String> custom(Activity a) {
+        List<String> out = new ArrayList<>();
+        try {
+            org.json.JSONArray j = new org.json.JSONArray(
+                    a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).getString(KEY, "[]"));
+            for (int i = 0; i < j.length(); i++) out.add(j.getString(i));
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    private static void saveCustom(Activity a, String name) {
+        List<String> l = custom(a);
+        for (String x : l) if (x.equalsIgnoreCase(name)) return;
+        l.add(name);
+        org.json.JSONArray j = new org.json.JSONArray();
+        for (String x : l) j.put(x);
+        a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).edit().putString(KEY, j.toString()).apply();
     }
 
     private static void drill(Activity a, String path, Consumer<String> onDone, Runnable up) {
