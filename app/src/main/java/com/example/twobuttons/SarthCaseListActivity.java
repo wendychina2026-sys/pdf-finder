@@ -49,7 +49,7 @@ public class SarthCaseListActivity extends BaseActivity {
         bar.setBackgroundColor(0xFF0D47A1);
         bar.setPadding(LegalUi.dp(this, 12), LegalUi.dp(this, 10), LegalUi.dp(this, 12), LegalUi.dp(this, 12));
         search = new RoundEdit(this);
-        search.setHint("Search");
+        FieldStyle.hint(search, "Search");
         search.setSingleLine(true);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}

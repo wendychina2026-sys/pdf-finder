@@ -381,7 +381,7 @@ public class NewCaseActivity extends BaseActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         cnrLookup = new RoundEdit(this);
-        cnrLookup.setHint("Enter CNR Number");
+        FieldStyle.hint(cnrLookup, "Enter CNR Number");
         cnrLookup.setInputType(CAPS);
         cnrLookup.setSingleLine(true);
         cnrLookup.setFilters(new InputFilter[]{new InputFilter.LengthFilter(16)});
@@ -496,7 +496,7 @@ public class NewCaseActivity extends BaseActivity {
         box.setPadding(dp(16), dp(8), dp(16), 0);
 
         EditText search = new RoundEdit(this);
-        search.setHint("Search clients...");
+        FieldStyle.hint(search, "Search clients...");
         search.setSingleLine(true);
         box.addView(search);
 
@@ -667,9 +667,9 @@ public class NewCaseActivity extends BaseActivity {
         curStatusText = dropdown(f, "Select Current Stage", v -> openStages(true));
         titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
         ((RoundEdit) titleEdit).setRequired(true);
-        titleEdit.setHint("Enter Case Title");
+        FieldStyle.hint(titleEdit, "Enter Case Title");
         regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
-        regEdit.setHint("Select Date");
+        FieldStyle.hint(regEdit, "Select Date");
         regEdit.setOnClickListener(v ->
                 PickerDialogs.calendar(this, "Select Registration Date", regEdit));
 
@@ -700,9 +700,9 @@ public class NewCaseActivity extends BaseActivity {
                 }));
         caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
         ((RoundEdit) caseNoEdit).setRequired(true);
-        caseNoEdit.setHint("Case No.");
+        FieldStyle.hint(caseNoEdit, "Case No.");
         nextHearingEdit = LegalUi.dmyInput(this, f, "Next hearing date", "");
-        nextHearingEdit.setHint("Select Date");
+        FieldStyle.hint(nextHearingEdit, "Select Date");
         nextHearingEdit.setOnClickListener(v ->
                 PickerDialogs.calendar(this, "Select Next Hearing Date", nextHearingEdit));
         f.addView(lbl("Next status"));
@@ -824,7 +824,7 @@ public class NewCaseActivity extends BaseActivity {
                         n -> true, this::deleteJudge, this::pickJudge));
         roomEdit = LegalUi.multiline(this, fj, "Court room / address", "");
         roomEdit.setMinLines(2);
-        roomEdit.setHint("Court room no. and address");
+        FieldStyle.hint(roomEdit, "Court room no. and address");
         extra.addView(section(R.drawable.ic_court, "Judge & hearing",
                 "Judge and court room / address", fj));
 
@@ -841,7 +841,7 @@ public class NewCaseActivity extends BaseActivity {
         stationEdit = LegalUi.text(this, f5, "Police station", "");
         firNoEdit = LegalUi.text(this, f5, "FIR number", "");
         firYearEdit = LegalUi.input(this, f5, "FIR year", "", InputType.TYPE_CLASS_NUMBER);
-        firYearEdit.setHint("e.g. 2024");
+        FieldStyle.hint(firYearEdit, "e.g. 2024");
         firYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
         TextView secLabel = CaseViews.text(this, "Under section(s)", 12, AppTheme.sub(this), true);
         secLabel.setPadding(0, dp(10), 0, 0);
@@ -854,7 +854,7 @@ public class NewCaseActivity extends BaseActivity {
         f5.addView(addSec, lpTop(10));
         addFirSectionRow();
         firDateEdit = LegalUi.dmyInput(this, f5, "FIR date", "");
-        firDateEdit.setHint("Select Date");
+        FieldStyle.hint(firDateEdit, "Select Date");
         firDateEdit.setOnClickListener(v -> PickerDialogs.calendar(this, "Select FIR Date", firDateEdit));
         extra.addView(section(R.drawable.ic_notes, "FIR Details",
                 "Police station, FIR number, year, sections and date", f5));
@@ -1632,7 +1632,7 @@ public class NewCaseActivity extends BaseActivity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         final EditText e = new RoundEdit(this);
         e.setInputType(NAME);
-        e.setHint(hint);
+        FieldStyle.hint(e, hint);
         e.setSingleLine(true);
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -1752,10 +1752,10 @@ public class NewCaseActivity extends BaseActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         EditText a = new RoundEdit(this);
-        a.setHint("Act (e.g. IPC)");
+        FieldStyle.hint(a, "Act (e.g. IPC)");
         a.setSingleLine(true);
         EditText s = new RoundEdit(this);
-        s.setHint("Sections");
+        FieldStyle.hint(s, "Sections");
         s.setSingleLine(true);
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -1843,7 +1843,7 @@ public class NewCaseActivity extends BaseActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         EditText s = new RoundEdit(this);
-        s.setHint("Section (e.g. 420 IPC)");
+        FieldStyle.hint(s, "Section (e.g. 420 IPC)");
         s.setSingleLine(true);
         s.setTextSize(14);
         ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);

@@ -3,7 +3,6 @@ package com.example.twobuttons;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.widget.EditText;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,21 +37,31 @@ final class CourtPicker {
     }
 
     private static void pickState(Activity a, String path, Consumer<String> onDone) {
-        Toast.makeText(a, "Loading states...", Toast.LENGTH_SHORT).show();
-        CourtDirectory.states(a, list -> show(a, "State", list, it -> {
+        show(a, "State", CourtDirectory.offlineStates(), it -> {
             String p = path + SEP + it.name;
-            if (it.code.isEmpty()) {                       // offline state list: no codes
-                typeIt(a, "District", "No internet for district list.", s ->
-                        typeIt(a, "Court complex", "Type it.", c ->
-                                onDone.accept(p + SEP + s + SEP + c)));
-            } else {
-                pickDistrict(a, p, it.code, onDone);
+            if (CourtDirectory.isDelhi(it.name)) {         // fixed list, no network
+                show(a, "District", CourtDirectory.delhiDistricts(), d ->
+                        show(a, "Court complex", CourtDirectory.delhiComplexes(d.name), c ->
+                                onDone.accept(p + SEP + d.name + SEP + c.name)));
+                return;
             }
-        }));
+            CourtDirectory.states(a, live -> {             // need eCourts state code
+                String code = "";
+                for (CourtDirectory.Item x : live) {
+                    if (x.name.equalsIgnoreCase(it.name)) code = x.code;
+                }
+                if (code.isEmpty()) {
+                    typeIt(a, "District", "No internet for district list.", s ->
+                            typeIt(a, "Court complex", "Type it.", c ->
+                                    onDone.accept(p + SEP + s + SEP + c)));
+                } else {
+                    pickDistrict(a, p, code, onDone);
+                }
+            });
+        });
     }
 
     private static void pickDistrict(Activity a, String path, String stateCode, Consumer<String> onDone) {
-        Toast.makeText(a, "Loading districts...", Toast.LENGTH_SHORT).show();
         CourtDirectory.districts(a, stateCode,
                 list -> show(a, "District", list, it ->
                         pickComplex(a, path + SEP + it.name, stateCode, it.code, onDone)),
@@ -63,7 +72,6 @@ final class CourtPicker {
 
     private static void pickComplex(Activity a, String path, String stateCode, String distCode,
                                     Consumer<String> onDone) {
-        Toast.makeText(a, "Loading court complexes...", Toast.LENGTH_SHORT).show();
         CourtDirectory.complexes(a, stateCode, distCode,
                 list -> show(a, "Court complex", list, it -> onDone.accept(path + SEP + it.name)),
                 err -> typeIt(a, "Court complex", err, c -> onDone.accept(path + SEP + c)));
@@ -78,7 +86,7 @@ final class CourtPicker {
 
     private static void typeIt(Activity a, String what, String why, Consumer<String> cb) {
         EditText e = new EditText(a);
-        e.setHint(what);
+        FieldStyle.hint(e, what);
         e.setSingleLine(true);
         new AlertDialog.Builder(a)
                 .setTitle(what)

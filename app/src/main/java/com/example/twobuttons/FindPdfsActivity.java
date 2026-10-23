@@ -52,7 +52,7 @@ public class FindPdfsActivity extends BaseActivity {
         rescanButton.setOnClickListener(v -> startScan());
 
         searchBox = new RoundEdit(this);
-        searchBox.setHint("Search PDF name");
+        FieldStyle.hint(searchBox, "Search PDF name");
         searchBox.setSingleLine(true);
         searchBox.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}

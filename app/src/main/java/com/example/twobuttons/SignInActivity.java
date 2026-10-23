@@ -142,7 +142,7 @@ public class SignInActivity extends BaseActivity {
         row.setBackground(CaseViews.box(this, AppTheme.card(this), 14, AppTheme.fieldStroke(this), 1));
         row.addView(CaseViews.icon(this, iconRes, AppTheme.text(this), 26));
         EditText e = new RoundEdit(this);
-        e.setHint(hint);
+        FieldStyle.hint(e, hint);
         e.setSingleLine(true);
         e.setBackground(null);
         e.setTextSize(16);

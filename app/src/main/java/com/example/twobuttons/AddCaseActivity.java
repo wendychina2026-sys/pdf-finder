@@ -156,7 +156,7 @@ public class AddCaseActivity extends BaseActivity {
 
     private EditText field(String hint, String value, int type) {
         EditText e = new RoundEdit(this);
-        e.setHint(hint);
+        FieldStyle.hint(e, hint);
         e.setText(value);
         e.setInputType(type);
         e.setSingleLine(true);

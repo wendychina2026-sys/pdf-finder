@@ -3,6 +3,7 @@ package com.example.twobuttons;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.widget.Toast;
 import android.text.Html;
 
 import org.json.JSONArray;
@@ -61,6 +62,45 @@ final class CourtDirectory {
             "The Dadra And Nagar Haveli And Daman And Diu", "Tripura", "Uttarakhand",
             "Uttar Pradesh", "West Bengal"};
 
+    /** Delhi: judicial district -> court complexes (fixed, no network needed). */
+    private static final String[][] DELHI = {
+            {"Central", "Tis Hazari Courts", "Rouse Avenue Courts"},
+            {"East", "Karkardooma Courts"},
+            {"New Delhi", "Patiala House Courts"},
+            {"North", "Rohini Courts"},
+            {"North East", "Karkardooma Courts"},
+            {"North West", "Rohini Courts"},
+            {"Shahdara", "Karkardooma Courts"},
+            {"South", "Saket Courts"},
+            {"South East", "Saket Courts"},
+            {"South West", "Dwarka Courts"},
+            {"West", "Tis Hazari Courts"}};
+
+    static boolean isDelhi(String state) { return "Delhi".equalsIgnoreCase(state); }
+
+    static List<Item> delhiDistricts() {
+        List<Item> l = new ArrayList<>();
+        for (String[] d : DELHI) l.add(new Item(d[0], d[0]));
+        return l;
+    }
+
+    static List<Item> delhiComplexes(String district) {
+        List<Item> l = new ArrayList<>();
+        for (String[] d : DELHI) {
+            if (d[0].equalsIgnoreCase(district)) {
+                for (int i = 1; i < d.length; i++) l.add(new Item(d[i], d[i]));
+            }
+        }
+        return l;
+    }
+
+    /** All state names, instantly, no codes (codes are looked up from eCourts when needed). */
+    static List<Item> offlineStates() {
+        List<Item> l = new ArrayList<>();
+        for (String s : OFFLINE_STATES) l.add(new Item("", s));
+        return l;
+    }
+
     private static final String BASE = "https://services.ecourts.gov.in/ecourtindia_v6/";
     private static final String PAGE = BASE + "?p=casestatus/index&app_token="
             + "c8ae7676034b92766b82c1422bcce4284c02d630e486924b9efff89bfb56187c";
@@ -105,6 +145,7 @@ final class CourtDirectory {
                              Consumer<String> fail) {
         List<Item> cached = cached(a, key);
         if (!cached.isEmpty()) { ok.accept(cached); return; }
+        Toast.makeText(a, "Loading from eCourts...", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             List<Item> out = null;
             String why = "No data from eCourts";

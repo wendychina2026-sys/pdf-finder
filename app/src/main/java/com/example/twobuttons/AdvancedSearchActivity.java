@@ -206,7 +206,7 @@ public class AdvancedSearchActivity extends BaseActivity {
         final Spinner courtSp = spinner(CaseOptions.arr(opts.courts()));
         final Spinner yearSp = spinner(years());
         final AutoCompleteTextView lawyer = new RoundAuto(this);
-        lawyer.setHint("Lawyer name");
+        FieldStyle.hint(lawyer, "Lawyer name");
         lawyer.setSingleLine(true);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,

@@ -63,7 +63,7 @@ public class MarkedFilesActivity extends BaseActivity {
         root.setPadding(16, 16, 16, 16);
 
         search = new RoundEdit(this);
-        search.setHint("Search file name, path or category");
+        FieldStyle.hint(search, "Search file name, path or category");
         search.setSingleLine(true);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}

@@ -46,13 +46,13 @@ public class CategoryActivity extends BaseActivity {
         root.addView(typeSpinner);
 
         titleEdit = new RoundEdit(this);
-        titleEdit.setHint("Title of case");
+        FieldStyle.hint(titleEdit, "Title of case");
         titleEdit.setSingleLine(true);
         root.addView(label("Title of case"));
         root.addView(titleEdit);
 
         numberEdit = new RoundEdit(this);
-        numberEdit.setHint("Case number");
+        FieldStyle.hint(numberEdit, "Case number");
         numberEdit.setSingleLine(true);
         root.addView(label("Case number"));
         root.addView(numberEdit);

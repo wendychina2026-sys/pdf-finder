@@ -218,7 +218,7 @@ public class AddClientActivity extends BaseActivity {
 
     private EditText edit(String hint, int inputType, int minLines) {
         EditText e = new RoundEdit(this);
-        e.setHint(hint);
+        FieldStyle.hint(e, hint);
         e.setInputType(inputType);
         e.setTextSize(15);
         e.setTextColor(AppTheme.text(this));

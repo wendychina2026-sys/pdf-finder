@@ -66,7 +66,7 @@ public class CaseDetailsActivity extends BaseActivity {
         root.addView(file);
 
         caseNameEdit = new RoundEdit(this);
-        caseNameEdit.setHint("Case name");
+        FieldStyle.hint(caseNameEdit, "Case name");
         caseNameEdit.setSingleLine(true);
         root.addView(label("Case name"));
         root.addView(caseNameEdit);
@@ -109,7 +109,7 @@ public class CaseDetailsActivity extends BaseActivity {
         root.addView(dateRow);
 
         lawyer = new RoundAuto(this);
-        lawyer.setHint("Lawyer name");
+        FieldStyle.hint(lawyer, "Lawyer name");
         lawyer.setSingleLine(true);
         lawyer.setThreshold(1);
         lawyer.setAdapter(new ArrayAdapter<>(this,

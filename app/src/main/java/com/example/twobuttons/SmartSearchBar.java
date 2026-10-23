@@ -33,7 +33,7 @@ final class SmartSearchBar {
         frame.addView(CaseViews.icon(a, R.drawable.ic_search, AppTheme.sub(a), 18));
 
         edit = new RoundEdit(a);
-        edit.setHint(hint);
+        FieldStyle.hint(edit, hint);
         edit.setSingleLine(true);
         edit.setEllipsize(TextUtils.TruncateAt.END);
         edit.setTextSize(13);

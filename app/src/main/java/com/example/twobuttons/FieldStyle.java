@@ -24,6 +24,7 @@ final class FieldStyle {
     static final int HEIGHT_DP = 52;          // every single-line box and every dropdown
     static final int RADIUS_DP = 14;
     static final float TEXT_SP = 15;
+    static final float HINT_SP = 12;          // THE placeholder size, every box and dropdown
     static final int PAD_H_DP = 16;
     static final int PAD_V_DP = 12;
     static final int STROKE_DP = 1;           // normal border
@@ -73,7 +74,7 @@ final class FieldStyle {
     /** Closed-dropdown text: same size and face as a text box, hint colour while nothing is chosen. */
     static void applyDropdownText(TextView t, boolean placeholder) {
         Context c = t.getContext();
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, placeholder ? HINT_SP : TEXT_SP);
         t.setTypeface(Typeface.DEFAULT);
         t.setIncludeFontPadding(false);
         t.setSingleLine(true);
@@ -112,7 +113,10 @@ final class FieldStyle {
         t.setTextColor(has ? textColor(t.getContext()) : hintColor(t.getContext()));
         // long values (e.g. Complaint > Return Complaint > Sent via Speed Post): smaller, two lines
         int n = shown == null ? 0 : shown.length();
-        if (n > 26) {
+        if (!has || isPlaceholder(shown)) {
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, HINT_SP);
+            t.setSingleLine(true);
+        } else if (n > 26) {
             t.setTextSize(TypedValue.COMPLEX_UNIT_SP, n > 60 ? 10.5f : 12f);
             t.setSingleLine(false);
             t.setMaxLines(2);
@@ -123,12 +127,15 @@ final class FieldStyle {
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
     }
 
-    /** Placeholder text in a smaller size than what the user types. */
-    static void smallHint(android.widget.EditText e, String hint) {
+    /** Placeholder for any text box: one size (HINT_SP), one face, hint colour. */
+    static void hint(TextView e, CharSequence hint) {
+        if (hint == null) { e.setHint((CharSequence) null); return; }
         android.text.SpannableString sp = new android.text.SpannableString(hint);
-        sp.setSpan(new android.text.style.AbsoluteSizeSpan(12, true), 0, hint.length(), 0);
+        sp.setSpan(new android.text.style.AbsoluteSizeSpan((int) HINT_SP, true), 0, sp.length(), 0);
         e.setHint(sp);
     }
+
+    static void smallHint(android.widget.EditText e, String hint) { hint(e, hint); }
 
     static void setDropdownInvalid(TextView t, boolean invalid) {
         if (t != null && t.getTag() instanceof View) {

@@ -61,7 +61,7 @@ public class DocumentsActivity extends BaseActivity {
         root.addView(sub);
 
         search = new RoundEdit(this);
-        search.setHint("Search file, case or client");
+        FieldStyle.hint(search, "Search file, case or client");
         search.setSingleLine(true);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}

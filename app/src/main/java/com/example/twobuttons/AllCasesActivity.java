@@ -137,7 +137,7 @@ public class AllCasesActivity extends BaseActivity {
         pill.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
         pill.addView(CaseViews.icon(this, R.drawable.ic_search, AppTheme.sub(this), 20));
         search = new RoundEdit(this);
-        search.setHint("Search cases, CNR, client…");
+        FieldStyle.hint(search, "Search cases, CNR, client…");
         search.setHintTextColor(AppTheme.sub(this));
         search.setTextColor(AppTheme.text(this));
         search.setTextSize(14);

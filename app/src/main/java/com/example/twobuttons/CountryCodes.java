@@ -193,7 +193,7 @@ final class CountryCodes {
         box.setPadding(pad, pad / 2, pad, 0);
 
         EditText search = new RoundEdit(a);
-        search.setHint("Search country or code");
+        FieldStyle.hint(search, "Search country or code");
         search.setSingleLine(true);
         box.addView(search);
 

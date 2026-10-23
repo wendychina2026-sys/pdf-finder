@@ -625,7 +625,7 @@ final class PickerDialogs {
             pill.setPadding(dp(a, 14), 0, dp(a, 14), 0);
             pill.setBackground(CaseViews.box(a, chip(a), 28, hair(a), 1));
             pill.addView(CaseViews.icon(a, R.drawable.ic_search, ink(a), 22));
-            search.setHint(searchHint);
+            FieldStyle.hint(search, searchHint);
             search.setHintTextColor(soft(a));
             search.setTextColor(ink(a));
             search.setTextSize(15);
@@ -732,7 +732,7 @@ final class PickerDialogs {
         root.addView(label, topMargin(a, 18));
 
         EditText name = new RoundEdit(a);
-        name.setHint(hint);
+        FieldStyle.hint(name, hint);
         name.setHintTextColor(soft(a));
         name.setTextColor(ink(a));
         name.setTextSize(15);

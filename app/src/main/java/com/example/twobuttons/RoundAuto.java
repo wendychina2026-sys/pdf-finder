@@ -47,6 +47,12 @@ public class RoundAuto extends AutoCompleteTextView {
     // ---- locked look: outside callers cannot restyle the box (one look app-wide) ----
 
     @Override
+    public void setHint(CharSequence hint) {
+        if (hint == null || hint instanceof android.text.Spanned) super.setHint(hint);
+        else FieldStyle.hint(this, hint);
+    }
+
+    @Override
     public void setTextSize(int unit, float size) {
         super.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, FieldStyle.TEXT_SP);
     }
