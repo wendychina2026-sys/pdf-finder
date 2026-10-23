@@ -610,6 +610,20 @@ public class NewCaseActivity extends BaseActivity {
             return;
         }
         if (flow.handle(req, res)) return;
+        if (req == REQ_ADV_CONTACT && res == RESULT_OK && data != null && advTarget != null) {
+            setAdvocate(advTarget, data.getStringExtra("name"), data.getStringExtra("number"), advTarget.card);
+            return;
+        }
+        if (req == REQ_ADV_IMG) {
+            if (res == RESULT_OK && data != null && data.getData() != null && advTarget != null) {
+                try {
+                    storeCard(advTarget, getContentResolver().openInputStream(data.getData()));
+                } catch (Exception e) {
+                    Toast.makeText(this, "Could not read that image", Toast.LENGTH_SHORT).show();
+                }
+            }
+            return;
+        }
         if (req == REQ_CLIENT && res == RESULT_OK && data != null) {
             String id = data.getStringExtra("client_id");
             if (id != null) {
@@ -663,16 +677,6 @@ public class NewCaseActivity extends BaseActivity {
         f.setPadding(0, 0, 0, 0);
         f.addView(clientSideRow(), lpTop(10));   // "My client is": first option in Case details, mandatory
         f.addView(buildClientCard(), lpTop(16));
-        f.addView(lbl("Current Stage"));
-        curStatusText = dropdown(f, "Select Current Stage", v -> openStages(true));
-        titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
-        ((RoundEdit) titleEdit).setRequired(true);
-        FieldStyle.hint(titleEdit, "Enter Case Title");
-        regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
-        FieldStyle.hint(regEdit, "Select Date");
-        regEdit.setOnClickListener(v ->
-                PickerDialogs.calendar(this, "Select Registration Date", regEdit));
-
         f.addView(lbl("Court"));
         kindText = dropdown(f, CHOOSE_COURT, v -> openCourtKinds());
         setChosen(kindText, courtKind, CHOOSE_COURT);
@@ -685,6 +689,16 @@ public class NewCaseActivity extends BaseActivity {
                             setChosen(courtNameText, s, "Select Court Type");
                             refresh();
                         }));
+        f.addView(lbl("Current Stage"));
+        curStatusText = dropdown(f, "Select Current Stage", v -> openStages(true));
+        titleEdit = LegalUi.input(this, f, "Case Title*", "", TEXT);
+        ((RoundEdit) titleEdit).setRequired(true);
+        FieldStyle.hint(titleEdit, "Enter Case Title");
+        regEdit = LegalUi.dmyInput(this, f, "Registration Date*", "");
+        FieldStyle.hint(regEdit, "Select Date");
+        regEdit.setOnClickListener(v ->
+                PickerDialogs.calendar(this, "Select Registration Date", regEdit));
+
         f.addView(lbl("Case type*"));
         caseTypeText = dropdown(f, "Select Particular", v ->
                 choose("Case type", Arrays.asList(DiaryStore.CASE_TYPES), s -> {
@@ -804,14 +818,15 @@ public class NewCaseActivity extends BaseActivity {
 
         // parties
         LinearLayout f2 = subForm();
-        multiNames(f2, "Petitioner / Plaintiff / First Party", "Add petitioner",
+        multiNames(f2, "Petitioner / Plaintiff / First Party", "Add",
                 "Enter Petitioner / First Party", petRows, 0xFF1565C0, 0xFF64B5F6);
-        multiNames(f2, "Respondent / Defendant / Opposite Party", "Add respondent",
+        multiNames(f2, "Respondent / Defendant / Opposite Party", "Add",
                 "Enter Respondent / Opposite Party", resRows, 0xFFE65100, 0xFFFFB74D);
-        multiNames(f2, "Opposing Advocate", "Add opposing advocate",
-                "Enter Opposing Advocate Name", advRows, 0xFF6A1B9A, 0xFFCE93D8);
-        extra.addView(section(R.drawable.ic_contacts, "Parties & representation",
-                "Petitioners, respondents and opposing advocates", f2));
+        extra.addView(section(R.drawable.ic_contacts, "Parties",
+                "Petitioners and respondents", f2));
+
+        extra.addView(section(R.drawable.ic_briefcase, "Opposing advocate",
+                "Name, contact and visiting card", buildAdvocateForm()));
 
         // fee
         LinearLayout f3 = subForm();
@@ -1612,25 +1627,280 @@ public class NewCaseActivity extends BaseActivity {
         return card;
     }
 
+    // ---------- opposing advocate: own card with name, saved list / contacts, visiting card photo ----------
+
+    private static final int REQ_ADV_CONTACT = 55, REQ_ADV_PERM = 56, REQ_ADV_IMG = 57;
+
+    private static final class Adv {
+        EditText name;
+        String mobile = "", card = "";
+        ImageView thumb;
+        TextView hint;
+    }
+
+    private final List<Adv> advs = new ArrayList<>();
+    private LinearLayout advBox;
+    private Adv advTarget;
+
+    private LinearLayout buildAdvocateForm() {
+        LinearLayout f = subForm();
+        advBox = new LinearLayout(this);
+        advBox.setOrientation(LinearLayout.VERTICAL);
+        int col = IconPalette.pick(this, 0xFF6A1B9A, 0xFFCE93D8);
+        f.addView(labelWithAdd("Opposing Advocate", "Add", col, this::addAdvocate));
+        f.addView(advBox, lpTop(8));
+        addAdvocate();
+        return f;
+    }
+
+    private void addAdvocate() {
+        final boolean first = advs.isEmpty();
+        final Adv a = new Adv();
+        final LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(12), dp(12), dp(12));
+        card.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        a.name = new RoundEdit(this);
+        a.name.setInputType(NAME);
+        FieldStyle.hint(a.name, "Enter Opposing Advocate Name");
+        a.name.setSingleLine(true);
+        advRows.add(a.name);
+        ImageView x = CaseViews.icon(this, R.drawable.ic_close, AppTheme.sub(this), 20);
+        x.setPadding(dp(10), dp(10), dp(10), dp(10));
+        x.setContentDescription("Remove advocate");
+        if (first) {
+            x.setVisibility(View.INVISIBLE);
+        } else {
+            x.setOnClickListener(v -> {
+                advBox.removeView(card);
+                advs.remove(a);
+                advRows.remove(a.name);
+            });
+        }
+        top.addView(a.name, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        card.addView(top);
+
+        int col = IconPalette.pick(this, 0xFF6A1B9A, 0xFFCE93D8);
+        LinearLayout pick = new LinearLayout(this);
+        pick.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout saved = LegalUi.chipButton(this, "Saved list", col, R.drawable.ic_person);
+        saved.setOnClickListener(v -> pickSavedAdvocate(a));
+        LinearLayout cont = LegalUi.chipButton(this, "Phone contacts", col, R.drawable.ic_contacts);
+        cont.setOnClickListener(v -> pickAdvocateContact(a));
+        pick.addView(saved);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clp.leftMargin = dp(8);
+        pick.addView(cont, clp);
+        card.addView(pick, lpTop(8));
+
+        LinearLayout slot = new LinearLayout(this);
+        slot.setOrientation(LinearLayout.HORIZONTAL);
+        slot.setGravity(Gravity.CENTER_VERTICAL);
+        slot.setPadding(dp(10), dp(10), dp(10), dp(10));
+        slot.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
+        a.thumb = new ImageView(this);
+        a.thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        slot.addView(a.thumb, new LinearLayout.LayoutParams(dp(56), dp(56)));
+        a.hint = CaseViews.text(this, "", 13, AppTheme.sub(this), false);
+        a.hint.setPadding(dp(12), 0, 0, 0);
+        slot.addView(a.hint, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        slot.setOnClickListener(v -> cardActions(a));
+        card.addView(slot, lpTop(10));
+
+        advs.add(a);
+        advBox.addView(card, lpTop(first ? 0 : 10));
+        refreshCard(a);
+        if (scaled) shrink(card);
+    }
+
+    private void setAdvocate(Adv a, String name, String mobile, String card) {
+        if (name != null && !name.isEmpty()) a.name.setText(name);
+        a.mobile = mobile == null ? "" : mobile;
+        if (card != null && !card.isEmpty() && new File(card).exists()) a.card = card;
+        refreshCard(a);
+    }
+
+    private void refreshCard(Adv a) {
+        android.graphics.Bitmap b = a.card.isEmpty() ? null : decodeCard(a.card, 200);
+        if (b != null) {
+            a.thumb.clearColorFilter();
+            a.thumb.setPadding(0, 0, 0, 0);
+            a.thumb.setImageBitmap(b);
+            a.hint.setText("Visiting card added. Tap to view or change.");
+        } else {
+            a.card = "";
+            a.thumb.setPadding(dp(14), dp(14), dp(14), dp(14));
+            a.thumb.setImageResource(R.drawable.ic_camera);
+            a.thumb.setColorFilter(AppTheme.sub(this));
+            a.hint.setText("Visiting card photo. Tap to take or choose.");
+        }
+    }
+
+    private static android.graphics.Bitmap decodeCard(String path, int max) {
+        try {
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(path, o);
+            int s = 1;
+            while (o.outWidth / (s * 2) >= max && o.outHeight / (s * 2) >= max) s *= 2;
+            o.inJustDecodeBounds = false;
+            o.inSampleSize = s;
+            return android.graphics.BitmapFactory.decodeFile(path, o);
+        } catch (Exception | OutOfMemoryError e) {
+            return null;
+        }
+    }
+
+    private void cardActions(final Adv a) {
+        advTarget = a;
+        if (a.card.isEmpty()) {
+            PickerDialogs.actions(this, "Visiting card",
+                    new String[]{"Take photo", "Choose from gallery"},
+                    new int[]{R.drawable.ic_camera, R.drawable.ic_image},
+                    i -> { if (i == 0) shootCard(); else pickCardImage(); });
+        } else {
+            PickerDialogs.actions(this, "Visiting card",
+                    new String[]{"View", "Retake photo", "Choose from gallery", "Remove"},
+                    new int[]{R.drawable.ic_eye, R.drawable.ic_camera, R.drawable.ic_image, R.drawable.ic_delete},
+                    i -> {
+                        if (i == 0) {
+                            Intent v = new Intent(Intent.ACTION_VIEW);
+                            v.setDataAndType(PhotoFlow.uri(this, new File(a.card)), "image/*");
+                            v.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            try { startActivity(v); } catch (Exception e) {
+                                Toast.makeText(this, "No app found to open this image", Toast.LENGTH_SHORT).show();
+                            }
+                        } else if (i == 1) shootCard();
+                        else if (i == 2) pickCardImage();
+                        else { a.card = ""; refreshCard(a); }
+                    });
+        }
+    }
+
+    private void shootCard() {
+        flow.start(false, new PhotoFlow.Result() {
+            @Override public void images(List<File> files) {
+                if (files.isEmpty() || advTarget == null) return;
+                try {
+                    storeCard(advTarget, new java.io.FileInputStream(files.get(0)));
+                } catch (Exception e) {
+                    Toast.makeText(NewCaseActivity.this, "Could not save the card photo", Toast.LENGTH_SHORT).show();
+                }
+                for (File f : files) f.delete();
+            }
+            @Override public void pdf(File file) {}
+        });
+    }
+
+    private void pickCardImage() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("image/*");
+        try {
+            startActivityForResult(i, REQ_ADV_IMG);
+        } catch (Exception e) {
+            Toast.makeText(this, "No gallery available on this device", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Copy the picture into the app's own folder so it stays after the camera / gallery file goes. */
+    private void storeCard(Adv a, java.io.InputStream in) throws java.io.IOException {
+        File dir = new File(getFilesDir(), "adv_cards");
+        dir.mkdirs();
+        File out = new File(dir, "card_" + System.currentTimeMillis() + ".jpg");
+        try (java.io.InputStream src = in; java.io.OutputStream dst = new java.io.FileOutputStream(out)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = src.read(buf)) > 0) dst.write(buf, 0, n);
+        }
+        a.card = out.getAbsolutePath();
+        refreshCard(a);
+    }
+
+    private void pickSavedAdvocate(final Adv a) {
+        final List<AdvocateStore.Adv> all = new AdvocateStore(this).list();
+        if (all.isEmpty()) {
+            Toast.makeText(this, "No saved advocate yet. They are saved when you create a case.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] items = new String[all.size()];
+        for (int i = 0; i < items.length; i++) {
+            AdvocateStore.Adv v = all.get(i);
+            items[i] = v.mobile.isEmpty() ? v.name : v.name + "  \u2022  " + v.mobile;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Saved advocates")
+                .setItems(items, (d, w) -> {
+                    AdvocateStore.Adv v = all.get(w);
+                    setAdvocate(a, v.name, v.mobile, v.card);
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void pickAdvocateContact(Adv a) {
+        advTarget = a;
+        if (checkSelfPermission(android.Manifest.permission.READ_CONTACTS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            startActivityForResult(new Intent(this, ChooseContactActivity.class), REQ_ADV_CONTACT);
+        } else {
+            requestPermissions(new String[]{android.Manifest.permission.READ_CONTACTS}, REQ_ADV_PERM);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(code, perms, results);
+        if (code != REQ_ADV_PERM) return;
+        if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            startActivityForResult(new Intent(this, ChooseContactActivity.class), REQ_ADV_CONTACT);
+        } else {
+            Toast.makeText(this, "Allow contacts permission to pick from phone contacts", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Remember each advocate (name, number, card photo) so next case can pick them from the saved list. */
+    private void saveAdvocates() {
+        AdvocateStore st = new AdvocateStore(this);
+        for (Adv a : advs) st.save(LegalUi.str(a.name), a.mobile, a.card);
+    }
+
     // ---------- several names: petitioners, respondents, opposing advocates ----------
 
     private void multiNames(LinearLayout f, String label, String addLabel, String hint, List<EditText> rows,
                             int lightColor, int darkColor) {
-        f.addView(partyLabel(label));
+        int col = IconPalette.pick(this, lightColor, darkColor);
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
+        f.addView(labelWithAdd(label, addLabel, col, () -> addNameRow(box, rows, hint)));
         f.addView(box, lpTop(8));
-        int col = IconPalette.pick(this, lightColor, darkColor);
-        LinearLayout add = LegalUi.chipButton(this, addLabel, col);
-        add.setOnClickListener(v -> addNameRow(box, rows, hint));
-        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        alp.topMargin = dp(6);
-        f.addView(add, alp);
         addNameRow(box, rows, hint);
     }
 
+    /** Field label on the left, small "Add" chip on the same line at the right. */
+    private LinearLayout labelWithAdd(String label, String addLabel, int color, Runnable onAdd) {
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(partyLabel(label), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout add = LegalUi.chipButton(this, addLabel, color);
+        add.setOnClickListener(v -> onAdd.run());
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        alp.leftMargin = dp(8);
+        head.addView(add, alp);
+        return head;
+    }
+
     private void addNameRow(LinearLayout box, List<EditText> rows, String hint) {
+        final boolean first = box.getChildCount() == 0;
         final LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -1642,17 +1912,17 @@ public class NewCaseActivity extends BaseActivity {
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
         x.setContentDescription("Remove");
         rows.add(e);
-        x.setOnClickListener(v -> {
-            if (rows.size() == 1) {
-                e.setText("");
-                return;
-            }
-            box.removeView(row);
-            rows.remove(e);
-        });
+        if (first) {
+            x.setVisibility(View.INVISIBLE);      // nothing to remove yet: only added rows get a cross
+        } else {
+            x.setOnClickListener(v -> {
+                box.removeView(row);
+                rows.remove(e);
+            });
+        }
         row.addView(e, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(x, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        box.addView(row, lpTop(box.getChildCount() == 0 ? 0 : 8));
+        box.addView(row, lpTop(first ? 0 : 8));
         if (scaled) shrink(row);
     }
 
@@ -2026,6 +2296,7 @@ public class NewCaseActivity extends BaseActivity {
         c.second = names(resRows);
         c.appearingFor = clientRole;
         c.opposingAdvocate = names(advRows);
+        saveAdvocates();
         c.representing = cl != null ? cl.name : clientRole;
 
         c.cnr = cnrValue();

@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.provider.MediaStore;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -118,7 +119,8 @@ final class PhotoFlow {
                 LinearLayout row = new LinearLayout(a);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(0, dp(6), 0, dp(6));
+                row.setPadding(dp(10), dp(10), dp(6), dp(10));
+                row.setBackground(CaseViews.box(a, AppTheme.card(a), 16, AppTheme.cardStroke(a), 1));
                 ImageView iv = new ImageView(a);
                 iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 iv.setBackground(CaseViews.box(a, AppTheme.field(a), 8, AppTheme.fieldStroke(a), 1));
@@ -151,11 +153,18 @@ final class PhotoFlow {
                     }
                 });
                 row.addView(del);
-                box.addView(row);
+                LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                rlp.topMargin = dp(i == 0 ? 4 : 8);
+                box.addView(row, rlp);
             }
+            // one photo: the bin already removes it, "Discard all" only makes sense for several
+            android.widget.Button all = dlg.getButton(AlertDialog.BUTTON_NEUTRAL);
+            if (all != null) all.setVisibility(shots.size() > 1 ? View.VISIBLE : View.GONE);
         };
         fill[0].run();
         dlg.show();
+        fill[0].run();
     }
 
     private void discardAll() {
