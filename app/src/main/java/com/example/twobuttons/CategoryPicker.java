@@ -1,3 +1,40 @@
+package com.example.twobuttons;
+
+import android.app.Activity;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+
+/**
+ * Document Category with drill-down: pick a category; if it has sub-options (e.g. Complaint),
+ * a new list opens with them; pick one and, if that has sub-options too (Return Complaint),
+ * another list opens. The saved value is the path, e.g. "Complaint › Return Complaint › Sent via Speed Post".
+ */
+final class CategoryPicker {
+    static final String SEP = " \u203a ";
+    private String value;
+    private TextView tv;
+
+    /** Dropdown for the Edit document dialogs. */
+    CategoryPicker(Activity a, LinearLayout f, String current) {
+        value = current == null ? "" : current;
+        LegalUi.label(a, f, "Category");
+        tv = FieldStyle.dropdown(a, f, "Select category", v ->
+                pick(a, value, s -> {
+                    value = s;
+                    FieldStyle.setDropdownValue(tv, value, "Select category");
+                }), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        FieldStyle.setDropdownValue(tv, value, "Select category");
+    }
+
+    String get() {
+        return value.isEmpty() ? "Other" : value;
+    }
+
     /**
      * Opens the category list and, level by level, any sub-options; onDone gets the full path.
      * The cross (or back) on a sub-level goes up exactly one level; on the first list it just closes.
