@@ -91,7 +91,7 @@ public class NewCaseActivity extends BaseActivity {
     private LinearLayout cnrCard, clientBox, actsBox, segAuto, segManual;
     private View progFill, progRest;
     private EditText cnrLookup, titleEdit, caseNoEdit, regEdit;
-    private EditText cnrId, filingEdit, diaryEdit, feeEdit, feeNotesEdit;
+    private EditText filingYearEdit, diaryYearEdit, cnrId, filingEdit, diaryEdit, feeEdit, feeNotesEdit;
     private final List<EditText> petRows = new ArrayList<>();   // several petitioners
     private final List<EditText> resRows = new ArrayList<>();   // several respondents
     private final List<EditText> advRows = new ArrayList<>();   // several opposing advocates
@@ -99,7 +99,9 @@ public class NewCaseActivity extends BaseActivity {
     private String judgeName = "", curStatus = "", nextStatus = "", clientRole = "";
     private TextView judgeText, curStatusText, nextStatusText;
     private EditText roomEdit, nextHearingEdit;
-    private EditText subTypeEdit, notesEdit, stationEdit, firNoEdit, firDateEdit;
+    private String subTypeVal = "";
+    private TextView subTypeText;
+    private EditText notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
     private final List<EditText[]> actRows = new ArrayList<>();
     private final List<EditText> firSecRows = new ArrayList<>();
@@ -107,6 +109,7 @@ public class NewCaseActivity extends BaseActivity {
     private EditText firYearEdit;
     private final List<Uri> pickedUris = new ArrayList<>();
     private final List<String> pickedNames = new ArrayList<>();
+    private final List<List<Uri>> pickedMore = new ArrayList<>();   // further files of the same group
     private final List<String[]> pickedMeta = new ArrayList<>();   // per file: category, matter, stage, size, date
     private int replaceIdx = -1;          // >= 0 while a file is being replaced
     private Uri cameraUri;
@@ -609,6 +612,7 @@ public class NewCaseActivity extends BaseActivity {
             DocFileCard.finishSave(this, res, data);
             return;
         }
+        if (FileSetDialog.handle(this, req, res, data)) return;
         if (flow.handle(req, res)) return;
         if (req == REQ_ADV_CONTACT && res == RESULT_OK && data != null && advTarget != null) {
             setAdvocate(advTarget, data.getStringExtra("name"), data.getStringExtra("number"), advTarget.card);
@@ -705,6 +709,12 @@ public class NewCaseActivity extends BaseActivity {
                     caseType = s;
                     setChosen(caseTypeText, s, "Select Particular");
                     refresh();
+                }));
+        f.addView(lbl("Sub-case type"));
+        subTypeText = dropdown(f, "Select Sub-case type", v ->
+                choose("Sub-case type", Arrays.asList(SubCaseTypes.ALL), s -> {
+                    subTypeVal = s;
+                    setChosen(subTypeText, s, "Select Sub-case type");
                 }));
         caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
         ((RoundEdit) caseNoEdit).setRequired(true);
@@ -811,10 +821,16 @@ public class NewCaseActivity extends BaseActivity {
         // case identifiers
         LinearLayout f1 = subForm();
         filingEdit = LegalUi.text(this, f1, "Filing number", "");
+        filingYearEdit = LegalUi.input(this, f1, "Filing year", "", InputType.TYPE_CLASS_NUMBER);
+        FieldStyle.hint(filingYearEdit, "e.g. 2024");
+        filingYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
         diaryEdit = LegalUi.text(this, f1, "Diary number", "");
+        diaryYearEdit = LegalUi.input(this, f1, "Diary year", "", InputType.TYPE_CLASS_NUMBER);
+        FieldStyle.hint(diaryYearEdit, "e.g. 2024");
+        diaryYearEdit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(4)});
         cnrId = LegalUi.input(this, f1, "CNR number", "", CAPS);
         extra.addView(section(R.drawable.ic_tag, "Case identifiers",
-                "Filing number, diary number and CNR", f1));
+                "Filing / diary number and year, CNR", f1));
 
         // parties
         LinearLayout f2 = subForm();
@@ -849,7 +865,6 @@ public class NewCaseActivity extends BaseActivity {
 
         LinearLayout f4 = subForm();
         priority = LegalUi.spinner(this, f4, "Priority", PRIORITIES, PRIORITIES[0]);
-        subTypeEdit = LegalUi.text(this, f4, "Case sub type", "");
         notesEdit = LegalUi.multiline(this, f4, "Notes", "");
         notesEdit.setMinLines(3);
         extra.addView(section(R.drawable.ic_edit, "Notes & other details",
@@ -1149,6 +1164,17 @@ public class NewCaseActivity extends BaseActivity {
                         drop.addView(pages, plp);
                     }
                 }
+                // more files / photos into the SAME group, before saving
+                View more = dlgBtn(R.drawable.ic_add_circle, AppTheme.accent(this), "Add more files / photos", () ->
+                        PickerDialogs.actions(this, "Add to this document", SRC_LABELS, SRC_ICONS, i -> {
+                            dlgReplaceIdx = -1;
+                            if (i == 0) pickFile();
+                            else takePhoto();
+                        }));
+                LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                mlp.topMargin = dp(14);
+                drop.addView(more, mlp);
             }
             // empty box: tap to choose. With files: only the View / Replace / Delete buttons act.
             if (!has) drop.setOnClickListener(v -> PickerDialogs.actions(this, "Upload file",
@@ -1174,25 +1200,29 @@ public class NewCaseActivity extends BaseActivity {
             String base = LegalUi.str(name);
             String matterName = matterSel[0].equals(general) ? "General Document Vault" : matterSel[0];
             LegalStore ls = new LegalStore(this);
-            for (int i = 0; i < dlgUris.size(); i++) {
-                Uri u = dlgUris.get(i);
-                String label = dlgUris.size() == 1 ? base : base + " (" + (i + 1) + ")";
-                String shown = label + extOf(displayName(u));
-                pickedUris.add(u);
-                pickedNames.add(shown);
-                String today = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
-                pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], sizeText(fileSize(u)), today, displayName(u)});
-                LegalStore.Doc d = new LegalStore.Doc();
-                d.name = shown;
-                d.caseName = matterName;
-                d.category = catSel[0];
-                d.stage = stageSel[0];
-                d.uri = u.toString();
-                d.fileName = displayName(u);
-                d.size = sizeText(fileSize(u));
-                d.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
-                ls.saveDoc(d);
-            }
+            // all files chosen in this dialog belong to ONE group: one card, one Vault entry
+            List<Uri> group = new ArrayList<>(dlgUris);
+            Uri first = group.get(0);
+            List<Uri> rest = new ArrayList<>(group.subList(1, group.size()));
+            String shown = base + extOf(displayName(first));
+            String today = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
+            String total = FileSetDialog.totalSize(this, group);
+            String fname = FileSetDialog.label(this, group);
+            pickedUris.add(first);
+            pickedMore.add(rest);
+            pickedNames.add(shown);
+            pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], total, today, fname});
+            LegalStore.Doc d = new LegalStore.Doc();
+            d.name = shown;
+            d.caseName = matterName;
+            d.category = catSel[0];
+            d.stage = stageSel[0];
+            d.uri = first.toString();
+            for (Uri r : rest) d.more.add(r.toString());
+            d.fileName = fname;
+            d.size = total;
+            d.date = today;
+            ls.saveDoc(d);
             if (matterSel[0].equals(general)) { vaultSaved = true; missing(); relaxRequiredLabels(findViewById(android.R.id.content)); }
             dlgUris.clear();
             renderFiles();
@@ -1332,6 +1362,7 @@ public class NewCaseActivity extends BaseActivity {
         }
         if (pickedUris.contains(uri)) return;
         pickedUris.add(uri);
+        pickedMore.add(new ArrayList<>());
         pickedNames.add(displayName(uri));
         pickedMeta.add(new String[]{"", "", "", sizeText(fileSize(uri)),
                 new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date()), displayName(uri)});
@@ -1363,6 +1394,44 @@ public class NewCaseActivity extends BaseActivity {
         Collections.swap(pickedUris, a, b);
         Collections.swap(pickedNames, a, b);
         Collections.swap(pickedMeta, a, b);
+        Collections.swap(pickedMore, a, b);
+    }
+
+    private List<Uri> groupOf(int idx) {
+        List<Uri> g = new ArrayList<>();
+        g.add(pickedUris.get(idx));
+        g.addAll(pickedMore.get(idx));
+        return g;
+    }
+
+    /** View / replace / delete / reorder / add more files of one document group. */
+    private void manageFiles(int idx) {
+        FileSetDialog.show(this, flow, "Files in this document", groupOf(idx), files -> applyGroup(idx, files));
+    }
+
+    private void applyGroup(int idx, List<Uri> files) {
+        String oldPrimary = pickedUris.get(idx).toString();
+        Uri first = files.get(0);
+        pickedUris.set(idx, first);
+        pickedMore.set(idx, new ArrayList<>(files.subList(1, files.size())));
+        pickedNames.set(idx, DocFileCard.stem(pickedNames.get(idx)) + extOf(displayName(first)));
+        String[] m = pickedMeta.get(idx);
+        m[3] = FileSetDialog.totalSize(this, files);
+        m[5] = FileSetDialog.label(this, files);
+        LegalStore ls = new LegalStore(this);
+        for (LegalStore.Doc d : ls.docs()) {
+            if (oldPrimary.equals(d.uri)) {
+                d.uri = first.toString();
+                d.more.clear();
+                for (int k = 1; k < files.size(); k++) d.more.add(files.get(k).toString());
+                d.name = pickedNames.get(idx);
+                d.size = m[3];
+                d.fileName = m[5];
+                ls.saveDoc(d);
+                break;
+            }
+        }
+        renderFiles();
     }
 
     /** Edit button on an uploaded file card: caption, category, matter, stage (also updates the Vault copy). */
@@ -1390,6 +1459,13 @@ public class NewCaseActivity extends BaseActivity {
             clp.topMargin = dp(12);
             f.addView(chip, clp);
         }
+        LinearLayout mchip = LegalUi.chipButton(this, "Manage files (add / replace / delete / reorder)",
+                IconPalette.pick(this, 0xFF1565C0, 0xFF64B5F6), R.drawable.ic_image);
+        mchip.setOnClickListener(v -> manageFiles(idx));
+        LinearLayout.LayoutParams mlp2 = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        mlp2.topMargin = dp(12);
+        f.addView(mchip, mlp2);
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             String neu = LegalUi.str(name) + ext;
@@ -1439,9 +1515,13 @@ public class NewCaseActivity extends BaseActivity {
             info.fileName = m.length > 5 ? m[5] : "";
             info.uri = pickedUris.get(i);
             DocFileCard.Actions act = new DocFileCard.Actions();
-            act.open = () -> openFile(idx);
-            act.save = () -> DocFileCard.startSave(this, REQ_SAVE, pickedUris.get(idx), pickedNames.get(idx));
-            act.share = () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
+            final boolean grp = !pickedMore.get(i).isEmpty();
+            info.count = 1 + pickedMore.get(i).size();
+            act.open = grp ? () -> manageFiles(idx) : () -> openFile(idx);
+            act.save = grp ? null : () -> DocFileCard.startSave(this, REQ_SAVE, pickedUris.get(idx), pickedNames.get(idx));
+            act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(idx))
+                    : () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
+            act.files = () -> manageFiles(idx);
             act.edit = () -> editPicked(idx);
             act.replace = () -> PickerDialogs.confirm(this, "Replace file?",
                     "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
@@ -1450,6 +1530,7 @@ public class NewCaseActivity extends BaseActivity {
                     "\"" + pickedNames.get(idx) + "\" will be removed from this case.",
                     "Delete", () -> {
                         pickedUris.remove(idx);
+                        pickedMore.remove(idx);
                         pickedNames.remove(idx);
                         pickedMeta.remove(idx);
                         renderFiles();
@@ -2236,7 +2317,9 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "Case no.", LegalUi.str(caseNoEdit));
         line(sb, "CNR", cnrValue());
         line(sb, "Filing no.", LegalUi.str(filingEdit));
+        line(sb, "Filing year", LegalUi.str(filingYearEdit));
         line(sb, "Diary no.", LegalUi.str(diaryEdit));
+        line(sb, "Diary year", LegalUi.str(diaryYearEdit));
         line(sb, "Petitioner / Plaintiff / First Party", names(petRows));
         line(sb, "Respondent / Defendant / Opposite Party", names(resRows));
         line(sb, "Opposing advocate", names(advRows));
@@ -2302,6 +2385,8 @@ public class NewCaseActivity extends BaseActivity {
         c.cnr = cnrValue();
         c.filingNo = LegalUi.str(filingEdit);
         c.diaryNo = LegalUi.str(diaryEdit);
+        c.filingYear = LegalUi.str(filingYearEdit);
+        c.diaryYear = LegalUi.str(diaryYearEdit);
         c.billTotal = LegalUi.num(feeEdit);
         c.feeNotes = LegalUi.str(feeNotesEdit);
         c.judge = judgeName;
@@ -2312,7 +2397,7 @@ public class NewCaseActivity extends BaseActivity {
         c.clientRole = clientRole;
         saveJudge(judgeName, c.room);
         c.priority = String.valueOf(priority.getSelectedItem());
-        c.subType = LegalUi.str(subTypeEdit);
+        c.subType = subTypeVal;
         c.notes = LegalUi.str(notesEdit);
         c.firStation = LegalUi.str(stationEdit);
         c.firNo = LegalUi.str(firNoEdit);

@@ -24,10 +24,11 @@ final class DocFileCard {
     static final class Info {
         String name = "", fileName = "", category = "", matter = "", stage = "", size = "", date = "";
         Uri uri;
+        int count = 1;          // files in this group
     }
 
     static final class Actions {
-        Runnable open, save, edit, replace, share, delete;
+        Runnable open, save, edit, replace, share, delete, files;
     }
 
     static final int PDF_RED = 0xFFE5484D, WORD_BLUE = 0xFF3B82F6, IMG_GREEN = 0xFF22C55E;
@@ -97,7 +98,7 @@ final class DocFileCard {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         View sp = new View(a);
         head.addView(sp, new LinearLayout.LayoutParams(0, 1, 1f));
-        String meta = kindLabel(k, in.name) + (in.size.isEmpty() ? "" : "  \u2022  " + in.size);
+        String meta = kindLabel(k, in.name) + (in.count > 1 ? "  \u2022  " + in.count + " files" : "") + (in.size.isEmpty() ? "" : "  \u2022  " + in.size);
         TextView metaTv = CaseViews.text(a, meta, 12, AppTheme.sub(a), true);
         head.addView(metaTv);
         final ImageView chev = CaseViews.icon(a, R.drawable.ic_expand_more, AppTheme.text(a), 22);
@@ -164,7 +165,8 @@ final class DocFileCard {
         if (act.open != null) row.addView(labelBtn(a, R.drawable.ic_eye, info, "Open", act.open), wlp(a, 0));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
         if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
-        if (act.replace != null) row.addView(iconBtn(a, R.drawable.ic_replace, gold, "Replace file", act.replace), ilp(a));
+        if (act.files != null) row.addView(iconBtn(a, R.drawable.ic_image, gold, "Manage files (add / replace / delete / reorder)", act.files), ilp(a));
+        else if (act.replace != null) row.addView(iconBtn(a, R.drawable.ic_replace, gold, "Replace file", act.replace), ilp(a));
         if (act.share != null) row.addView(iconBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share file", act.share), ilp(a));
         if (act.delete != null) row.addView(iconBtn(a, R.drawable.ic_delete, RoundEdit.RED, "Delete file", act.delete), ilp(a));
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
@@ -256,6 +258,18 @@ final class DocFileCard {
             a.startActivity(Intent.createChooser(i, "Share file"));
         } catch (Exception e) {
             Toast.makeText(a, "Cannot share this file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    static void shareAll(Activity a, java.util.List<Uri> us) {
+        Intent i = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        i.setType("*/*");
+        i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, new java.util.ArrayList<>(us));
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            a.startActivity(Intent.createChooser(i, "Share files"));
+        } catch (Exception e) {
+            Toast.makeText(a, "Cannot share these files", Toast.LENGTH_SHORT).show();
         }
     }
 

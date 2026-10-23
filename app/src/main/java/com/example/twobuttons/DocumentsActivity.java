@@ -161,9 +161,13 @@ public class DocumentsActivity extends BaseActivity {
         info.date = d.date;
         info.uri = uri;
         DocFileCard.Actions act = new DocFileCard.Actions();
-        act.open = () -> DocFileCard.open(this, uri, d.name);
-        act.save = () -> DocFileCard.startSave(this, REQ_SAVE, uri, d.name);
-        act.share = () -> DocFileCard.share(this, uri, d.name);
+        final boolean grp = !d.more.isEmpty();
+        info.count = 1 + d.more.size();
+        act.open = grp ? () -> manageFiles(d) : () -> DocFileCard.open(this, uri, d.name);
+        act.save = grp ? null : () -> DocFileCard.startSave(this, REQ_SAVE, uri, d.name);
+        act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(d))
+                : () -> DocFileCard.share(this, uri, d.name);
+        act.files = () -> manageFiles(d);
         act.edit = () -> editSaved(d);
         act.replace = () -> LegalUi.confirm(this, "Replace " + d.name + "?",
                 "The stored file will be swapped for the one you pick.", () -> {
@@ -194,9 +198,39 @@ public class DocumentsActivity extends BaseActivity {
         return card;
     }
 
+    private java.util.List<android.net.Uri> groupOf(LegalStore.Doc d) {
+        java.util.List<android.net.Uri> g = new java.util.ArrayList<>();
+        if (!d.uri.isEmpty()) g.add(android.net.Uri.parse(d.uri));
+        for (String m : d.more) g.add(android.net.Uri.parse(m));
+        return g;
+    }
+
+    /** View / replace / delete / reorder / add more files of one saved document. */
+    private void manageFiles(LegalStore.Doc d) {
+        java.util.List<android.net.Uri> g = groupOf(d);
+        if (g.isEmpty()) {
+            android.widget.Toast.makeText(this, "File not stored on this device", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        FileSetDialog.show(this, flow, "Files in this document", g, files -> {
+            android.net.Uri first = files.get(0);
+            d.uri = first.toString();
+            d.more.clear();
+            for (int k = 1; k < files.size(); k++) d.more.add(files.get(k).toString());
+            d.fileName = FileSetDialog.label(this, files);
+            d.size = FileSetDialog.totalSize(this, files);
+            String nm = FileSetDialog.displayName(this, first);
+            int dot = nm.lastIndexOf('.');
+            if (dot > 0) d.name = DocFileCard.stem(d.name) + nm.substring(dot);
+            store.saveDoc(d);
+            renderList();
+        });
+    }
+
     @Override
     protected void onActivityResult(int req, int res, android.content.Intent data) {
         super.onActivityResult(req, res, data);
+        if (FileSetDialog.handle(this, req, res, data)) return;
         if (flow.handle(req, res)) return;
         if (req == REQ_SAVE) {
             DocFileCard.finishSave(this, res, data);
@@ -257,6 +291,13 @@ public class DocumentsActivity extends BaseActivity {
             f.addView(chip, clp);
         }
 
+        LinearLayout mchip = LegalUi.chipButton(this, "Manage files (add / replace / delete / reorder)",
+                IconPalette.pick(this, 0xFF1565C0, 0xFF64B5F6), R.drawable.ic_image);
+        mchip.setOnClickListener(v -> manageFiles(d));
+        LinearLayout.LayoutParams mlp2 = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        mlp2.topMargin = LegalUi.dp(this, 12);
+        f.addView(mchip, mlp2);
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             d.name = LegalUi.str(name) + ext;

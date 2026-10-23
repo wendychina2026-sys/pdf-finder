@@ -30,7 +30,7 @@ final class DiaryStore {
         String prev = "", next = "";           // dd/MM/yyyy
         // fields from the New Case page
         String caseTitle = "", regDate = "", courtKind = "", clientId = "", cnr = "";
-        String filingNo = "", diaryNo = "", feeNotes = "", priority = "", notes = "";
+        String filingNo = "", diaryNo = "", filingYear = "", diaryYear = "", feeNotes = "", priority = "", notes = "";
         String firStation = "", firNo = "", firYear = "", firSections = "", firDate = "", acts = "";
         String nextStatus = "", clientRole = "";   // status expected at next hearing; my client: Appellant / Respondent
         String appearingFor = "", opposingAdvocate = "";   // side we appear for, and the other side's advocate
@@ -110,7 +110,7 @@ final class DiaryStore {
                 c.courtKind = o.optString("courtKind"); c.clientId = o.optString("clientId");
                 c.appearingFor = o.optString("appearingFor"); c.opposingAdvocate = o.optString("opposingAdvocate");
                 c.cnr = o.optString("cnr"); c.filingNo = o.optString("filingNo");
-                c.diaryNo = o.optString("diaryNo"); c.feeNotes = o.optString("feeNotes");
+                c.diaryNo = o.optString("diaryNo"); c.filingYear = o.optString("filingYear"); c.diaryYear = o.optString("diaryYear"); c.feeNotes = o.optString("feeNotes");
                 c.priority = o.optString("priority"); c.notes = o.optString("notes");
                 c.firStation = o.optString("firStation"); c.firNo = o.optString("firNo");
                 c.firDate = o.optString("firDate"); c.acts = o.optString("acts");
@@ -166,7 +166,7 @@ final class DiaryStore {
                 o.put("courtKind", c.courtKind); o.put("clientId", c.clientId);
                 o.put("appearingFor", c.appearingFor); o.put("opposingAdvocate", c.opposingAdvocate);
                 o.put("cnr", c.cnr); o.put("filingNo", c.filingNo);
-                o.put("diaryNo", c.diaryNo); o.put("feeNotes", c.feeNotes);
+                o.put("diaryNo", c.diaryNo); o.put("filingYear", c.filingYear); o.put("diaryYear", c.diaryYear); o.put("feeNotes", c.feeNotes);
                 o.put("priority", c.priority); o.put("notes", c.notes);
                 o.put("firStation", c.firStation); o.put("firNo", c.firNo);
                 o.put("firDate", c.firDate); o.put("acts", c.acts);

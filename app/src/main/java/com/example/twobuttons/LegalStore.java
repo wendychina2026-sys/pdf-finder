@@ -35,6 +35,7 @@ final class LegalStore {
     static final class Doc {
         String id = UUID.randomUUID().toString();
         String name = "", caseName = "", size = "", date = "", category = "Other", stage = "", uri = "", fileName = "";
+        List<String> more = new ArrayList<>();   // further files of the same group (after uri)
     }
 
     static final class Reminder {
@@ -216,6 +217,8 @@ final class LegalStore {
                 d.stage = o.optString("stage");
                 d.uri = o.optString("uri");
                 d.fileName = o.optString("fileName");
+                JSONArray mo = o.optJSONArray("more");
+                if (mo != null) for (int k = 0; k < mo.length(); k++) d.more.add(mo.optString(k));
                 out.add(d);
             }
         } catch (JSONException ignored) {
@@ -256,6 +259,9 @@ final class LegalStore {
                 o.put("stage", d.stage);
                 o.put("uri", d.uri);
                 o.put("fileName", d.fileName);
+                JSONArray mo = new JSONArray();
+                for (String m : d.more) mo.put(m);
+                o.put("more", mo);
                 a.put(o);
             }
         } catch (JSONException e) {
