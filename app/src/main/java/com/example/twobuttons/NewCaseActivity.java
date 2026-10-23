@@ -91,7 +91,7 @@ public class NewCaseActivity extends BaseActivity {
     private LinearLayout cnrCard, clientBox, actsBox, segAuto, segManual;
     private View progFill, progRest;
     private EditText cnrLookup, titleEdit, caseNoEdit, regEdit;
-    private EditText filingYearEdit, diaryYearEdit, cnrId, filingEdit, diaryEdit, feeEdit, feeNotesEdit;
+    private EditText filingYearEdit, cnrId, filingEdit, feeEdit, feeNotesEdit;
     private final List<EditText> petRows = new ArrayList<>();   // several petitioners
     private final List<EditText> resRows = new ArrayList<>();   // several respondents
     private final List<EditText> advRows = new ArrayList<>();   // several opposing advocates
@@ -100,6 +100,9 @@ public class NewCaseActivity extends BaseActivity {
     private TextView judgeText, curStatusText, nextStatusText;
     private EditText roomEdit, nextHearingEdit;
     private String subTypeVal = "";
+    private EditText caseYearEdit;
+    private LinearLayout extraBox, idForm, idSection;
+    private View extraHead;
     private TextView subTypeText;
     private EditText notesEdit, stationEdit, firNoEdit, firDateEdit;
     private Spinner priority;
@@ -710,15 +713,6 @@ public class NewCaseActivity extends BaseActivity {
                     setChosen(caseTypeText, s, "Select Particular");
                     refresh();
                 }));
-        f.addView(lbl("Sub-case type"));
-        subTypeText = dropdown(f, "Select Sub-case type", v ->
-                choose("Sub-case type", Arrays.asList(SubCaseTypes.ALL), s -> {
-                    subTypeVal = s;
-                    setChosen(subTypeText, s, "Select Sub-case type");
-                }));
-        caseNoEdit = LegalUi.input(this, f, "Case No.*", "", TEXT);
-        ((RoundEdit) caseNoEdit).setRequired(true);
-        FieldStyle.hint(caseNoEdit, "Case No.");
         nextHearingEdit = LegalUi.dmyInput(this, f, "Next hearing date", "");
         FieldStyle.hint(nextHearingEdit, "Select Date");
         nextHearingEdit.setOnClickListener(v ->
@@ -729,7 +723,6 @@ public class NewCaseActivity extends BaseActivity {
 
         titleEdit.addTextChangedListener(watcher);
         regEdit.addTextChangedListener(watcher);
-        caseNoEdit.addTextChangedListener(watcher);
         return c;
     }
 
@@ -812,6 +805,9 @@ public class NewCaseActivity extends BaseActivity {
         extra.setOrientation(LinearLayout.VERTICAL);
         extra.setVisibility(View.GONE);
         c.addView(extra);
+        extraBox = extra;
+        extraHead = head;
+        idForm = f1;
         head.setOnClickListener(v -> {
             boolean open = extra.getVisibility() != View.VISIBLE;
             extra.setVisibility(open ? View.VISIBLE : View.GONE);
@@ -820,15 +816,25 @@ public class NewCaseActivity extends BaseActivity {
 
         // case identifiers
         LinearLayout f1 = subForm();
-        EditText[] fl = numberYear(f1, "Filing number", "Filing year");
+        EditText[] fl = numberYear(f1, "Filing\\Diary number", "Year");
         filingEdit = fl[0];
         filingYearEdit = fl[1];
-        EditText[] dy = numberYear(f1, "Diary number", "Diary year");
-        diaryEdit = dy[0];
-        diaryYearEdit = dy[1];
         cnrId = LegalUi.input(this, f1, "CNR number", "", CAPS);
-        extra.addView(section(R.drawable.ic_tag, "Case identifiers",
-                "Filing / diary number and year, CNR", f1));
+        f1.addView(lbl("Sub-case type"));
+        subTypeText = dropdown(f1, "Select Sub-case type", v ->
+                choose("Sub-case type", Arrays.asList(SubCaseTypes.ALL), s -> {
+                    subTypeVal = s;
+                    setChosen(subTypeText, s, "Select Sub-case type");
+                }));
+        EditText[] cn = numberYear(f1, "Case No.*", "Case year");
+        caseNoEdit = cn[0];
+        caseYearEdit = cn[1];
+        ((RoundEdit) caseNoEdit).setRequired(true);
+        FieldStyle.hint(caseNoEdit, "Case No.");
+        caseNoEdit.addTextChangedListener(watcher);
+        idSection = section(R.drawable.ic_tag, "Case identifiers",
+                "Filing\\Diary no. and year, CNR, sub-case type, case no. and year", f1);
+        extra.addView(idSection);
 
         // parties
         LinearLayout f2 = subForm();
@@ -2294,6 +2300,12 @@ public class NewCaseActivity extends BaseActivity {
         }
     }
 
+    /** Case No. lives inside the collapsed identifiers section: expand both levels so the red mark shows. */
+    private void openIdentifiers() {
+        if (extraBox != null && extraBox.getVisibility() != View.VISIBLE) extraHead.performClick();
+        if (idForm != null && idForm.getVisibility() != View.VISIBLE) idSection.getChildAt(1).performClick();
+    }
+
     private List<String> missing() {
         List<String> m = new ArrayList<>();
         if (vaultSaved) {                       // vault-only: clear every red "required" mark, require nothing
@@ -2334,10 +2346,9 @@ public class NewCaseActivity extends BaseActivity {
         line(sb, "Case type", caseType);
         line(sb, "Case no.", LegalUi.str(caseNoEdit));
         line(sb, "CNR", cnrValue());
-        line(sb, "Filing no.", LegalUi.str(filingEdit));
-        line(sb, "Filing year", LegalUi.str(filingYearEdit));
-        line(sb, "Diary no.", LegalUi.str(diaryEdit));
-        line(sb, "Diary year", LegalUi.str(diaryYearEdit));
+        line(sb, "Filing\\Diary no.", LegalUi.str(filingEdit));
+        line(sb, "Filing\\Diary year", LegalUi.str(filingYearEdit));
+        line(sb, "Case year", LegalUi.str(caseYearEdit));
         line(sb, "Petitioner / Plaintiff / First Party", names(petRows));
         line(sb, "Respondent / Defendant / Opposite Party", names(resRows));
         line(sb, "Opposing advocate", names(advRows));
@@ -2372,6 +2383,7 @@ public class NewCaseActivity extends BaseActivity {
     private void create() {
         List<String> m = missing();
         if (!m.isEmpty()) {
+            if (m.contains("Case No.")) openIdentifiers();
             Toast.makeText(this, "Required: " + android.text.TextUtils.join(", ", m),
                     Toast.LENGTH_LONG).show();
             return;
@@ -2402,9 +2414,10 @@ public class NewCaseActivity extends BaseActivity {
 
         c.cnr = cnrValue();
         c.filingNo = LegalUi.str(filingEdit);
-        c.diaryNo = LegalUi.str(diaryEdit);
+        c.diaryNo = c.filingNo;                 // one shared Filing\\Diary number and year
         c.filingYear = LegalUi.str(filingYearEdit);
-        c.diaryYear = LegalUi.str(diaryYearEdit);
+        c.diaryYear = c.filingYear;
+        c.caseYear = LegalUi.str(caseYearEdit);
         c.billTotal = LegalUi.num(feeEdit);
         c.feeNotes = LegalUi.str(feeNotesEdit);
         c.judge = judgeName;
