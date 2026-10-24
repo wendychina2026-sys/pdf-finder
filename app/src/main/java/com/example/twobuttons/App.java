@@ -12,6 +12,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        DataFolder.install(this);
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
             SharedPreferences sp = getSharedPreferences("app_runtime", MODE_PRIVATE);

@@ -29,7 +29,7 @@ final class PdfTools {
     private PdfTools() {}
 
     static File newFile(Context c, String prefix, String ext) {
-        File dir = c.getExternalFilesDir("case_photos");
+        File dir = DataFolder.dir("Photos", c.getExternalFilesDir("case_photos"));
         if (dir == null) dir = c.getCacheDir();
         dir.mkdirs();
         return new File(dir, prefix + new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(new Date()) + ext);
