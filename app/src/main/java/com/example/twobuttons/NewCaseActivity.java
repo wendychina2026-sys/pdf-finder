@@ -85,6 +85,8 @@ public class NewCaseActivity extends BaseActivity {
     private String courtName = "";
     private String caseType = "";
     private String clientId = "";
+    private String referredBy = "";
+    private TextView referredTv;
     private boolean autoMode = false;   // opens on "Enter manually"
 
     private TextView kindText, courtNameText, caseTypeText, cnrTitle, progressText, remainText;
@@ -447,7 +449,36 @@ public class NewCaseActivity extends BaseActivity {
         clientBox = new LinearLayout(this);
         clientBox.setOrientation(LinearLayout.VERTICAL);
         c.addView(clientBox, lpTop(12));
+        LegalUi.label(this, c, "Referred by");
+        referredTv = FieldStyle.dropdown(this, c, "Select or add reference person", v -> pickReferrer(),
+                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+        FieldStyle.setDropdownValue(referredTv, referredBy, "Select or add reference person");
         return c;
+    }
+
+    /** Referred by: saved client names, or a reference person added from the phone's contacts. */
+    private void pickReferrer() {
+        final List<String> names = new ArrayList<>();
+        for (LegalStore.Client cl : legal.clients()) if (!cl.name.isEmpty() && !names.contains(cl.name)) names.add(cl.name);
+        final List<String> items = new ArrayList<>();
+        items.add("+ Add reference person from contacts");
+        if (!referredBy.isEmpty()) items.add("Clear");
+        items.addAll(names);
+        PickerDialogs.optionSheet(this, "Referred by", "Saved clients", items, items.indexOf(referredBy), i -> {
+            String s = items.get(i);
+            if (i == 0) {
+                if (checkSelfPermission(android.Manifest.permission.READ_CONTACTS)
+                        == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    startActivityForResult(new Intent(this, ChooseContactActivity.class), REQ_REF_CONTACT);
+                } else {
+                    requestPermissions(new String[]{android.Manifest.permission.READ_CONTACTS}, REQ_REF_PERM);
+                }
+                return;
+            }
+            referredBy = s.equals("Clear") ? "" : s;
+            FieldStyle.setDropdownValue(referredTv, referredBy, "Select or add reference person");
+        });
     }
 
     private void renderClient() {
@@ -617,6 +648,13 @@ public class NewCaseActivity extends BaseActivity {
         }
         if (FileSetDialog.handle(this, req, res, data)) return;
         if (flow.handle(req, res)) return;
+        if (req == REQ_REF_CONTACT) {
+            if (res == RESULT_OK && data != null && data.getStringExtra("name") != null) {
+                referredBy = data.getStringExtra("name");
+                FieldStyle.setDropdownValue(referredTv, referredBy, "Select or add reference person");
+            }
+            return;
+        }
         if (req == REQ_ADV_CONTACT && res == RESULT_OK && data != null && advTarget != null) {
             setAdvocate(advTarget, data.getStringExtra("name"), data.getStringExtra("number"), advTarget.card);
             return;
@@ -1749,7 +1787,7 @@ public class NewCaseActivity extends BaseActivity {
 
     // ---------- opposing advocate: own card with name, saved list / contacts, visiting card photo ----------
 
-    private static final int REQ_ADV_CONTACT = 55, REQ_ADV_PERM = 56, REQ_ADV_IMG = 57;
+    private static final int REQ_ADV_CONTACT = 55, REQ_ADV_PERM = 56, REQ_ADV_IMG = 57, REQ_REF_CONTACT = 58, REQ_REF_PERM = 59;
 
     private static final class Adv {
         EditText name;
@@ -1978,6 +2016,14 @@ public class NewCaseActivity extends BaseActivity {
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
+        if (code == REQ_REF_PERM) {
+            if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                startActivityForResult(new Intent(this, ChooseContactActivity.class), REQ_REF_CONTACT);
+            } else {
+                Toast.makeText(this, "Allow contacts permission to pick from phone contacts", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (code != REQ_ADV_PERM) return;
         if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             startActivityForResult(new Intent(this, ChooseContactActivity.class), REQ_ADV_CONTACT);
@@ -2386,6 +2432,7 @@ public class NewCaseActivity extends BaseActivity {
         StringBuilder sb = new StringBuilder();
         line(sb, "Court", courtKind);
         line(sb, "Client", cl == null ? "" : cl.name);
+        line(sb, "Referred by", referredBy);
         line(sb, "Case title", LegalUi.str(titleEdit));
         line(sb, "Registration date", LegalUi.str(regEdit));
         line(sb, "Court name / type", courtName);
@@ -2449,6 +2496,7 @@ public class NewCaseActivity extends BaseActivity {
         c.type = caseType;
         c.number = LegalUi.str(caseNoEdit);
         c.clientId = clientId;
+        c.referredBy = referredBy;
 
         String pet = names(petRows);
         c.first = pet.isEmpty() ? c.caseTitle : pet;

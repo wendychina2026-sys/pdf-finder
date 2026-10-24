@@ -33,7 +33,7 @@ final class DiaryStore {
         String filingNo = "", diaryNo = "", filingYear = "", diaryYear = "", caseYear = "", feeNotes = "", priority = "", notes = "";
         String firStation = "", firNo = "", firYear = "", firSections = "", firDate = "", acts = "";
         String nextStatus = "", clientRole = "";   // status expected at next hearing; my client: Appellant / Respondent
-        String appearingFor = "", opposingAdvocate = "";   // side we appear for, and the other side's advocate
+        String appearingFor = "", opposingAdvocate = "", referredBy = "";   // side we appear for, and the other side's advocate
         long billTotal = 0, billPaid = 0;
         boolean completed = false;
         List<Hearing> hearings = new ArrayList<>();
@@ -108,7 +108,7 @@ final class DiaryStore {
                 c.completed = o.optBoolean("completed");
                 c.caseTitle = o.optString("caseTitle"); c.regDate = o.optString("regDate");
                 c.courtKind = o.optString("courtKind"); c.clientId = o.optString("clientId");
-                c.appearingFor = o.optString("appearingFor"); c.opposingAdvocate = o.optString("opposingAdvocate");
+                c.appearingFor = o.optString("appearingFor"); c.opposingAdvocate = o.optString("opposingAdvocate"); c.referredBy = o.optString("referredBy");
                 c.cnr = o.optString("cnr"); c.filingNo = o.optString("filingNo");
                 c.diaryNo = o.optString("diaryNo"); c.filingYear = o.optString("filingYear"); c.diaryYear = o.optString("diaryYear"); c.caseYear = o.optString("caseYear"); c.feeNotes = o.optString("feeNotes");
                 c.priority = o.optString("priority"); c.notes = o.optString("notes");
@@ -164,7 +164,7 @@ final class DiaryStore {
                 o.put("completed", c.completed);
                 o.put("caseTitle", c.caseTitle); o.put("regDate", c.regDate);
                 o.put("courtKind", c.courtKind); o.put("clientId", c.clientId);
-                o.put("appearingFor", c.appearingFor); o.put("opposingAdvocate", c.opposingAdvocate);
+                o.put("appearingFor", c.appearingFor); o.put("opposingAdvocate", c.opposingAdvocate); o.put("referredBy", c.referredBy);
                 o.put("cnr", c.cnr); o.put("filingNo", c.filingNo);
                 o.put("diaryNo", c.diaryNo); o.put("filingYear", c.filingYear); o.put("diaryYear", c.diaryYear); o.put("caseYear", c.caseYear); o.put("feeNotes", c.feeNotes);
                 o.put("priority", c.priority); o.put("notes", c.notes);

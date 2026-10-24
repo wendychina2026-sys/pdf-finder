@@ -95,6 +95,35 @@ public class MarkActivity extends BaseActivity {
         root.addView(hint, wide);
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // Attach to matter (optional): General Document Vault first, then the saved cases.
+        final java.util.List<String> matters = new java.util.ArrayList<>();
+        matters.add(MatterPicker.VAULT);
+        for (DiaryStore.HCase hc : new DiaryStore(this).cases()) {
+            String t = (!hc.first.isEmpty() && !hc.second.isEmpty())
+                    ? hc.first + " vs. " + hc.second : hc.title();
+            if (!matters.contains(t)) matters.add(t);
+        }
+        final android.content.SharedPreferences mp = getSharedPreferences("pdf_matters", MODE_PRIVATE);
+        String saved = mp.getString(path, "");
+        final String[] matter = {saved.isEmpty() ? MatterPicker.VAULT : saved};
+        if (!matters.contains(matter[0])) matters.add(1, matter[0]);   // older value stays selectable
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.VERTICAL);
+        bottom.setPadding(0, 8, 0, 0);
+        LegalUi.label(this, bottom, "Attach to Matter (Optional)");
+        final TextView[] mtv = new TextView[1];
+        mtv[0] = FieldStyle.dropdown(this, bottom, MatterPicker.VAULT, v ->
+                PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", matters,
+                        matters.indexOf(matter[0]), i -> {
+                            matter[0] = matters.get(i);
+                            mp.edit().putString(path, matter[0]).apply();
+                            FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
+                        }), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
+        root.addView(bottom, wide);
         setContentView(root);
     }
 
@@ -143,7 +172,7 @@ public class MarkActivity extends BaseActivity {
                 CategoryPicker.pick(this, chosen[0], s -> {
                     chosen[0] = s;
                     FieldStyle.setDropdownValue(tv[0], s, "Select category");
-                }, otherMarks(page)), new LinearLayout.LayoutParams(
+                }, new java.util.HashMap<>(marks)), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FieldStyle.setDropdownValue(tv[0], chosen[0], "Select category");
 
@@ -158,18 +187,38 @@ public class MarkActivity extends BaseActivity {
         if (current != null) {
             // Remove mark: unmark the page and reset the box, but keep the dialog open (Cancel closes it).
             Button rm = dlg.getButton(AlertDialog.BUTTON_NEUTRAL);
-            rm.setOnClickListener(v -> {
-                store.remove(path, page);
-                marks.remove(page);
-                pageAdapter.notifyDataSetChanged();
-                chosen[0] = "";
-                FieldStyle.setDropdownValue(tv[0], "", "Select category");
-                rm.setVisibility(View.GONE);
-            });
+            rm.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Remove mark?")
+                    .setMessage("Page " + (page + 1) + " will no longer be marked as \"" + current + "\".")
+                    .setPositiveButton("Remove", (d, w) -> {
+                        store.remove(path, page);
+                        marks.remove(page);
+                        pageAdapter.notifyDataSetChanged();
+                        chosen[0] = "";
+                        FieldStyle.setDropdownValue(tv[0], "", "Select category");
+                        rm.setVisibility(View.GONE);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
         }
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (chosen[0].isEmpty()) {
                 Toast.makeText(this, "Select a category", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (current != null && !current.equals(chosen[0])) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Change mark?")
+                        .setMessage("Page " + (page + 1) + " is marked as \"" + current
+                                + "\". Change it to \"" + chosen[0] + "\"?")
+                        .setPositiveButton("Change", (d, w) -> {
+                            store.set(path, page, chosen[0]);
+                            marks.put(page, chosen[0]);
+                            pageAdapter.notifyDataSetChanged();
+                            dlg.dismiss();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
                 return;
             }
             store.set(path, page, chosen[0]);
@@ -177,13 +226,6 @@ public class MarkActivity extends BaseActivity {
             pageAdapter.notifyDataSetChanged();
             dlg.dismiss();
         });
-    }
-
-    // Pages of this PDF that are already marked (other than the given page), page index -> category path.
-    private Map<Integer, String> otherMarks(int page) {
-        Map<Integer, String> m = new java.util.HashMap<>(marks);
-        m.remove(page);
-        return m;
     }
 
     private Bitmap render(int index) {
