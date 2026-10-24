@@ -143,7 +143,7 @@ public class MarkActivity extends BaseActivity {
                 CategoryPicker.pick(this, chosen[0], s -> {
                     chosen[0] = s;
                     FieldStyle.setDropdownValue(tv[0], s, "Select category");
-                }), new LinearLayout.LayoutParams(
+                }, otherMarks(page)), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FieldStyle.setDropdownValue(tv[0], chosen[0], "Select category");
 
@@ -152,15 +152,21 @@ public class MarkActivity extends BaseActivity {
                 .setView(box)
                 .setPositiveButton("OK", null)
                 .setNegativeButton("Cancel", null);
+        if (current != null) b.setNeutralButton("Remove mark", null);
+        AlertDialog dlg = b.create();
+        dlg.show();
         if (current != null) {
-            b.setNeutralButton("Remove mark", (d, w) -> {
+            // Remove mark: unmark the page and reset the box, but keep the dialog open (Cancel closes it).
+            Button rm = dlg.getButton(AlertDialog.BUTTON_NEUTRAL);
+            rm.setOnClickListener(v -> {
                 store.remove(path, page);
                 marks.remove(page);
                 pageAdapter.notifyDataSetChanged();
+                chosen[0] = "";
+                FieldStyle.setDropdownValue(tv[0], "", "Select category");
+                rm.setVisibility(View.GONE);
             });
         }
-        AlertDialog dlg = b.create();
-        dlg.show();
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (chosen[0].isEmpty()) {
                 Toast.makeText(this, "Select a category", Toast.LENGTH_SHORT).show();
@@ -171,6 +177,13 @@ public class MarkActivity extends BaseActivity {
             pageAdapter.notifyDataSetChanged();
             dlg.dismiss();
         });
+    }
+
+    // Pages of this PDF that are already marked (other than the given page), page index -> category path.
+    private Map<Integer, String> otherMarks(int page) {
+        Map<Integer, String> m = new java.util.HashMap<>(marks);
+        m.remove(page);
+        return m;
     }
 
     private Bitmap render(int index) {

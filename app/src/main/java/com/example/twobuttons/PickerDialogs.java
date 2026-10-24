@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -308,6 +309,11 @@ final class PickerDialogs {
     }
 
     private static LinearLayout optionRow(Activity a, String text, boolean sel) {
+        return optionRow(a, text, sel, null);
+    }
+
+    /** note (may be null/empty): a small second line under the option, e.g. which pages are marked. */
+    private static LinearLayout optionRow(Activity a, String text, boolean sel, String note) {
         LinearLayout r = new LinearLayout(a);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
@@ -315,7 +321,15 @@ final class PickerDialogs {
         r.setPadding(dp(a, 16), dp(a, 4), dp(a, 12), dp(a, 4));
         int fill = sel ? (dark(a) ? 0xFF1B2A4E : 0xFFE8F0FE) : (dark(a) ? 0xFF0D1428 : 0xFFF4F5FA);
         r.setBackground(CaseViews.box(a, fill, 16, sel ? BLUE : hair(a), 1));
-        r.addView(CaseViews.text(a, text, 14, ink(a), sel), weight());
+        if (note == null || note.isEmpty()) {
+            r.addView(CaseViews.text(a, text, 14, ink(a), sel), weight());
+        } else {
+            LinearLayout col = new LinearLayout(a);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.addView(CaseViews.text(a, text, 14, ink(a), sel));
+            col.addView(CaseViews.text(a, note, 11, BLUE, false));
+            r.addView(col, weight());
+        }
         return r;
     }
 
@@ -342,6 +356,12 @@ final class PickerDialogs {
     /** onBack (may be null): cross or system back reopens the level above instead of leaving. */
     static void optionSheet(Activity a, String title, String subtitle, List<String> items, int selected,
                             Consumer<Integer> onPick, Runnable onBack) {
+        optionSheet(a, title, subtitle, items, selected, onPick, onBack, null);
+    }
+
+    /** note (may be null) gives a small extra line per item, e.g. "Marked on pages 1, 3". */
+    static void optionSheet(Activity a, String title, String subtitle, List<String> items, int selected,
+                            Consumer<Integer> onPick, Runnable onBack, Function<String, String> note) {
         final Dialog d = shell(a);
         if (onBack != null) d.setOnCancelListener(x -> onBack.run());
         LinearLayout root = new LinearLayout(a);
@@ -358,7 +378,7 @@ final class PickerDialogs {
         for (int i = 0; i < items.size(); i++) {
             final int idx = i;
             boolean on = i == selected;
-            LinearLayout r = optionRow(a, items.get(i), on);
+            LinearLayout r = optionRow(a, items.get(i), on, note == null ? null : note.apply(items.get(i)));
             r.addView(selMark(a, on));
             r.setOnClickListener(v -> {
                 d.dismiss();
@@ -379,6 +399,13 @@ final class PickerDialogs {
     static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
                             String addLabel, String addFieldLabel, Consumer<String> onAdd,
                             Consumer<String> onPick, Runnable onBack) {
+        searchSheet(a, title, subtitle, source, selected, addLabel, addFieldLabel, onAdd, onPick, onBack, null);
+    }
+
+    /** note (may be null) gives a small extra line per item, e.g. "Marked on pages 1, 3". */
+    static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
+                            String addLabel, String addFieldLabel, Consumer<String> onAdd,
+                            Consumer<String> onPick, Runnable onBack, Function<String, String> note) {
         final Dialog d = shell(a);
         if (onBack != null) d.setOnCancelListener(x -> onBack.run());
         LinearLayout root = new LinearLayout(a);
@@ -434,7 +461,7 @@ final class PickerDialogs {
                 final String it = items.get(i);
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
                 boolean on = it.equals(selected);
-                LinearLayout r = optionRow(a, it, on);
+                LinearLayout r = optionRow(a, it, on, note == null ? null : note.apply(it));
                 r.addView(selMark(a, on));
                 r.setOnClickListener(v -> {
                     d.dismiss();

@@ -6,6 +6,8 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 
 /**
@@ -41,6 +43,15 @@ final class CategoryPicker {
      * Every sub-level shows the path so far as its subtitle.
      */
     static void pick(Activity a, String current, Consumer<String> onDone) {
+        pick(a, current, onDone, null);
+    }
+
+    /**
+     * Same picker; marked (page index 0-based -> saved category path, may be null) adds a small
+     * "Marked on pages ..." line under every category/option that already has marked pages.
+     * Used by the Category marker only.
+     */
+    static void pick(Activity a, String current, Consumer<String> onDone, Map<Integer, String> marked) {
         final List<String> top = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
         final List<String> mine = custom(a);
         for (String c : mine) if (!top.contains(c)) top.add(Math.max(0, top.size() - 1), c);   // before "Other"
@@ -49,7 +60,8 @@ final class CategoryPicker {
         Runnable[] again = new Runnable[1];
         again[0] = () -> PickerDialogs.searchSheet(a, "Document Category", null, top, top0,
                 "Add New Category", "Category Name", s -> saveCustom(a, s),
-                s -> drill(a, s, onDone, again[0]), null);
+                s -> drill(a, s, onDone, again[0], marked), null,
+                marked == null ? null : item -> pagesNote(marked, item));
         again[0].run();
     }
 
@@ -75,7 +87,28 @@ final class CategoryPicker {
         a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).edit().putString(KEY, j.toString()).apply();
     }
 
-    private static void drill(Activity a, String path, Consumer<String> onDone, Runnable up) {
+    /** "Marked on pages 1, 3-5" for pages whose saved path is prefix or starts with prefix + SEP. */
+    private static String pagesNote(Map<Integer, String> marked, String prefix) {
+        TreeSet<Integer> pages = new TreeSet<>();
+        for (Map.Entry<Integer, String> e : marked.entrySet()) {
+            String v = e.getValue();
+            if (v != null && (v.equals(prefix) || v.startsWith(prefix + SEP))) pages.add(e.getKey() + 1);
+        }
+        if (pages.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        Integer start = null, prev = null;
+        for (int p : pages) {
+            if (start == null) { start = p; prev = p; continue; }
+            if (p == prev + 1) { prev = p; continue; }
+            sb.append(sb.length() > 0 ? ", " : "").append(start.equals(prev) ? "" + start : start + "-" + prev);
+            start = p; prev = p;
+        }
+        sb.append(sb.length() > 0 ? ", " : "").append(start.equals(prev) ? "" + start : start + "-" + prev);
+        return (pages.size() == 1 ? "Marked on page " : "Marked on pages ") + sb;
+    }
+
+    private static void drill(Activity a, String path, Consumer<String> onDone, Runnable up,
+                              Map<Integer, String> marked) {
         String[] subs = LegalStore.docSubOptions(path);
         if (subs.length == 0) {
             onDone.accept(path);
@@ -84,7 +117,8 @@ final class CategoryPicker {
         List<String> items = Arrays.asList(subs);
         Runnable[] self = new Runnable[1];
         self[0] = () -> PickerDialogs.optionSheet(a, "Choose one", path, items, -1,
-                i -> drill(a, path + SEP + items.get(i), onDone, self[0]), up);
+                i -> drill(a, path + SEP + items.get(i), onDone, self[0], marked), up,
+                marked == null ? null : item -> pagesNote(marked, path + SEP + item));
         self[0].run();
     }
 }
