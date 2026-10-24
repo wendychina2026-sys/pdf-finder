@@ -50,7 +50,7 @@ public class ShareReceiverActivity extends Activity {
             return;
         }
 
-        File dir = DataFolder.dir("Documents", new File(getExternalFilesDir(null), "shared"));
+        File dir = new File(getExternalFilesDir(null), "shared");
         if (!dir.exists()) dir.mkdirs();
 
         File first = null;

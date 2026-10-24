@@ -1931,7 +1931,7 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Copy the picture into the app's own folder so it stays after the camera / gallery file goes. */
     private void storeCard(Adv a, java.io.InputStream in) throws java.io.IOException {
-        File dir = DataFolder.dir("Cards", new File(getFilesDir(), "adv_cards"));
+        File dir = new File(getFilesDir(), "adv_cards");
         dir.mkdirs();
         File out = new File(dir, "card_" + System.currentTimeMillis() + ".jpg");
         try (java.io.InputStream src = in; java.io.OutputStream dst = new java.io.FileOutputStream(out)) {
