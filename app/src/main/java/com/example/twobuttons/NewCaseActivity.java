@@ -134,10 +134,16 @@ public class NewCaseActivity extends BaseActivity {
         @Override public void afterTextChanged(Editable s) { refresh(); }
     };
 
+    /** Intent extra: path of a PDF from the Category marker; opens the upload popup with it loaded. */
+    static final String EXTRA_UPLOAD_PDF = "upload_pdf";
+    private String markerPdf = "";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getActionBar() != null) getActionBar().hide();
+        String mp = getIntent().getStringExtra(EXTRA_UPLOAD_PDF);
+        markerPdf = (mp == null || savedInstanceState != null) ? "" : mp;
         store = new DiaryStore(this);
         legal = new LegalStore(this);
         stages = new StageStore(this);
@@ -169,6 +175,7 @@ public class NewCaseActivity extends BaseActivity {
         refresh();
         shrink(root);
         scaled = true;
+        if (!markerPdf.isEmpty()) root.post(this::uploadDialog);
     }
 
     // ---------- small helpers ----------
@@ -1016,6 +1023,12 @@ public class NewCaseActivity extends BaseActivity {
     /** Document name + category + matter (+ stage), then "Tap to choose" (PDF / Word / image, or a photo). */
     private void uploadDialog() {
         dlgUris.clear();
+        // the PDF handed over by the Category marker is used once, for the popup opened on arrival
+        final String markerPath = markerPdf;
+        markerPdf = "";
+        final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
+        final boolean fromMarker = marked != null && marked.isFile();
+        if (fromMarker) dlgUris.add(PhotoFlow.uri(this, marked));
         replaceIdx = -1;
         dlgReplaceIdx = -1;
         final String general = "-- General Document Vault --";
@@ -1039,6 +1052,15 @@ public class NewCaseActivity extends BaseActivity {
         TextView catTv = dropdown(f, "Select category", null);
         setChosen(catTv, catSel[0], "Select category");
         ((View) catTv.getTag()).setOnClickListener(v -> {
+            if (fromMarker) {
+                // same view as the Category marker: pages already marked, plus edit pages / rename / delete
+                final java.util.Map<Integer, String> marks = new MarkStore(this).all(markerPath);
+                CategoryPicker.pick(this, catSel[0], c -> {
+                    catSel[0] = c;
+                    setChosen(catTv, catSel[0], "Select category");
+                }, marks, CategoryPicker.manage(this, markerPath, marks));
+                return;
+            }
             CategoryPicker.pick(this, catSel[0], c -> {
                 catSel[0] = c;
                 setChosen(catTv, catSel[0], "Select category");
@@ -1289,6 +1311,20 @@ public class NewCaseActivity extends BaseActivity {
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
                 () -> saver[0].getAsBoolean(), () -> dlgRefresh = null);
+        if (fromMarker) {       // arriving from the Category marker: cursor straight in Document Name
+            name.requestFocus();
+            if (dlg[0] != null && dlg[0].getWindow() != null) {
+                dlg[0].getWindow().setSoftInputMode(
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                                | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            }
+            name.postDelayed(() -> {
+                name.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(name, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }, 250);
+        }
     }
 
     /**

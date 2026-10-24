@@ -67,4 +67,36 @@ class MarkStore {
         }
         return out;
     }
+
+    /** Rename a category on every PDF: pages marked old (or old › sub) become neu (or neu › sub). */
+    void renameCategory(String old, String neu) {
+        String sep = CategoryPicker.SEP;
+        for (String path : prefs.getAll().keySet()) {
+            Map<Integer, String> m = all(path);
+            boolean changed = false;
+            for (Map.Entry<Integer, String> e : m.entrySet()) {
+                String v = e.getValue();
+                if (v.equals(old)) { e.setValue(neu); changed = true; }
+                else if (v.startsWith(old + sep)) { e.setValue(neu + v.substring(old.length())); changed = true; }
+            }
+            if (changed) save(path, m);
+        }
+    }
+
+    /** Unmark every page of this PDF whose mark is cat or starts with cat › . */
+    void removeCategory(String path, String cat) {
+        Map<Integer, String> m = all(path);
+        boolean changed = m.values().removeIf(v -> v.equals(cat) || v.startsWith(cat + CategoryPicker.SEP));
+        if (changed) save(path, m);
+    }
+
+    private void save(String path, Map<Integer, String> m) {
+        try {
+            JSONObject o = new JSONObject();
+            for (Map.Entry<Integer, String> e : m.entrySet()) o.put(String.valueOf(e.getKey()), e.getValue());
+            prefs.edit().putString(path, o.toString()).apply();
+        } catch (JSONException e) {
+            // ignore
+        }
+    }
 }

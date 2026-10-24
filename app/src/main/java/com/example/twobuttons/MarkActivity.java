@@ -96,9 +96,12 @@ public class MarkActivity extends BaseActivity {
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // Attach to matter (optional): General Document Vault first, then the saved cases.
+        // Attach to matter (optional): General Document Vault first, then "Create new case", then the saved cases.
+        // The list has OK and Cancel; the choice is only applied on OK.
+        final String createNew = "+ Create new case";
         final java.util.List<String> matters = new java.util.ArrayList<>();
         matters.add(MatterPicker.VAULT);
+        matters.add(createNew);
         for (DiaryStore.HCase hc : new DiaryStore(this).cases()) {
             String t = (!hc.first.isEmpty() && !hc.second.isEmpty())
                     ? hc.first + " vs. " + hc.second : hc.title();
@@ -107,7 +110,7 @@ public class MarkActivity extends BaseActivity {
         final android.content.SharedPreferences mp = getSharedPreferences("pdf_matters", MODE_PRIVATE);
         String saved = mp.getString(path, "");
         final String[] matter = {saved.isEmpty() ? MatterPicker.VAULT : saved};
-        if (!matters.contains(matter[0])) matters.add(1, matter[0]);   // older value stays selectable
+        if (!matters.contains(matter[0])) matters.add(2, matter[0]);   // older value stays selectable
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.VERTICAL);
@@ -115,8 +118,15 @@ public class MarkActivity extends BaseActivity {
         LegalUi.label(this, bottom, "Attach to Matter (Optional)");
         final TextView[] mtv = new TextView[1];
         mtv[0] = FieldStyle.dropdown(this, bottom, MatterPicker.VAULT, v ->
-                PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", matters,
+                PickerDialogs.optionSheetOk(this, "Attach to Matter", "Saved cases", matters,
                         matters.indexOf(matter[0]), i -> {
+                            if (matters.get(i).equals(createNew)) {
+                                // straight to New Case > Upload Legal Document, name box focused, this PDF loaded
+                                Intent nc = new Intent(this, NewCaseActivity.class);
+                                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
+                                startActivity(nc);
+                                return;
+                            }
                             matter[0] = matters.get(i);
                             mp.edit().putString(path, matter[0]).apply();
                             FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);

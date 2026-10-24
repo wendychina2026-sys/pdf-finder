@@ -392,6 +392,106 @@ final class PickerDialogs {
         present(d, a, root, true);
     }
 
+
+
+    /**
+     * List of rows {title, note} with an edit icon on each; tapping a row (or its icon) calls onEdit(index).
+     * Returns a Runnable that redraws the list from rows.get() (call it after something changed).
+     */
+    static Runnable editRowsSheet(Activity a, String title, String subtitle, Supplier<List<String[]>> rows,
+                                  String emptyText, Consumer<Integer> onEdit) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
+        root.setBackground(panel(a, 28, 0, true));
+        root.addView(titleRow(a, d, title, subtitle));
+        final MaxScroll sc = new MaxScroll(a, 0.6f);
+        final LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sc.addView(list);
+        root.addView(sc);
+        final Runnable fill = () -> {
+            list.removeAllViews();
+            List<String[]> rs = rows.get();
+            for (int i = 0; i < rs.size(); i++) {
+                final int idx = i;
+                LinearLayout r = optionRow(a, rs.get(i)[0], false, rs.get(i)[1]);
+                ImageView ed = CaseViews.icon(a, R.drawable.ic_edit, BLUE, 36);
+                ed.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                ed.setContentDescription("Change category of " + rs.get(i)[0]);
+                r.addView(ed, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                r.setOnClickListener(v -> onEdit.accept(idx));
+                list.addView(r, topMargin(a, i == 0 ? 16 : 8));
+            }
+            if (rs.isEmpty()) {
+                TextView none = CaseViews.text(a, emptyText, 14, soft(a), false);
+                none.setPadding(dp(a, 6), dp(a, 18), dp(a, 6), dp(a, 6));
+                list.addView(none);
+            }
+        };
+        fill.run();
+        present(d, a, root, true);
+        return fill;
+    }
+
+    /**
+     * Single-choice list with OK and Cancel: tapping a row only highlights it; the choice is applied
+     * (onOk gets the index) when OK is pressed. Cancel or the cross leaves everything unchanged.
+     */
+    static void optionSheetOk(Activity a, String title, String subtitle, List<String> items, int selected,
+                              Consumer<Integer> onOk) {
+        final Dialog d = shell(a);
+        LinearLayout root = new LinearLayout(a);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 20));
+        root.setBackground(panel(a, 28, 0, true));
+        root.addView(titleRow(a, d, title, subtitle));
+        final MaxScroll sc = new MaxScroll(a, 0.55f);
+        final LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sc.addView(list);
+        root.addView(sc);
+        final int[] pick = {selected};
+        final Runnable[] fill = new Runnable[1];
+        fill[0] = () -> {
+            list.removeAllViews();
+            for (int i = 0; i < items.size(); i++) {
+                final int idx = i;
+                boolean on = i == pick[0];
+                LinearLayout r = optionRow(a, items.get(i), on);
+                r.addView(selMark(a, on));
+                r.setOnClickListener(v -> {
+                    pick[0] = idx;
+                    fill[0].run();
+                });
+                list.addView(r, topMargin(a, i == 0 ? 16 : 8));
+            }
+        };
+        fill[0].run();
+
+        root.addView(hairline(a, 14));
+        LinearLayout foot = new LinearLayout(a);
+        foot.setOrientation(LinearLayout.HORIZONTAL);
+        foot.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        foot.setPadding(0, dp(a, 12), 0, 0);
+        TextView cancel = CaseViews.text(a, "Cancel", 15, soft(a), false);
+        cancel.setPadding(dp(a, 16), dp(a, 12), dp(a, 20), dp(a, 12));
+        cancel.setOnClickListener(v -> d.dismiss());
+        foot.addView(cancel);
+        TextView ok = CaseViews.text(a, "OK", 15, ink(a), true);
+        ok.setGravity(Gravity.CENTER);
+        ok.setPadding(dp(a, 28), 0, dp(a, 28), 0);
+        ok.setBackground(CaseViews.box(a, dark(a) ? 0xFF0F1B3D : 0xFFFFFFFF, 14, AppTheme.accent(a), 1));
+        ok.setOnClickListener(v -> {
+            d.dismiss();
+            if (pick[0] >= 0 && pick[0] < items.size()) onOk.accept(pick[0]);
+        });
+        foot.addView(ok, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(a, RoundEdit.HEIGHT_DP)));
+        root.addView(foot);
+        present(d, a, root, true);
+    }
+
     /**
      * Option list with a search bar and, when onAdd is set, an "Add New" card on top. The added name is
      * kept in the list for this sheet; onAdd must persist it. Back / cross goes to onBack when given.
@@ -406,6 +506,24 @@ final class PickerDialogs {
     static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
                             String addLabel, String addFieldLabel, Consumer<String> onAdd,
                             Consumer<String> onPick, Runnable onBack, Function<String, String> note) {
+        searchSheet(a, title, subtitle, source, selected, addLabel, addFieldLabel, onAdd, onPick, onBack, note, null);
+    }
+
+    /** Extra icons on a searchSheet row: edit marked pages, rename, delete (each only where it applies). */
+    interface Manage {
+        boolean hasPages(String item);
+        boolean editable(String item);
+        /** Open the marked-pages editor; call refresh when pages changed so the list notes update. */
+        void editPages(String item, Runnable refresh);
+        void rename(String old, String neu);
+        void delete(String item);
+        String deleteNote(String item);
+    }
+
+    static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
+                            String addLabel, String addFieldLabel, Consumer<String> onAdd,
+                            Consumer<String> onPick, Runnable onBack, Function<String, String> note,
+                            Manage manage) {
         final Dialog d = shell(a);
         if (onBack != null) d.setOnCancelListener(x -> onBack.run());
         LinearLayout root = new LinearLayout(a);
@@ -462,6 +580,45 @@ final class PickerDialogs {
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
                 boolean on = it.equals(selected);
                 LinearLayout r = optionRow(a, it, on, note == null ? null : note.apply(it));
+                if (manage != null) {
+                    if (manage.hasPages(it)) {
+                        ImageView pg = CaseViews.icon(a, R.drawable.ic_edit, BLUE, 36);
+                        pg.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                        pg.setContentDescription("Edit marked pages of " + it);
+                        pg.setOnClickListener(v -> manage.editPages(it, () -> fill[0].run()));
+                        r.addView(pg, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                    }
+                    if (manage.editable(it)) {
+                        ImageView rn = CaseViews.icon(a, R.drawable.ic_edit, ink(a), 36);
+                        rn.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                        rn.setContentDescription("Rename " + it);
+                        rn.setOnClickListener(v -> customName(a, "Rename Category", "Category Name*",
+                                "Enter category name", "Category name is required", it, "Rename", s -> {
+                                    if (s.equals(it)) return;
+                                    if (hasName(items, s, it)) {
+                                        Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+                                    confirm(a, "Rename category?", "\"" + it + "\" will become \"" + s
+                                            + "\". Pages already marked with it are updated too.", "Rename", () -> {
+                                        manage.rename(it, s);
+                                        items.set(items.indexOf(it), s);
+                                        fill[0].run();
+                                    });
+                                }));
+                        r.addView(rn, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                        ImageView dl = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 36);
+                        dl.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
+                        dl.setContentDescription("Delete " + it);
+                        dl.setOnClickListener(v -> confirm(a, "Delete category?", "\"" + it
+                                + "\" will be removed from the list. " + manage.deleteNote(it), "Delete", () -> {
+                            manage.delete(it);
+                            items.remove(it);
+                            fill[0].run();
+                        }));
+                        r.addView(dl, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
+                    }
+                }
                 r.addView(selMark(a, on));
                 r.setOnClickListener(v -> {
                     d.dismiss();
