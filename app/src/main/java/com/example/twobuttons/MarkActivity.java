@@ -15,19 +15,16 @@ import android.util.LruCache;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.Map;
 
 public class MarkActivity extends BaseActivity {
@@ -74,21 +71,8 @@ public class MarkActivity extends BaseActivity {
         name.setTypeface(null, Typeface.BOLD);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        Button categories = new Button(this);
-        categories.setText("Categories");
-        categories.setOnClickListener(v ->
-                startActivity(new Intent(this, CategoryActivity.class)));
         top.addView(name, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        Button details = new Button(this);
-        details.setText("File details");
-        details.setOnClickListener(v -> {
-            Intent di = new Intent(this, CaseDetailsActivity.class);
-            di.putExtra("path", path);
-            startActivity(di);
-        });
-        top.addView(details);
-        top.addView(categories);
 
         TextView hint = new TextView(this);
         hint.setText(onlySub.isEmpty()
@@ -142,33 +126,31 @@ public class MarkActivity extends BaseActivity {
         return visible == null ? pos : visible[pos];
     }
 
-    // New mark, or view/edit existing mark.
+    // New mark, or view/edit existing mark. Uses the same Document Category picker
+    // (search, add new category, drill-down) as the rest of the app.
     private void showMarkDialog(int page) {
-        String current = marks.get(page);
+        final String current = marks.get(page);
+        final String[] chosen = {current == null ? "" : current};
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(48, 24, 48, 0);
         TextView msg = new TextView(this);
         msg.setText("Mark page " + (page + 1) + " as:");
-        Spinner spin = new RoundSpinner(this);
-        spin.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, MarkStore.SUBS));
-        if (current != null) {
-            spin.setSelection(Math.max(Arrays.asList(MarkStore.SUBS).indexOf(current), 0));
-        }
         box.addView(msg);
-        box.addView(spin);
+        final TextView[] tv = new TextView[1];
+        tv[0] = FieldStyle.dropdown(this, box, "Select category", v ->
+                CategoryPicker.pick(this, chosen[0], s -> {
+                    chosen[0] = s;
+                    FieldStyle.setDropdownValue(tv[0], s, "Select category");
+                }), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        FieldStyle.setDropdownValue(tv[0], chosen[0], "Select category");
 
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(current == null ? "Mark page" : "Page mark")
                 .setView(box)
-                .setPositiveButton("OK", (d, w) -> {
-                    String sub = (String) spin.getSelectedItem();
-                    store.set(path, page, sub);
-                    marks.put(page, sub);
-                    pageAdapter.notifyDataSetChanged();
-                })
+                .setPositiveButton("OK", null)
                 .setNegativeButton("Cancel", null);
         if (current != null) {
             b.setNeutralButton("Remove mark", (d, w) -> {
@@ -177,7 +159,18 @@ public class MarkActivity extends BaseActivity {
                 pageAdapter.notifyDataSetChanged();
             });
         }
-        b.show();
+        AlertDialog dlg = b.create();
+        dlg.show();
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (chosen[0].isEmpty()) {
+                Toast.makeText(this, "Select a category", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            store.set(path, page, chosen[0]);
+            marks.put(page, chosen[0]);
+            pageAdapter.notifyDataSetChanged();
+            dlg.dismiss();
+        });
     }
 
     private Bitmap render(int index) {

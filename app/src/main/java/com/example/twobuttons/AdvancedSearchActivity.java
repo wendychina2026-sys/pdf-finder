@@ -273,9 +273,13 @@ public class AdvancedSearchActivity extends BaseActivity {
                         : CaseViews.box(this, AppTheme.card(this), 18, AppTheme.fieldStroke(this), 1));
             }
         };
-        String[] cats = new String[MarkStore.SUBS.length + 1];
-        cats[0] = "";
-        System.arraycopy(MarkStore.SUBS, 0, cats, 1, MarkStore.SUBS.length);
+        java.util.List<String> catList = new java.util.ArrayList<>();
+        catList.add("");
+        java.util.Collections.addAll(catList, MarkStore.SUBS);
+        java.util.TreeSet<String> used = new java.util.TreeSet<>();
+        for (Map<Integer, String> m : marks.everything().values()) used.addAll(m.values());
+        for (String u : used) if (!catList.contains(u)) catList.add(u);
+        String[] cats = catList.toArray(new String[0]);
         for (String c : cats) {
             TextView t = new TextView(this);
             t.setText(c.isEmpty() ? "All" : c);
