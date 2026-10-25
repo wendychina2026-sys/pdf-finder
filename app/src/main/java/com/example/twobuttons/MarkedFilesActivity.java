@@ -42,6 +42,7 @@ public class MarkedFilesActivity extends BaseActivity {
         final Map<Integer, String> marks;
         int total = -1;
         String size = "", date = "";
+        String refName = "", stage = "";    // the name the user gave the document when uploading it
 
         Item(String path, Map<Integer, String> marks) {
             this.path = path;
@@ -159,10 +160,20 @@ public class MarkedFilesActivity extends BaseActivity {
         Collections.sort(paths, (a, b) ->
                 new File(a).getName().compareToIgnoreCase(new File(b).getName()));
         java.text.DateFormat df = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM);
+        // uploaded documents: the stored file's URI -> the document record (it holds the reference name)
+        Map<String, LegalStore.Doc> byUri = new java.util.HashMap<>();
+        for (LegalStore.Doc d : new LegalStore(this).docs()) {
+            if (!d.uri.isEmpty() && !byUri.containsKey(d.uri)) byUri.put(d.uri, d);
+            for (String u : d.more) if (!byUri.containsKey(u)) byUri.put(u, d);
+        }
         for (String p : paths) {
             Item n = new Item(p, everything.get(p));
             File f = new File(p);
             n.total = totalPages(p);
+            try {
+                LegalStore.Doc d = byUri.get(PhotoFlow.uri(this, f).toString());
+                if (d != null) { n.refName = d.name; n.stage = d.stage; }
+            } catch (Exception ignored) { }
             n.size = android.text.format.Formatter.formatShortFileSize(this, f.length());
             n.date = df.format(new java.util.Date(f.lastModified()));
             out.add(n);
@@ -182,6 +193,7 @@ public class MarkedFilesActivity extends BaseActivity {
 
     private boolean matches(Item it, String q) {
         if (new File(it.path).getName().toLowerCase(Locale.ROOT).contains(q)) return true;
+        if (it.refName.toLowerCase(Locale.ROOT).contains(q)) return true;
         if (it.path.toLowerCase(Locale.ROOT).contains(q)) return true;
         for (String sub : it.marks.values()) {
             if (sub.toLowerCase(Locale.ROOT).contains(q)) return true;
@@ -402,7 +414,7 @@ public class MarkedFilesActivity extends BaseActivity {
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(CaseViews.icon(this, DocFileCard.kindIcon(k), DocFileCard.kindColor(this, k), 30));
-        TextView nm = CaseViews.text(this, f.getName(), 15, AppTheme.text(this), true);
+        TextView nm = CaseViews.text(this, it.refName.isEmpty() ? f.getName() : it.refName, 15, AppTheme.text(this), true);
         nm.setPadding(CaseViews.dp(this, 10), 0, 0, 0);
         head.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(head);
@@ -413,6 +425,8 @@ public class MarkedFilesActivity extends BaseActivity {
         card.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
         java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(
                 java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT);
+        if (!it.refName.isEmpty()) infoRow(card, "Document name", it.refName);
+        infoRow(card, "File name", f.getName());
         infoRow(card, "Type", DocFileCard.kindLabel(k, f.getName()));
         infoRow(card, "Size", it.size.isEmpty() ? "-" : it.size);
         infoRow(card, "Last edited", df.format(new java.util.Date(f.lastModified())));
@@ -514,8 +528,12 @@ public class MarkedFilesActivity extends BaseActivity {
 
             File f = new File(it.path);
             DocFileCard.Info info = new DocFileCard.Info();
-            info.name = f.getName();
+            // the title is the name the user gave the document; the real file name stays in the details
+            String ext = DocFileCard.ext(f.getName());
+            info.name = it.refName.isEmpty() ? f.getName()
+                    : (DocFileCard.ext(it.refName).isEmpty() && !ext.isEmpty() ? it.refName + "." + ext : it.refName);
             info.fileName = f.getName();
+            info.stage = it.stage;
             java.util.Set<String> cats = new TreeSet<>(it.marks.values());
             info.category = cats.size() == 1 ? cats.iterator().next() : "Multiple";
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
