@@ -79,6 +79,18 @@ public class SettingsActivity extends BaseActivity {
         bk.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
         root.addView(bk);
 
+        LinearLayout folder = new LinearLayout(this);
+        folder.setOrientation(LinearLayout.VERTICAL);
+        folder.setGravity(Gravity.CENTER_VERTICAL);
+        folder.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        folder.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        folder.addView(CaseViews.text(this, "Open data folder", 16, AppTheme.text(this), true));
+        folder.addView(CaseViews.text(this, "Browse the app's data folder: documents, photos, cards and data files.",
+                14, AppTheme.sub(this), false));
+        folder.setOnClickListener(v -> startActivity(new Intent(this, FileExplorerActivity.class)));
+        root.addView(folder, CaseViews.lp(this, 0, 8));
+
         LinearLayout drive = new LinearLayout(this);
         drive.setOrientation(LinearLayout.VERTICAL);
         drive.setGravity(Gravity.CENTER_VERTICAL);
