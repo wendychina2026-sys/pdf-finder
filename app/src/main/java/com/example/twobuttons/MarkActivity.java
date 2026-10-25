@@ -125,16 +125,22 @@ public class MarkActivity extends BaseActivity {
         mtv[0] = FieldStyle.dropdown(this, bottom, MatterPicker.VAULT, v ->
                 PickerDialogs.optionSheetOk(this, "Attach to Matter", "Saved cases", matters,
                         matters.indexOf(matter[0]), i -> {
-                            if (matters.get(i).equals(createNew)) {
-                                // straight to New Case > Upload Legal Document, name box focused, this PDF loaded
-                                Intent nc = new Intent(this, NewCaseActivity.class);
-                                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
-                                startActivity(nc);
+                            final String pick = matters.get(i);
+                            if (!pick.equals(createNew)) {
+                                matter[0] = pick;
+                                mp.edit().putString(path, pick).apply();
+                                FieldStyle.setDropdownValue(mtv[0], pick, MatterPicker.VAULT);
+                            }
+                            if (getIntent().getBooleanExtra("from_new_case", false)) {
+                                finish();       // the Upload Legal Document popup is still open underneath
                                 return;
                             }
-                            matter[0] = matters.get(i);
-                            mp.edit().putString(path, matter[0]).apply();
-                            FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
+                            // OK on any choice (General Document Vault, a saved case or Create new case) goes straight to
+                            // New Case > Upload Legal Document: this PDF in "Tap to choose", Attach to Matter preselected.
+                            Intent nc = new Intent(this, NewCaseActivity.class);
+                            nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
+                            nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, pick);
+                            startActivity(nc);
                         }), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);

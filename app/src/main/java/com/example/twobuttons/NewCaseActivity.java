@@ -136,7 +136,10 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Intent extra: path of a PDF from the Category marker; opens the upload popup with it loaded. */
     static final String EXTRA_UPLOAD_PDF = "upload_pdf";
+    /** Intent extra: the Attach to Matter choice made in the marker (vault, saved case or Create new case). */
+    static final String EXTRA_UPLOAD_MATTER = "upload_matter";
     private String markerPdf = "";
+    private String markerMatter = "";
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
     /** Uris of documents saved with "Create new case": they join this case when it is created. */
@@ -151,6 +154,8 @@ public class NewCaseActivity extends BaseActivity {
         if (getActionBar() != null) getActionBar().hide();
         String mp = getIntent().getStringExtra(EXTRA_UPLOAD_PDF);
         markerPdf = (mp == null || savedInstanceState != null) ? "" : mp;
+        String mm = getIntent().getStringExtra(EXTRA_UPLOAD_MATTER);
+        markerMatter = (mm == null || savedInstanceState != null) ? "" : mm;
         store = new DiaryStore(this);
         legal = new LegalStore(this);
         stages = new StageStore(this);
@@ -1034,6 +1039,8 @@ public class NewCaseActivity extends BaseActivity {
         // the PDF handed over by the Category marker is used once, for the popup opened on arrival
         final String markerPath = markerPdf;
         markerPdf = "";
+        final String markerMatterPick = markerMatter;
+        markerMatter = "";
         final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
         final boolean fromMarker = marked != null && marked.isFile();
         final java.util.Map<Integer, String> marks = fromMarker
@@ -1048,10 +1055,20 @@ public class NewCaseActivity extends BaseActivity {
         final String general = "-- General Document Vault --";
         final String[] catSel = {fromMarker ? markedCategory(marks) : "Other"};
         final boolean[] autoCat = {fromMarker && !marks.isEmpty()};   // category still follows the marked pages
+        final List<DiaryStore.HCase> cases = store.cases();
         final String[] matterSel = {fromMarker ? CREATE_NEW_CASE : general};
+        if (fromMarker && !markerMatterPick.isEmpty()) {      // the choice made in the marker's Attach to Matter
+            if (markerMatterPick.equals(MatterPicker.VAULT) || markerMatterPick.equals("General Document Vault")) {
+                matterSel[0] = general;
+            } else if (!markerMatterPick.equals("+ Create new case")) {
+                for (DiaryStore.HCase hc : cases) {
+                    String t = (!hc.first.isEmpty() && !hc.second.isEmpty()) ? hc.first + " vs. " + hc.second : hc.title();
+                    if (t.equals(markerMatterPick) || hc.title().equals(markerMatterPick)) matterSel[0] = hc.title();
+                }
+            }
+        }
         final String[] stageSel = {""};
         final boolean[] dupOk = {false};
-        final List<DiaryStore.HCase> cases = store.cases();
 
         LinearLayout f = new LinearLayout(this);
         f.setOrientation(LinearLayout.VERTICAL);
@@ -1472,6 +1489,7 @@ public class NewCaseActivity extends BaseActivity {
         if (markedPath != null && new java.io.File(markedPath).isFile()) {      // a marked PDF: open the Category marker
             Intent mv = new Intent(this, MarkActivity.class);
             mv.putExtra("path", markedPath);
+            mv.putExtra("from_new_case", true);
             startActivity(mv);
             return;
         }
