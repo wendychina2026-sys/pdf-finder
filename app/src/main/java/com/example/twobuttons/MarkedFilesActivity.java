@@ -390,19 +390,114 @@ public class MarkedFilesActivity extends BaseActivity {
         return b;
     }
 
-    /** The complete path of a marked PDF, on request (the card itself stays short). */
-    private void showPath(Item it) {
-        TextView t = new TextView(this);
-        t.setText(it.path);
-        t.setTextSize(14);
-        t.setTextIsSelectable(true);
-        t.setTextColor(AppTheme.text(this));
-        t.setPadding(48, 24, 48, 0);
-        new AlertDialog.Builder(this)
-                .setTitle("File path")
-                .setView(t)
+    /** The (i) dialog: type, size, dates, marked pages and the complete path, plus a way to reach the folder. */
+    private void showPath(final Item it) {
+        final File f = new File(it.path);
+        final int pad = CaseViews.dp(this, 16);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, CaseViews.dp(this, 8), pad, CaseViews.dp(this, 4));
+
+        int k = DocFileCard.kind(f.getName());
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(CaseViews.icon(this, DocFileCard.kindIcon(k), DocFileCard.kindColor(this, k), 30));
+        TextView nm = CaseViews.text(this, f.getName(), 15, AppTheme.text(this), true);
+        nm.setPadding(CaseViews.dp(this, 10), 0, 0, 0);
+        head.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        box.addView(head);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 6), CaseViews.dp(this, 12), CaseViews.dp(this, 6));
+        card.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
+        java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(
+                java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT);
+        infoRow(card, "Type", DocFileCard.kindLabel(k, f.getName()));
+        infoRow(card, "Size", it.size.isEmpty() ? "-" : it.size);
+        infoRow(card, "Last edited", df.format(new java.util.Date(f.lastModified())));
+        int n = it.marks.size();
+        infoRow(card, "Marked pages", n + (it.total >= 0 ? " of " + it.total : ""));
+        infoRow(card, "Location", f.getParent() == null ? "" : f.getParent());
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clp.topMargin = CaseViews.dp(this, 10);
+        box.addView(card, clp);
+
+        TextView pl = CaseViews.text(this, "Full path", 11, AppTheme.sub(this), true);
+        pl.setPadding(0, CaseViews.dp(this, 10), 0, CaseViews.dp(this, 2));
+        box.addView(pl);
+        TextView pt = CaseViews.text(this, it.path, 12, AppTheme.text(this), false);
+        pt.setTextIsSelectable(true);
+        box.addView(pt);
+
+        final AlertDialog[] dlg = new AlertDialog[1];
+        LinearLayout btns = new LinearLayout(this);
+        btns.setPadding(0, CaseViews.dp(this, 12), 0, 0);
+        btns.addView(chipButton("Open folder", R.drawable.ic_folder, AppTheme.accent(this), () -> {
+            if (dlg[0] != null) dlg[0].dismiss();
+            openContainingFolder(f);
+        }));
+        LinearLayout copy = chipButton("Copy path", R.drawable.ic_notes, AppTheme.sub(this), () -> {
+            android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("path", it.path));
+            android.widget.Toast.makeText(this, "Path copied", android.widget.Toast.LENGTH_SHORT).show();
+        });
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cp.leftMargin = CaseViews.dp(this, 8);
+        btns.addView(copy, cp);
+        box.addView(btns);
+
+        ScrollView sv = new ScrollView(this);
+        sv.addView(box);
+        dlg[0] = new AlertDialog.Builder(this)
+                .setTitle("File information")
+                .setView(sv)
                 .setPositiveButton("Close", null)
                 .show();
+    }
+
+    private void infoRow(LinearLayout parent, String label, String value) {
+        LinearLayout r = new LinearLayout(this);
+        r.setPadding(0, CaseViews.dp(this, 5), 0, CaseViews.dp(this, 5));
+        r.addView(CaseViews.text(this, label, 12, AppTheme.sub(this), true),
+                new LinearLayout.LayoutParams(CaseViews.dp(this, 96), LinearLayout.LayoutParams.WRAP_CONTENT));
+        r.addView(CaseViews.text(this, value, 13, AppTheme.text(this), false),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        parent.addView(r);
+    }
+
+    /** The app's own explorer when the file is inside the data folder, else the system file manager. */
+    private void openContainingFolder(File f) {
+        File dir = f.getParentFile();
+        if (dir == null) return;
+        File root = DataFolder.root();
+        try {
+            if (root != null && dir.getCanonicalPath().startsWith(root.getCanonicalPath())) {
+                Intent i = new Intent(this, FileExplorerActivity.class);
+                i.putExtra("dir", dir.getCanonicalPath());
+                startActivity(i);
+                return;
+            }
+        } catch (java.io.IOException ignored) { }
+        String prim = android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/";
+        String abs = dir.getAbsolutePath() + "/";
+        try {
+            if (abs.startsWith(prim)) {
+                String rel = abs.substring(prim.length());
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(android.net.Uri.parse(
+                        "content://com.android.externalstorage.documents/document/primary%3A"
+                                + android.net.Uri.encode(rel.endsWith("/") ? rel.substring(0, rel.length() - 1) : rel)),
+                        "vnd.android.document/directory");
+                startActivity(i);
+                return;
+            }
+        } catch (Exception ignored) { }
+        android.widget.Toast.makeText(this, "Cannot open this folder: " + dir.getAbsolutePath(),
+                android.widget.Toast.LENGTH_LONG).show();
     }
 
     private class ItemAdapter extends BaseAdapter {
@@ -425,8 +520,7 @@ public class MarkedFilesActivity extends BaseActivity {
             info.category = cats.size() == 1 ? cats.iterator().next() : "Multiple";
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
-            info.size = it.size;
-            info.date = it.date;
+            info.hideMeta = true;       // type, size and date are in the (i) dialog
             int n = it.marks.size();
             info.pagesLine = "Marked pages: " + n
                     + (it.total >= 0 ? "  \u2022  Unmarked: " + Math.max(0, it.total - n) + "  \u2022  Total: " + it.total : "");

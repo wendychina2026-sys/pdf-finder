@@ -67,6 +67,8 @@ public class FileExplorerActivity extends BaseActivity {
             if (root == null) root = getFilesDir();
         }
         cur = root;
+        String startDir = getIntent().getStringExtra("dir");
+        if (startDir != null && inRoot(new File(startDir)) && new File(startDir).isDirectory()) cur = new File(startDir);
         if (savedInstanceState != null) {
             String p = savedInstanceState.getString("cur");
             if (p != null && inRoot(new File(p)) && new File(p).isDirectory()) cur = new File(p);

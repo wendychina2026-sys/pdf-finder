@@ -27,6 +27,7 @@ final class DocFileCard {
         int count = 1;          // files in this group
         String pagesLine = "";  // Document Vault: marked / unmarked / total pages
         String rangeLine = "";  // Document Vault: category -> page range summary
+        boolean hideMeta;       // Document Vault: type / size / date live in the info dialog instead
     }
 
     static final class Actions {
@@ -102,7 +103,7 @@ final class DocFileCard {
         head.addView(sp, new LinearLayout.LayoutParams(0, 1, 1f));
         String meta = kindLabel(k, in.name) + (in.count > 1 ? "  \u2022  " + in.count + " files" : "") + (in.size.isEmpty() ? "" : "  \u2022  " + in.size);
         TextView metaTv = CaseViews.text(a, meta, 12, AppTheme.sub(a), true);
-        head.addView(metaTv);
+        if (!in.hideMeta) head.addView(metaTv);
         final ImageView chev = CaseViews.icon(a, R.drawable.ic_expand_more, AppTheme.text(a), 22);
         LinearLayout.LayoutParams clp = (LinearLayout.LayoutParams) chev.getLayoutParams();
         clp.leftMargin = dp(a, 6);
@@ -131,7 +132,7 @@ final class DocFileCard {
         mt.setSingleLine(true);
         mt.setEllipsize(android.text.TextUtils.TruncateAt.END);
         att.addView(mt, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        if (!in.date.isEmpty()) {
+        if (!in.date.isEmpty() && !in.hideMeta) {
             TextView d = CaseViews.text(a, in.date, 11, AppTheme.sub(a), false);
             d.setPadding(dp(a, 8), 0, 0, 0);
             att.addView(d);
