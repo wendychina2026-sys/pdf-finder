@@ -54,6 +54,8 @@ public class FileExplorerActivity extends BaseActivity {
     private HorizontalScrollView crumbScroll;
     private TextView summary, empty, sortLabel;
     private BaseAdapter adapter;
+    private ListView listView;
+    private File focus;          // the file the user came here for: marked and scrolled into view
     private final SimpleDateFormat fmt = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US);
 
     @Override
@@ -67,6 +69,8 @@ public class FileExplorerActivity extends BaseActivity {
             if (root == null) root = getFilesDir();
         }
         cur = root;
+        String focusPath = getIntent().getStringExtra("focus");
+        if (focusPath != null && !focusPath.isEmpty()) focus = new File(focusPath);
         String startDir = getIntent().getStringExtra("dir");
         if (startDir != null && inRoot(new File(startDir)) && new File(startDir).isDirectory()) cur = new File(startDir);
         if (savedInstanceState != null) {
@@ -148,6 +152,7 @@ public class FileExplorerActivity extends BaseActivity {
 
         adapter = new RowAdapter();
         ListView list = new ListView(this);
+        listView = list;
         list.setAdapter(adapter);
         list.setDivider(null);
         list.setDividerHeight(0);
@@ -272,6 +277,15 @@ public class FileExplorerActivity extends BaseActivity {
         empty.setText(query.isEmpty() ? "This folder is empty" : "Nothing matches your search");
         empty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
         adapter.notifyDataSetChanged();
+        if (focus != null && listView != null) {
+            for (int i = 0; i < shown.size(); i++) {
+                if (shown.get(i).equals(focus)) {
+                    final int at = i;
+                    listView.post(() -> listView.setSelectionFromTop(at, CaseViews.dp(this, 80)));
+                    break;
+                }
+            }
+        }
     }
 
     private Comparator<File> comparator() {
@@ -551,7 +565,10 @@ public class FileExplorerActivity extends BaseActivity {
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(CaseViews.dp(c, 12), CaseViews.dp(c, 10), CaseViews.dp(c, 12), CaseViews.dp(c, 10));
-            row.setBackground(CaseViews.box(c, AppTheme.card(c), 14, AppTheme.cardStroke(c), 1));
+            boolean mark = focus != null && f.equals(focus);
+            row.setBackground(mark
+                    ? CaseViews.box(c, (AppTheme.accent(c) & 0x00FFFFFF) | 0x26000000, 14, AppTheme.accent(c), 2)
+                    : CaseViews.box(c, AppTheme.card(c), 14, AppTheme.cardStroke(c), 1));
 
             ImageView ic = CaseViews.icon(c, iconFor(f), colorFor(f), 26);
             row.addView(ic, new LinearLayout.LayoutParams(CaseViews.dp(c, 36), CaseViews.dp(c, 36)));
@@ -572,6 +589,11 @@ public class FileExplorerActivity extends BaseActivity {
                 sub = size(f.length()) + "  \u2022  " + fmt.format(new Date(f.lastModified()));
             }
             col.addView(CaseViews.text(c, sub, 12, AppTheme.sub(c), false));
+            if (mark) {
+                TextView tag = CaseViews.text(c, "\u2605 Your file", 11, AppTheme.accent(c), true);
+                tag.setPadding(0, CaseViews.dp(c, 2), 0, 0);
+                col.addView(tag);
+            }
             row.addView(col, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
             if (f.isDirectory()) {

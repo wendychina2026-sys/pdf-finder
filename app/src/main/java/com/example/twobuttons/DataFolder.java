@@ -127,7 +127,44 @@ final class DataFolder {
         });
     }
 
+    /**
+     * Files received while "All files access" was off were kept in the app's own folder
+     * (Android/data/com.example.twobuttons/files/shared). Once the access is on they move into
+     * PdfFinder/Documents; their page marks, matter and document records follow them.
+     */
+    static void migrateStranded(final Context c) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    File root = root();
+                    File ext = c.getExternalFilesDir(null);
+                    if (root == null || ext == null) return;
+                    File[] old = new File(ext, "shared").listFiles();
+                    if (old == null || old.length == 0) return;
+                    LegalStore ls = new LegalStore(c);
+                    for (File f : old) {
+                        if (!f.isFile()) continue;
+                        String oldUri = PhotoFlow.uri(c, f).toString();
+                        File moved = moveIntoDocuments(c, f);
+                        if (moved == null || moved.equals(f)) continue;
+                        new MarkStore(c).move(c, f.getAbsolutePath(), moved.getAbsolutePath());
+                        String newUri = PhotoFlow.uri(c, moved).toString();
+                        for (LegalStore.Doc d : ls.docs()) {
+                            boolean changed = false;
+                            if (oldUri.equals(d.uri)) { d.uri = newUri; changed = true; }
+                            for (int k = 0; k < d.more.size(); k++) {
+                                if (oldUri.equals(d.more.get(k))) { d.more.set(k, newUri); changed = true; }
+                            }
+                            if (changed) ls.saveDoc(d);
+                        }
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
     private static void onResume(Application app, Activity a) {
+        migrateStranded(app);
         try {
             SharedPreferences rt = app.getSharedPreferences(RUNTIME, Context.MODE_PRIVATE);
             if (rt.getBoolean(FLAG, false)) return;

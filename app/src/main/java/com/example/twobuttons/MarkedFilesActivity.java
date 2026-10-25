@@ -492,6 +492,7 @@ public class MarkedFilesActivity extends BaseActivity {
             if (root != null && dir.getCanonicalPath().startsWith(root.getCanonicalPath())) {
                 Intent i = new Intent(this, FileExplorerActivity.class);
                 i.putExtra("dir", dir.getCanonicalPath());
+                i.putExtra("focus", f.getCanonicalPath());
                 startActivity(i);
                 return;
             }
