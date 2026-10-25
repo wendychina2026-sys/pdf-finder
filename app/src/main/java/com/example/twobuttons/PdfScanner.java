@@ -6,14 +6,20 @@ import android.os.Build;
 import android.os.Environment;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
+/**
+ * Walks the phone's storage for PDFs, images and videos. The app's own PdfFinder data folder is never
+ * scanned (its PDFs are already managed in Document Vault). WhatsApp and Telegram folders are included:
+ * the old ones (WhatsApp/, Telegram/) and the new ones under Android/media (needs "All files access").
+ * Folders whose name starts with a dot are skipped, as before.
+ */
 class PdfScanner {
 
     interface Callback {
@@ -23,6 +29,8 @@ class PdfScanner {
     static void scan(Activity activity, Callback callback) {
         new Thread(() -> {
             List<Pdf> found = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            Set<String> skip = skipDirs();
             ArrayDeque<File> stack = new ArrayDeque<>();
             for (File r : storageRoots(activity)) stack.push(r);
             while (!stack.isEmpty()) {
@@ -35,15 +43,35 @@ class PdfScanner {
                         // Android/media allowed. Android/data + obb blocked on 11+.
                         boolean blocked = Build.VERSION.SDK_INT >= 30
                                 && (p.endsWith("/Android/data") || p.endsWith("/Android/obb"));
-                        if (!blocked && !name.startsWith(".")) stack.push(f);
-                    } else if (name.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-                        found.add(new Pdf(name, f.getAbsolutePath(), f.length()));
+                        if (!blocked && !name.startsWith(".") && !skip.contains(canon(f))) stack.push(f);
+                    } else {
+                        int kind = Pdf.kindOf(name);
+                        if (kind < 0) continue;
+                        if (!seen.add(canon(f))) continue;        // same file reached from two roots
+                        found.add(new Pdf(name, f.getAbsolutePath(), f.length(), kind));
                     }
                 }
             }
             Collections.sort(found, (a, b) -> a.name.compareToIgnoreCase(b.name));
             activity.runOnUiThread(() -> callback.onDone(found));
         }).start();
+    }
+
+    /** The PdfFinder data folder(s): not scanned. */
+    private static Set<String> skipDirs() {
+        Set<String> s = new LinkedHashSet<>();
+        s.add(canon(new File(Environment.getExternalStorageDirectory(), DataFolder.ROOT_NAME)));
+        File r = DataFolder.root();
+        if (r != null) s.add(canon(r));
+        return s;
+    }
+
+    private static String canon(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException e) {
+            return f.getAbsolutePath();
+        }
     }
 
     private static List<File> storageRoots(Context c) {

@@ -36,6 +36,7 @@ class PdfActions {
     private LinearLayout bar;
     private TextView countText;
     private Button deleteButton;
+    private Button shareButton;
 
     PdfActions(Activity activity, PdfAdapter adapter, Host host) {
         this.activity = activity;
@@ -63,6 +64,10 @@ class PdfActions {
             refresh();
         });
 
+        shareButton = new Button(activity);
+        shareButton.setText("Share");
+        shareButton.setOnClickListener(v -> shareSelected());
+
         deleteButton = new Button(activity);
         deleteButton.setText("Delete");
         deleteButton.setOnClickListener(v -> confirmDelete(new ArrayList<>(adapter.selected)));
@@ -74,6 +79,7 @@ class PdfActions {
         bar.addView(countText, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         bar.addView(all);
+        bar.addView(shareButton);
         bar.addView(deleteButton);
         bar.addView(cancel);
         return bar;
@@ -100,6 +106,7 @@ class PdfActions {
         if (countText != null) {
             countText.setText(adapter.selected.size() + " selected");
             deleteButton.setEnabled(!adapter.selected.isEmpty());
+            shareButton.setEnabled(!adapter.selected.isEmpty());
         }
         adapter.notifyDataSetChanged();
     }
@@ -117,8 +124,14 @@ class PdfActions {
     }
 
     private void showOptions(Pdf p) {
-        PickerDialogs.optionSheet(activity, p.name, null,
-                java.util.Arrays.asList("Mark", "Open containing folder", "Delete", "Select multiple"), -1, which -> {
+        final boolean pdf = p.kind == Pdf.PDF;
+        List<String> items = new ArrayList<>();
+        if (pdf) items.add("Mark");
+        items.add("Open containing folder");
+        items.add("Delete");
+        items.add("Select multiple");
+        PickerDialogs.optionSheet(activity, p.name, null, items, -1, pick -> {
+                    int which = pdf ? pick : pick + 1;
                     if (which == 0) {
                         Intent i = new Intent(activity, MarkActivity.class);
                         i.putExtra("path", p.path);
@@ -178,6 +191,36 @@ class PdfActions {
         return null;
     }
 
+    // Share every selected file in one go (any mix of PDFs, images and videos).
+    private void shareSelected() {
+        if (adapter.selected.isEmpty()) return;
+        try {
+            ArrayList<Uri> uris = new ArrayList<>();
+            Set<String> mimes = new HashSet<>();
+            for (String path : adapter.selected) {
+                File f = new File(path);
+                if (!f.isFile()) continue;
+                uris.add(FileProvider.getUriForFile(
+                        activity, activity.getPackageName() + ".fileprovider", f));
+                for (Pdf p : host.pdfs()) if (p.path.equals(path)) mimes.add(p.mime());
+            }
+            if (uris.isEmpty()) {
+                Toast.makeText(activity, "Nothing to share", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent i = new Intent(uris.size() == 1 ? Intent.ACTION_SEND : Intent.ACTION_SEND_MULTIPLE);
+            String type = mimes.size() == 1 ? mimes.iterator().next() : "*/*";
+            i.setType(type);
+            if (uris.size() == 1) i.putExtra(Intent.EXTRA_STREAM, uris.get(0));
+            else i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            activity.startActivity(Intent.createChooser(i, "Share " + uris.size()
+                    + (uris.size() == 1 ? " file" : " files")));
+        } catch (Exception e) {
+            Toast.makeText(activity, "Cannot share these files", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void confirmDelete(List<String> paths) {
         if (paths.isEmpty()) return;
         new AlertDialog.Builder(activity)
@@ -215,11 +258,11 @@ class PdfActions {
             Uri uri = FileProvider.getUriForFile(
                     activity, activity.getPackageName() + ".fileprovider", new File(p.path));
             Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setDataAndType(uri, "application/pdf");
+            i.setDataAndType(uri, p.mime());
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             activity.startActivity(i);
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(activity, "No PDF viewer app installed", Toast.LENGTH_LONG).show();
+            Toast.makeText(activity, "No app installed to open this file", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(activity, "Cannot open: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }

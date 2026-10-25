@@ -22,6 +22,9 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
 
     final Set<String> selected = new LinkedHashSet<>();
     boolean selectionMode = false;
+    String query = "";
+    /** -1 = all kinds, else Pdf.PDF / Pdf.IMAGE / Pdf.VIDEO */
+    int kindFilter = -1;
 
     PdfAdapter(Context c) {
         super(c, 0, new ArrayList<Pdf>());
@@ -30,9 +33,11 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
     // Rebuild visible list from master list + search text. Returns visible count.
     int filter(List<Pdf> all, String query) {
         String q = query.trim().toLowerCase(Locale.ROOT);
+        this.query = q;
         clear();
         Set<String> visible = new HashSet<>();
         for (Pdf p : all) {
+            if (kindFilter >= 0 && p.kind != kindFilter) continue;
             if (q.isEmpty() || p.name.toLowerCase(Locale.ROOT).contains(q)) {
                 add(p);
                 visible.add(p.path);
@@ -46,8 +51,8 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
     public View getView(int position, View convertView, ViewGroup parent) {
         Row r = (convertView == null) ? new Row(getContext()) : (Row) convertView;
         Pdf p = getItem(position);
-        r.name.setText(p.name);
-        r.path.setText(p.path);
+        r.name.setText(Highlight.apply(p.name, query));
+        r.path.setText(Highlight.apply(p.path, query));
         r.size.setText(Pdf.formatSize(p.size));
         boolean isSelected = selected.contains(p.path);
         r.box.setVisibility(selectionMode ? View.VISIBLE : View.GONE);

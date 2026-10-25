@@ -18,6 +18,13 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("25 Oct 2026", "Find files: PDFs, images, videos; highlight; multi-select",
+            "Find PDFs is now Find files: scans PDFs, images and videos, with All / PDF / Images / Videos filter chips.",
+            "The scan skips the PdfFinder data folder (those PDFs are managed in Document Vault).",
+            "WhatsApp and Telegram folders are scanned, including Android/media (needs All files access).",
+            "Search text is highlighted (orange) in the file list and in the data-folder explorer.",
+            "Document Vault folder (explorer): long-press > Select multiple, then Share or Delete several files at once; All / Cancel in the bar.",
+            "Find files: Share several selected files at once, next to Delete."),
         new Entry("25 Oct 2026", "Document Vault, folders and change log",
             "Settings > Change log: this page, listing what every update adds.",
             "No duplicate PDFs: a file that is already in PdfFinder/Documents (same content, same or different name) is never stored again; Share / Open with reuses it.",

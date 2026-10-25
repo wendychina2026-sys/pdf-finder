@@ -2,6 +2,7 @@ package com.example.twobuttons;
 
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -12,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
 import android.widget.BaseAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -28,9 +30,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The app's own file explorer for the data folder (PdfFinder): breadcrumb path bar, folders first,
@@ -56,6 +60,10 @@ public class FileExplorerActivity extends BaseActivity {
     private BaseAdapter adapter;
     private ListView listView;
     private File focus;          // the file the user came here for: marked and scrolled into view
+    private boolean selMode = false;                         // select several files / folders to delete or share
+    private final Set<String> picked = new LinkedHashSet<>();
+    private LinearLayout selBar;
+    private TextView selCount, selShare, selDelete;
     private final SimpleDateFormat fmt = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US);
 
     @Override
@@ -150,6 +158,34 @@ public class FileExplorerActivity extends BaseActivity {
         summary.setPadding(CaseViews.dp(this, 4), CaseViews.dp(this, 8), 0, CaseViews.dp(this, 6));
         page.addView(summary);
 
+        selBar = new LinearLayout(this);
+        selBar.setOrientation(LinearLayout.HORIZONTAL);
+        selBar.setGravity(Gravity.CENTER_VERTICAL);
+        selBar.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 6), CaseViews.dp(this, 6), CaseViews.dp(this, 6));
+        selBar.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        selBar.setVisibility(View.GONE);
+        selCount = CaseViews.text(this, "0 selected", 14, AppTheme.text(this), true);
+        selBar.addView(selCount, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView selAll = selAction("All", AppTheme.accent(this));
+        selAll.setOnClickListener(v -> {
+            for (File f : shown) picked.add(f.getAbsolutePath());
+            selChanged();
+        });
+        selShare = selAction("Share", AppTheme.accent(this));
+        selShare.setOnClickListener(v -> shareSelected());
+        selDelete = selAction("Delete", LegalUi.RED);
+        selDelete.setOnClickListener(v -> deleteSelected());
+        TextView selCancel = selAction("Cancel", AppTheme.sub(this));
+        selCancel.setOnClickListener(v -> exitSelection());
+        selBar.addView(selAll);
+        selBar.addView(selShare);
+        selBar.addView(selDelete);
+        selBar.addView(selCancel);
+        LinearLayout.LayoutParams sblp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sblp.bottomMargin = CaseViews.dp(this, 6);
+        page.addView(selBar, sblp);
+
         adapter = new RowAdapter();
         ListView list = new ListView(this);
         listView = list;
@@ -158,9 +194,11 @@ public class FileExplorerActivity extends BaseActivity {
         list.setDividerHeight(0);
         list.setClipToPadding(false);
         list.setPadding(0, 0, 0, CaseViews.dp(this, 16));
-        list.setOnItemClickListener((parent, view, pos, id) -> open(shown.get(pos)));
+        list.setOnItemClickListener((parent, view, pos, id) -> {
+            if (selMode) toggle(shown.get(pos)); else open(shown.get(pos));
+        });
         list.setOnItemLongClickListener((parent, view, pos, id) -> {
-            options(shown.get(pos));
+            if (selMode) toggle(shown.get(pos)); else options(shown.get(pos));
             return true;
         });
 
@@ -191,7 +229,8 @@ public class FileExplorerActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
-        if (!cur.equals(root)) goUp();
+        if (selMode) exitSelection();
+        else if (!cur.equals(root)) goUp();
         else super.onBackPressed();
     }
 
@@ -217,6 +256,7 @@ public class FileExplorerActivity extends BaseActivity {
     }
 
     private void enter(File dir) {
+        if (selMode) exitSelection();
         cur = dir;
         reload(true);
     }
@@ -347,15 +387,118 @@ public class FileExplorerActivity extends BaseActivity {
         items.add("Rename");
         items.add("Delete");
         if (f.isFile()) items.add("Share");
+        items.add("Select multiple");
         items.add("Details");
         PickerDialogs.optionSheet(this, f.getName(), null, items, -1, which -> {
             String s = items.get(which);
-            if (s.equals("Open")) open(f);
+            if (s.equals("Select multiple")) startSelection(f);
+            else if (s.equals("Open")) open(f);
             else if (s.equals("Rename")) rename(f);
             else if (s.equals("Delete")) delete(f);
             else if (s.equals("Share")) share(f);
             else details(f);
         });
+    }
+
+    // ------------------------------------------------------------------ select several
+
+    private TextView selAction(String label, int color) {
+        TextView t = CaseViews.text(this, label, 14, color, true);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 8), CaseViews.dp(this, 10), CaseViews.dp(this, 8));
+        return t;
+    }
+
+    private void startSelection(File first) {
+        selMode = true;
+        picked.clear();
+        if (first != null) picked.add(first.getAbsolutePath());
+        selBar.setVisibility(View.VISIBLE);
+        selChanged();
+    }
+
+    private void exitSelection() {
+        selMode = false;
+        picked.clear();
+        selBar.setVisibility(View.GONE);
+        adapter.notifyDataSetChanged();
+    }
+
+    private void toggle(File f) {
+        String p = f.getAbsolutePath();
+        if (!picked.remove(p)) picked.add(p);
+        selChanged();
+    }
+
+    private void selChanged() {
+        selCount.setText(picked.size() + " selected");
+        boolean any = !picked.isEmpty();
+        selShare.setEnabled(any);
+        selShare.setAlpha(any ? 1f : 0.4f);
+        selDelete.setEnabled(any);
+        selDelete.setAlpha(any ? 1f : 0.4f);
+        adapter.notifyDataSetChanged();
+    }
+
+    private void shareSelected() {
+        List<Uri> uris = new ArrayList<>();
+        Set<String> mimes = new LinkedHashSet<>();
+        int folders = 0;
+        for (String path : picked) {
+            File f = new File(path);
+            if (f.isDirectory()) { folders++; continue; }
+            if (!f.isFile()) continue;
+            try {
+                uris.add(PhotoFlow.uri(this, f));
+                String m = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext(f).toLowerCase(Locale.ROOT));
+                mimes.add(m == null ? "*/*" : m);
+            } catch (Exception ignored) { }
+        }
+        if (uris.isEmpty()) {
+            Toast.makeText(this, folders > 0 ? "Folders cannot be shared, pick files" : "Nothing to share",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (folders > 0) {
+            Toast.makeText(this, "Sharing " + uris.size() + " files, folders skipped", Toast.LENGTH_SHORT).show();
+        }
+        try {
+            Intent i = new Intent(uris.size() == 1 ? Intent.ACTION_SEND : Intent.ACTION_SEND_MULTIPLE);
+            i.setType(mimes.size() == 1 ? mimes.iterator().next() : "*/*");
+            if (uris.size() == 1) i.putExtra(Intent.EXTRA_STREAM, uris.get(0));
+            else i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, new ArrayList<>(uris));
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(i, "Share"));
+        } catch (Exception ex) {
+            Toast.makeText(this, "Cannot share these files", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void deleteSelected() {
+        if (picked.isEmpty()) return;
+        final List<String> paths = new ArrayList<>(picked);
+        int folders = 0;
+        for (String p : paths) if (new File(p).isDirectory()) folders++;
+        String what = paths.size() + (paths.size() == 1 ? " item" : " items")
+                + (folders > 0 ? " (with everything inside the folders)" : "");
+        PickerDialogs.confirm(this, "Delete " + paths.size() + (paths.size() == 1 ? " item?" : " items?"),
+                what + " will be deleted permanently. It cannot be undone.", "Delete", () -> {
+                    int ok = 0, fail = 0;
+                    for (String p : paths) {
+                        File f = new File(p);
+                        boolean dir = f.isDirectory();
+                        if (deleteTree(f)) {
+                            ok++;
+                            if (!dir) new MarkStore(this).clear(p);
+                        } else {
+                            fail++;
+                        }
+                    }
+                    Toast.makeText(this, "Deleted " + ok + (fail > 0 ? ", failed " + fail : ""),
+                            Toast.LENGTH_SHORT).show();
+                    exitSelection();
+                    reload(false);
+                });
     }
 
     private EditText nameBox(String value) {
@@ -570,13 +713,26 @@ public class FileExplorerActivity extends BaseActivity {
                     ? CaseViews.box(c, (AppTheme.accent(c) & 0x00FFFFFF) | 0x26000000, 14, AppTheme.accent(c), 2)
                     : CaseViews.box(c, AppTheme.card(c), 14, AppTheme.cardStroke(c), 1));
 
+            if (selMode) {
+                CheckBox cb = new CheckBox(c);
+                cb.setFocusable(false);
+                cb.setClickable(false);
+                cb.setChecked(picked.contains(f.getAbsolutePath()));
+                row.addView(cb, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                if (picked.contains(f.getAbsolutePath())) {
+                    row.setBackground(CaseViews.box(c, (AppTheme.accent(c) & 0x00FFFFFF) | 0x26000000,
+                            14, AppTheme.accent(c), 2));
+                }
+            }
             ImageView ic = CaseViews.icon(c, iconFor(f), colorFor(f), 26);
             row.addView(ic, new LinearLayout.LayoutParams(CaseViews.dp(c, 36), CaseViews.dp(c, 36)));
 
             LinearLayout col = new LinearLayout(c);
             col.setOrientation(LinearLayout.VERTICAL);
             col.setPadding(CaseViews.dp(c, 10), 0, CaseViews.dp(c, 6), 0);
-            TextView name = CaseViews.text(c, f.getName(), 15, AppTheme.text(c), true);
+            TextView name = CaseViews.text(c, "", 15, AppTheme.text(c), true);
+            name.setText(Highlight.apply(f.getName(), query));
             name.setSingleLine(true);
             name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
             col.addView(name);
