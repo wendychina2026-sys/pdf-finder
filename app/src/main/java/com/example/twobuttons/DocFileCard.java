@@ -25,10 +25,12 @@ final class DocFileCard {
         String name = "", fileName = "", category = "", matter = "", stage = "", size = "", date = "";
         Uri uri;
         int count = 1;          // files in this group
+        String pagesLine = "";  // Document Vault: marked / unmarked / total pages
+        String rangeLine = "";  // Document Vault: category -> page range summary
     }
 
     static final class Actions {
-        Runnable open, save, edit, replace, share, delete, files;
+        Runnable open, save, edit, replace, share, delete, files, details, path;
     }
 
     static final int PDF_RED = 0xFFE5484D, WORD_BLUE = 0xFF3B82F6, IMG_GREEN = 0xFF22C55E;
@@ -136,6 +138,19 @@ final class DocFileCard {
         }
         top.addView(att);
 
+        if (!in.pagesLine.isEmpty()) {
+            TextView pl = CaseViews.text(a, in.pagesLine, 12, AppTheme.text(a), true);
+            pl.setPadding(0, dp(a, 4), 0, 0);
+            top.addView(pl);
+        }
+        if (!in.rangeLine.isEmpty()) {
+            TextView rl = CaseViews.text(a, in.rangeLine, 11, AppTheme.sub(a), false);
+            rl.setMaxLines(2);
+            rl.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            rl.setPadding(0, dp(a, 2), 0, 0);
+            top.addView(rl);
+        }
+
         // full details, hidden until the arrow is tapped
         final LinearLayout details = new LinearLayout(a);
         details.setOrientation(LinearLayout.VERTICAL);
@@ -163,7 +178,9 @@ final class DocFileCard {
         row.setGravity(Gravity.CENTER_VERTICAL);
         int info = AppTheme.info(a), green = AppTheme.topics(a);
         if (act.open != null) row.addView(labelBtn(a, R.drawable.ic_eye, info, "Open", act.open), wlp(a, 0));
+        if (act.details != null) row.addView(labelBtn(a, R.drawable.ic_notes, gold, "Show details", act.details), wlp(a, 8));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
+        if (act.path != null) row.addView(circleBtn(a, R.drawable.ic_info, info, "Show file path", act.path), ilp(a));
         if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
         if (act.files != null) row.addView(iconBtn(a, R.drawable.ic_image, gold, "Manage files (add / replace / delete / reorder)", act.files), ilp(a));
         else if (act.replace != null) row.addView(iconBtn(a, R.drawable.ic_replace, gold, "Replace file", act.replace), ilp(a));
@@ -208,6 +225,16 @@ final class DocFileCard {
         TextView t = CaseViews.text(a, label, 12, color, true);
         t.setPadding(dp(a, 5), 0, 0, 0);
         b.addView(t);
+        b.setOnClickListener(v -> click.run());
+        return b;
+    }
+
+    private static View circleBtn(Activity a, int icon, int color, String desc, Runnable click) {
+        LinearLayout b = new LinearLayout(a);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(CaseViews.box(a, (color & 0x00FFFFFF) | 0x1A000000, 16, (color & 0x00FFFFFF) | 0x66000000, 1));
+        b.addView(CaseViews.icon(a, icon, color, 16));
+        b.setContentDescription(desc);
         b.setOnClickListener(v -> click.run());
         return b;
     }

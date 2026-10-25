@@ -40,6 +40,8 @@ public class MarkedFilesActivity extends BaseActivity {
     static class Item {
         final String path;
         final Map<Integer, String> marks;
+        int total = -1;
+        String size = "", date = "";
 
         Item(String path, Map<Integer, String> marks) {
             this.path = path;
@@ -156,7 +158,15 @@ public class MarkedFilesActivity extends BaseActivity {
         }
         Collections.sort(paths, (a, b) ->
                 new File(a).getName().compareToIgnoreCase(new File(b).getName()));
-        for (String p : paths) out.add(new Item(p, everything.get(p)));
+        java.text.DateFormat df = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM);
+        for (String p : paths) {
+            Item n = new Item(p, everything.get(p));
+            File f = new File(p);
+            n.total = totalPages(p);
+            n.size = android.text.format.Formatter.formatShortFileSize(this, f.length());
+            n.date = df.format(new java.util.Date(f.lastModified()));
+            out.add(n);
+        }
         return out;
     }
 
@@ -249,6 +259,15 @@ public class MarkedFilesActivity extends BaseActivity {
         List<String> order = new ArrayList<>();
         Collections.addAll(order, MarkStore.SUBS);
         for (String s : new TreeSet<>(it.marks.values())) if (!order.contains(s)) order.add(s);
+        // the category of the first marked page comes first, then the next one, and so on
+        final Map<String, Integer> first = new java.util.HashMap<>();
+        for (Map.Entry<Integer, String> e : it.marks.entrySet()) {
+            Integer cur = first.get(e.getValue());
+            if (cur == null || e.getKey() < cur) first.put(e.getValue(), e.getKey());
+        }
+        Collections.sort(order, (x, y) -> Integer.compare(
+                first.containsKey(x) ? first.get(x) : Integer.MAX_VALUE,
+                first.containsKey(y) ? first.get(y) : Integer.MAX_VALUE));
 
         final AlertDialog[] holder = new AlertDialog[1];
 
@@ -265,15 +284,15 @@ public class MarkedFilesActivity extends BaseActivity {
             // one round card per marked category: name, pages, View / Delete, and + to add more pages to it
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 12), CaseViews.dp(this, 14), CaseViews.dp(this, 12));
-            card.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
+            card.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 7), CaseViews.dp(this, 10), CaseViews.dp(this, 8));
+            card.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
 
             LinearLayout head = new LinearLayout(this);
             head.setOrientation(LinearLayout.HORIZONTAL);
             head.setGravity(Gravity.CENTER_VERTICAL);
-            TextView title = CaseViews.text(this, sub, 15, AppTheme.text(this), true);
+            TextView title = CaseViews.text(this, sub, 14, AppTheme.text(this), true);
             head.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 32);
+            ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 26);
             add.setContentDescription("Add pages to " + sub);
             add.setOnClickListener(v -> {
                 Intent i = new Intent(this, MarkActivity.class);
@@ -282,12 +301,13 @@ public class MarkedFilesActivity extends BaseActivity {
                 startActivity(i);
                 if (holder[0] != null) holder[0].dismiss();
             });
-            head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 36), CaseViews.dp(this, 36)));
+            head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 30), CaseViews.dp(this, 30)));
             card.addView(head);
 
-            TextView info = CaseViews.text(this, (pages.size() == 1 ? "Page " : "Pages ") + rangeText,
-                    13, AppTheme.sub(this), false);
-            info.setPadding(0, CaseViews.dp(this, 2), 0, CaseViews.dp(this, 10));
+            TextView info = CaseViews.text(this, "Range: " + (pages.size() == 1 ? "page " : "pages ") + rangeText
+                    + "  (" + pages.size() + (pages.size() == 1 ? " page)" : " pages)"),
+                    12, AppTheme.sub(this), false);
+            info.setPadding(0, CaseViews.dp(this, 1), 0, CaseViews.dp(this, 6));
             card.addView(info);
 
             LinearLayout btns = new LinearLayout(this);
@@ -325,7 +345,7 @@ public class MarkedFilesActivity extends BaseActivity {
 
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            clp.topMargin = CaseViews.dp(this, 10);
+            clp.topMargin = CaseViews.dp(this, 6);
             box.addView(card, clp);
         }
 
@@ -340,9 +360,9 @@ public class MarkedFilesActivity extends BaseActivity {
         }
         TextView sum = new TextView(this);
         sum.setText(sb.toString());
-        sum.setTextSize(15);
+        sum.setTextSize(13);
         sum.setTextColor(AppTheme.text(MarkedFilesActivity.this));
-        sum.setPadding(0, 24, 0, 0);
+        sum.setPadding(0, 14, 0, 0);
         box.addView(sum);
 
         ScrollView sv = new ScrollView(this);
@@ -360,10 +380,10 @@ public class MarkedFilesActivity extends BaseActivity {
         LinearLayout b = new LinearLayout(this);
         b.setOrientation(LinearLayout.HORIZONTAL);
         b.setGravity(Gravity.CENTER_VERTICAL);
-        b.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 7), CaseViews.dp(this, 14), CaseViews.dp(this, 7));
+        b.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 4), CaseViews.dp(this, 12), CaseViews.dp(this, 4));
         b.setBackground(CaseViews.box(this, AppTheme.field(this), 20, color, 1));
-        b.addView(CaseViews.icon(this, iconRes, color, 18));
-        TextView t = CaseViews.text(this, label, 13, color, true);
+        b.addView(CaseViews.icon(this, iconRes, color, 16));
+        TextView t = CaseViews.text(this, label, 12, color, true);
         t.setPadding(CaseViews.dp(this, 6), 0, 0, 0);
         b.addView(t);
         b.setOnClickListener(v -> onClick.run());
@@ -395,46 +415,72 @@ public class MarkedFilesActivity extends BaseActivity {
             final Item it = items.get(i);
             final MarkedFilesActivity c = MarkedFilesActivity.this;
             LinearLayout outer = new LinearLayout(c);
-            outer.setPadding(0, CaseViews.dp(c, 6), 0, CaseViews.dp(c, 6));
+            outer.setPadding(0, CaseViews.dp(c, 5), 0, CaseViews.dp(c, 5));
 
-            LinearLayout card = new LinearLayout(c);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(CaseViews.dp(c, 16), CaseViews.dp(c, 14), CaseViews.dp(c, 16), CaseViews.dp(c, 14));
-            card.setBackground(CaseViews.box(c, AppTheme.card(c), 18, AppTheme.cardStroke(c), 1));
-
-            LinearLayout head = new LinearLayout(c);
-            head.setOrientation(LinearLayout.HORIZONTAL);
-            head.setGravity(Gravity.CENTER_VERTICAL);
-            head.addView(CaseViews.icon(c, R.drawable.ic_pdf, AppTheme.accent(c), 24));
-            TextView name = CaseViews.text(c, new File(it.path).getName(), 16, AppTheme.text(c), true);
-            name.setSingleLine(true);
-            name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
-            name.setPadding(CaseViews.dp(c, 10), 0, CaseViews.dp(c, 6), 0);
-            head.addView(name, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            // small icon button: shows the complete file path
-            ImageView pathBtn = CaseViews.icon(c, R.drawable.ic_info, AppTheme.accent(c), 24);
-            pathBtn.setContentDescription("Show file path");
-            pathBtn.setPadding(CaseViews.dp(c, 6), CaseViews.dp(c, 6), CaseViews.dp(c, 6), CaseViews.dp(c, 6));
-            pathBtn.setFocusable(false);
-            pathBtn.setOnClickListener(v -> showPath(it));
-            head.addView(pathBtn, new LinearLayout.LayoutParams(CaseViews.dp(c, 36), CaseViews.dp(c, 36)));
-            card.addView(head);
-
+            File f = new File(it.path);
+            DocFileCard.Info info = new DocFileCard.Info();
+            info.name = f.getName();
+            info.fileName = f.getName();
+            java.util.Set<String> cats = new TreeSet<>(it.marks.values());
+            info.category = cats.size() == 1 ? cats.iterator().next() : "Multiple";
+            String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
+            info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
+            info.size = it.size;
+            info.date = it.date;
             int n = it.marks.size();
-            TextView sub = CaseViews.text(c, n + (n == 1 ? " marked page" : " marked pages"), 12,
-                    AppTheme.sub(c), false);
-            sub.setPadding(0, CaseViews.dp(c, 4), 0, CaseViews.dp(c, 10));
-            card.addView(sub);
+            info.pagesLine = "Marked pages: " + n
+                    + (it.total >= 0 ? "  \u2022  Unmarked: " + Math.max(0, it.total - n) + "  \u2022  Total: " + it.total : "");
+            StringBuilder rs = new StringBuilder();
+            List<String> ord = new ArrayList<>(cats);
+            final Map<String, Integer> first = new java.util.HashMap<>();
+            for (Map.Entry<Integer, String> e : it.marks.entrySet()) {
+                Integer cur = first.get(e.getValue());
+                if (cur == null || e.getKey() < cur) first.put(e.getValue(), e.getKey());
+            }
+            Collections.sort(ord, (x, y) -> Integer.compare(first.get(x), first.get(y)));
+            for (String cat : ord) {
+                List<Integer> pg = new ArrayList<>();
+                for (Map.Entry<Integer, String> e : it.marks.entrySet()) if (cat.equals(e.getValue())) pg.add(e.getKey());
+                Collections.sort(pg);
+                if (rs.length() > 0) rs.append("  |  ");
+                rs.append(cat).append(": ").append(ranges(pg));
+            }
+            info.rangeLine = rs.toString();
 
-            LinearLayout details = chipButton("Show details", R.drawable.ic_notes, AppTheme.accent(c),
-                    () -> showDetails(it));
-            details.setFocusable(false);
-            card.addView(details, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            DocFileCard.Actions act = new DocFileCard.Actions();
+            act.open = () -> {
+                Intent in = new Intent(c, MarkActivity.class);
+                in.putExtra("path", it.path);
+                startActivity(in);
+            };
+            act.details = () -> showDetails(it);
+            act.path = () -> showPath(it);
+            act.share = () -> {
+                try {
+                    android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(
+                            c, getPackageName() + ".fileprovider", f);
+                    DocFileCard.share(c, u, f.getName());
+                } catch (Exception e) {
+                    android.widget.Toast.makeText(c, "Cannot share this file", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            };
+            act.delete = () -> showFileOptions(it);
+            LinearLayout card = DocFileCard.build(c, info, act);
+            longPressAll(card, it);
+            card.setOnLongClickListener(v -> { showFileOptions(it); return true; });
 
             outer.addView(card, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             return outer;
+        }
+    }
+
+    /** Long-press anywhere on a card (its tappable parts too) offers Delete file / Reset marking. */
+    private void longPressAll(View v, final Item it) {
+        if (v.hasOnClickListeners()) v.setOnLongClickListener(x -> { showFileOptions(it); return true; });
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int k = 0; k < g.getChildCount(); k++) longPressAll(g.getChildAt(k), it);
         }
     }
 }
