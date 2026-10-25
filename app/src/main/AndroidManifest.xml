@@ -91,6 +91,7 @@
         <activity android:name=".CasesListActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".FileExplorerActivity" android:exported="false" />
+        <activity android:name=".ChangeLogActivity" android:exported="false" />
         <activity android:name=".ContactUsActivity" android:exported="false" />
         <activity android:name=".AllCasesActivity" android:exported="false" />
         <activity android:name=".ClientDetailsActivity" android:exported="false" />

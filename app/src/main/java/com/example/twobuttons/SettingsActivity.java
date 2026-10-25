@@ -75,6 +75,18 @@ public class SettingsActivity extends BaseActivity {
         upd.setOnClickListener(v -> ApkInstaller.pick(this));
         root.addView(upd, CaseViews.lp(this, 0, 0));
 
+        LinearLayout log = new LinearLayout(this);
+        log.setOrientation(LinearLayout.VERTICAL);
+        log.setGravity(Gravity.CENTER_VERTICAL);
+        log.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        log.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        log.addView(CaseViews.text(this, "Change log", 16, AppTheme.text(this), true));
+        log.addView(CaseViews.text(this, "What every update adds. Latest: " + ChangeLog.ENTRIES[0].title + ".",
+                14, AppTheme.sub(this), false));
+        log.setOnClickListener(v -> startActivity(new Intent(this, ChangeLogActivity.class)));
+        root.addView(log, CaseViews.lp(this, 8, 0));
+
         TextView bk = CaseViews.text(this, "Backup", 14, AppTheme.accent(this), true);
         bk.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
         root.addView(bk);
