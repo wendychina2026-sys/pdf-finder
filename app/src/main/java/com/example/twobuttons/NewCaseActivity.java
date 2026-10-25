@@ -137,6 +137,13 @@ public class NewCaseActivity extends BaseActivity {
     /** Intent extra: path of a PDF from the Category marker; opens the upload popup with it loaded. */
     static final String EXTRA_UPLOAD_PDF = "upload_pdf";
     private String markerPdf = "";
+    /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
+    private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
+    /** Uris of documents saved with "Create new case": they join this case when it is created. */
+    private final List<String> pendingNewCaseDocs = new ArrayList<>();
+    private LinearLayout uploadCardView;
+    private static final String MULTIPLE = "Multiple";
+    private static final String CREATE_NEW_CASE = "Create new case";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -959,6 +966,7 @@ public class NewCaseActivity extends BaseActivity {
 
     private LinearLayout buildUploadCard() {
         LinearLayout c = card();
+        uploadCardView = c;
         c.setPadding(0, 0, 0, 0);
 
         LinearLayout head = new LinearLayout(this);
@@ -1028,12 +1036,19 @@ public class NewCaseActivity extends BaseActivity {
         markerPdf = "";
         final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
         final boolean fromMarker = marked != null && marked.isFile();
-        if (fromMarker) dlgUris.add(PhotoFlow.uri(this, marked));
+        final java.util.Map<Integer, String> marks = fromMarker
+                ? new MarkStore(this).all(markerPath) : new java.util.HashMap<>();
+        if (fromMarker) {
+            Uri mu = PhotoFlow.uri(this, marked);
+            dlgUris.add(mu);
+            markerFiles.put(mu.toString(), markerPath);
+        }
         replaceIdx = -1;
         dlgReplaceIdx = -1;
         final String general = "-- General Document Vault --";
-        final String[] catSel = {"Other"};
-        final String[] matterSel = {general};
+        final String[] catSel = {fromMarker ? markedCategory(marks) : "Other"};
+        final boolean[] autoCat = {fromMarker && !marks.isEmpty()};   // category still follows the marked pages
+        final String[] matterSel = {fromMarker ? CREATE_NEW_CASE : general};
         final String[] stageSel = {""};
         final boolean[] dupOk = {false};
         final List<DiaryStore.HCase> cases = store.cases();
@@ -1051,14 +1066,21 @@ public class NewCaseActivity extends BaseActivity {
         f.addView(dlgLbl("Document Category"));
         TextView catTv = dropdown(f, "Select category", null);
         setChosen(catTv, catSel[0], "Select category");
+        // marks changed (page re-marked, category renamed / deleted): "Multiple" follows them
+        final Runnable syncCat = () -> {
+            if (!autoCat[0]) return;
+            catSel[0] = markedCategory(marks);
+            if (marks.isEmpty()) autoCat[0] = false;
+            setChosen(catTv, catSel[0], "Select category");
+        };
         ((View) catTv.getTag()).setOnClickListener(v -> {
             if (fromMarker) {
-                // same view as the Category marker: pages already marked, plus edit pages / rename / delete
-                final java.util.Map<Integer, String> marks = new MarkStore(this).all(markerPath);
-                CategoryPicker.pick(this, catSel[0], c -> {
+                // same view as the Category marker: marked categories checked in green, plus edit pages / rename / delete
+                CategoryPicker.pick(this, autoCat[0] ? "" : catSel[0], c -> {
                     catSel[0] = c;
+                    autoCat[0] = false;
                     setChosen(catTv, catSel[0], "Select category");
-                }, marks, CategoryPicker.manage(this, markerPath, marks));
+                }, marks, CategoryPicker.manage(this, markerPath, marks, syncCat), autoCat[0]);
                 return;
             }
             CategoryPicker.pick(this, catSel[0], c -> {
@@ -1107,11 +1129,22 @@ public class NewCaseActivity extends BaseActivity {
         ((View) matterTv.getTag()).setOnClickListener(v -> {
             List<String> items = new ArrayList<>();
             items.add(general);
+            if (fromMarker) items.add(CREATE_NEW_CASE);
             for (DiaryStore.HCase hc : cases) items.add(hc.title());
             PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", items,
                     items.indexOf(matterSel[0]), i -> {
-                        matterSel[0] = items.get(i);
-                        setChosen(matterTv, matterSel[0], general);
+                        final String pick = items.get(i);
+                        if (pick.equals(matterSel[0])) return;
+                        final Runnable apply = () -> {
+                            matterSel[0] = pick;
+                            setChosen(matterTv, matterSel[0], general);
+                        };
+                        if (fromMarker) {       // it was chosen in the marker already: ask before changing it
+                            PickerDialogs.confirm(this, "Change matter?", "Attach to Matter is \"" + matterSel[0]
+                                    + "\". Change it to \"" + pick + "\"?", "Change", apply);
+                        } else {
+                            apply.run();
+                        }
                     });
         });
         // dashed "tap to choose" area (accent colour, upload icon)
@@ -1264,9 +1297,13 @@ public class NewCaseActivity extends BaseActivity {
                 return false;
             }
             String base = LegalUi.str(name);
-            String matterName = matterSel[0].equals(general) ? "General Document Vault" : matterSel[0];
+            final boolean newCase = matterSel[0].equals(CREATE_NEW_CASE);
+            // a document for the case being created is kept in the Vault until the case is saved
+            String matterName = matterSel[0].equals(general) || newCase ? "General Document Vault" : matterSel[0];
+            String shownMatter = newCase ? "This new case" : matterName;
+            if (autoCat[0]) catSel[0] = markedCategory(marks);
             LegalStore ls = new LegalStore(this);
-            LegalStore.Doc dup = matterSel[0].equals(general) ? null
+            LegalStore.Doc dup = matterSel[0].equals(general) || newCase || catSel[0].equals(MULTIPLE) ? null
                     : sameCategoryDoc(ls, cases, matterSel[0], catSel[0]);
             if (dup != null && !dupOk[0]) {
                 PickerDialogs.confirm(this, "Already uploaded",
@@ -1290,7 +1327,7 @@ public class NewCaseActivity extends BaseActivity {
             pickedUris.add(first);
             pickedMore.add(rest);
             pickedNames.add(shown);
-            pickedMeta.add(new String[]{catSel[0], matterName, stageSel[0], total, today, fname});
+            pickedMeta.add(new String[]{catSel[0], shownMatter, stageSel[0], total, today, fname});
             LegalStore.Doc d = new LegalStore.Doc();
             d.name = shown;
             d.caseName = matterName;
@@ -1302,6 +1339,7 @@ public class NewCaseActivity extends BaseActivity {
             d.size = total;
             d.date = today;
             ls.saveDoc(d);
+            if (newCase) pendingNewCaseDocs.add(d.uri);
             if (matterSel[0].equals(general)) { vaultSaved = true; missing(); relaxRequiredLabels(findViewById(android.R.id.content)); }
             dlgUris.clear();
             renderFiles();
@@ -1411,6 +1449,8 @@ public class NewCaseActivity extends BaseActivity {
 
     /** After a PDF was edited (pages removed / photos added): keep the Vault copy pointing at the new file. */
     private void updateStoredDoc(Uri old, Uri neu) {
+        int pend = pendingNewCaseDocs.indexOf(old.toString());
+        if (pend >= 0) pendingNewCaseDocs.set(pend, neu.toString());
         LegalStore ls = new LegalStore(this);
         for (LegalStore.Doc d : ls.docs()) {
             if (old.toString().equals(d.uri)) {
@@ -1428,6 +1468,13 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     private void openUri(Uri u) {
+        String markedPath = markerFiles.get(u.toString());
+        if (markedPath != null && new java.io.File(markedPath).isFile()) {      // a marked PDF: open the Category marker
+            Intent mv = new Intent(this, MarkActivity.class);
+            mv.putExtra("path", markedPath);
+            startActivity(mv);
+            return;
+        }
         String type = getContentResolver().getType(u);
         Intent i = new Intent(Intent.ACTION_VIEW);
         i.setDataAndType(u, type == null ? "*/*" : type);
@@ -1707,7 +1754,26 @@ public class NewCaseActivity extends BaseActivity {
             filesBox.addView(row, lp);
         }
         filesBox.setPadding(dp(16), 0, dp(16), pickedUris.isEmpty() ? 0 : dp(8));
+        tintUploadCard();
         if (scaled) shrink(filesBox);
+    }
+
+    /** The Upload Legal Document card turns green once a document is saved in it, plain again when emptied. */
+    private void tintUploadCard() {
+        if (uploadCardView == null) return;
+        if (pickedUris.isEmpty()) {
+            uploadCardView.setBackground(CaseViews.box(this, AppTheme.card(this), 18, AppTheme.cardStroke(this), 1));
+        } else {
+            uploadCardView.setBackground(CaseViews.box(this, AppTheme.isDark(this) ? 0xFF1B3A24 : 0xFFE3F4E6,
+                    18, AppTheme.topics(this), 2));
+        }
+    }
+
+    /** "Multiple" when the marked pages use several categories, the one category when only one, else "Other". */
+    private static String markedCategory(java.util.Map<Integer, String> marks) {
+        java.util.Set<String> d = new java.util.LinkedHashSet<>(marks.values());
+        if (d.isEmpty()) return "Other";
+        return d.size() == 1 ? d.iterator().next() : MULTIPLE;
     }
 
     // ---------- parties: field + chip look ----------
@@ -2568,6 +2634,15 @@ public class NewCaseActivity extends BaseActivity {
         c.acts = actsText();
 
         store.saveCase(c);
+        if (!pendingNewCaseDocs.isEmpty()) {
+            LegalStore docStore = new LegalStore(this);
+            for (LegalStore.Doc pd : docStore.docs()) {
+                if (pendingNewCaseDocs.contains(pd.uri)) {
+                    pd.caseName = c.title();
+                    docStore.saveDoc(pd);
+                }
+            }
+        }
         Toast.makeText(this, "Case created", Toast.LENGTH_SHORT).show();
         finish();
     }

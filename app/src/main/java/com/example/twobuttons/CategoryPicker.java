@@ -58,17 +58,104 @@ final class CategoryPicker {
     /** As above, plus edit-marked-pages / rename / delete icons on the first list (manage may be null). */
     static void pick(Activity a, String current, Consumer<String> onDone, Map<Integer, String> marked,
                      PickerDialogs.Manage manage) {
-        final List<String> top = new ArrayList<>(Arrays.asList(LegalStore.allDocCategories()));
-        final List<String> mine = custom(a);
-        for (String c : mine) if (!top.contains(c)) top.add(Math.max(0, top.size() - 1), c);   // before "Other"
+        pick(a, current, onDone, marked, manage, false);
+    }
+
+    /**
+     * As above; checkMarked shows a green checked radio on every category that already has marked pages
+     * (all of them at once) instead of a single blue tick on the current value.
+     */
+    static void pick(Activity a, String current, Consumer<String> onDone, Map<Integer, String> marked,
+                     PickerDialogs.Manage manage, boolean checkMarked) {
+        final List<String> top = visibleTop(a);
         final String top0 = current == null ? "" : current.split(SEP)[0];
         if (!top0.isEmpty() && !top.contains(top0)) top.add(0, top0);
+        final java.util.function.Predicate<String> chk = checkMarked && marked != null
+                ? item -> !pagesOf(marked, item).isEmpty() : null;
         Runnable[] again = new Runnable[1];
         again[0] = () -> PickerDialogs.searchSheet(a, "Document Category", null, top, top0,
                 "Add New Category", "Category Name", s -> saveCustom(a, s),
                 s -> drill(a, s, onDone, again[0], marked), null,
-                marked == null ? null : item -> pagesNote(marked, item), manage);
+                marked == null ? null : item -> pagesNote(marked, item), manage, chk);
         again[0].run();
+    }
+
+    // ---- built-in categories the user renamed or deleted (kept on the device) ----
+
+    private static final String KEY_HIDDEN = "hidden_doc_cats", KEY_RENAMED = "renamed_doc_cats";
+
+    private static List<String> hidden(Activity a) {
+        List<String> out = new ArrayList<>();
+        try {
+            org.json.JSONArray j = new org.json.JSONArray(
+                    a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).getString(KEY_HIDDEN, "[]"));
+            for (int i = 0; i < j.length(); i++) out.add(j.getString(i));
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** original built-in name -> name the user gave it. */
+    private static Map<String, String> renamed(Activity a) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(
+                    a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).getString(KEY_RENAMED, "{}"));
+            java.util.Iterator<String> it = o.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                out.put(k, o.getString(k));
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    private static void writeHidden(Activity a, List<String> l) {
+        org.json.JSONArray j = new org.json.JSONArray();
+        for (String x : l) j.put(x);
+        a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).edit().putString(KEY_HIDDEN, j.toString()).apply();
+    }
+
+    private static void writeRenamed(Activity a, Map<String, String> m) {
+        org.json.JSONObject o = new org.json.JSONObject();
+        try {
+            for (Map.Entry<String, String> e : m.entrySet()) o.put(e.getKey(), e.getValue());
+        } catch (org.json.JSONException ignored) { }
+        a.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).edit().putString(KEY_RENAMED, o.toString()).apply();
+    }
+
+    /** The built-in name behind a name the user may have renamed (same text when it was not renamed). */
+    private static String originalOf(Activity a, String shown) {
+        for (Map.Entry<String, String> e : renamed(a).entrySet()) if (e.getValue().equals(shown)) return e.getKey();
+        return shown;
+    }
+
+    private static boolean isBuiltIn(Activity a, String shown) {
+        return Arrays.asList(LegalStore.allDocCategories()).contains(originalOf(a, shown)) && !custom(a).contains(shown);
+    }
+
+    /** The first list: built-ins (minus deleted, with renames), then the user's own, before "Other". */
+    private static List<String> visibleTop(Activity a) {
+        final List<String> top = new ArrayList<>();
+        final List<String> gone = hidden(a);
+        final Map<String, String> ren = renamed(a);
+        for (String c : LegalStore.allDocCategories()) {
+            if (gone.contains(c)) continue;
+            String shown = ren.containsKey(c) ? ren.get(c) : c;
+            if (!top.contains(shown)) top.add(shown);
+        }
+        for (String c : custom(a)) {
+            if (top.contains(c)) continue;
+            boolean otherLast = !top.isEmpty() && originalOf(a, top.get(top.size() - 1)).equals("Other");
+            top.add(otherLast ? top.size() - 1 : top.size(), c);
+        }
+        return top;
+    }
+
+    /** Path with its first part mapped back to the built-in name, so sub-options still resolve after a rename. */
+    private static String originalPath(Activity a, String path) {
+        int i = path.indexOf(SEP);
+        if (i < 0) return originalOf(a, path);
+        return originalOf(a, path.substring(0, i)) + path.substring(i);
     }
 
     /** Pages (0-based) of marked whose saved path is cat or starts with cat › . */
@@ -88,10 +175,17 @@ final class CategoryPicker {
      * Rename / delete: only categories the user added; both ask first.
      */
     static PickerDialogs.Manage manage(Activity a, String pdfPath, Map<Integer, String> marks) {
+        return manage(a, pdfPath, marks, null);
+    }
+
+    /** As above; onChanged (may be null) runs after a page mark, a rename or a delete changed the marks. */
+    static PickerDialogs.Manage manage(Activity a, String pdfPath, Map<Integer, String> marks, Runnable onChanged) {
         final MarkStore ms = new MarkStore(a);
+        final Runnable changed = onChanged == null ? () -> { } : onChanged;
         return new PickerDialogs.Manage() {
             @Override public boolean hasPages(String item) { return !pagesOf(marks, item).isEmpty(); }
-            @Override public boolean editable(String item) { return custom(a).contains(item); }
+            // every option, built-in or the user's own, can be renamed and deleted
+            @Override public boolean editable(String item) { return true; }
 
             @Override public void editPages(String item, Runnable refresh) {
                 final Runnable[] redraw = new Runnable[1];
@@ -113,25 +207,41 @@ final class CategoryPicker {
                                     marks.put(pg, neu);
                                     redraw[0].run();
                                     refresh.run();
+                                    changed.run();
                                 });
                             }, new java.util.HashMap<>(marks));
                         });
             }
 
             @Override public void rename(String old, String neu) {
-                renameCustom(a, old, neu);
+                if (custom(a).contains(old)) {
+                    renameCustom(a, old, neu);
+                } else {
+                    Map<String, String> ren = renamed(a);
+                    ren.put(originalOf(a, old), neu);
+                    writeRenamed(a, ren);
+                }
                 ms.renameCategory(old, neu);
                 for (Map.Entry<Integer, String> e : marks.entrySet()) {
                     String v = e.getValue();
                     if (v.equals(old)) e.setValue(neu);
                     else if (v.startsWith(old + SEP)) e.setValue(neu + v.substring(old.length()));
                 }
+                changed.run();
             }
 
             @Override public void delete(String item) {
-                deleteCustom(a, item);
+                if (custom(a).contains(item)) {
+                    deleteCustom(a, item);
+                } else if (isBuiltIn(a, item)) {
+                    List<String> gone = hidden(a);
+                    String orig = originalOf(a, item);
+                    if (!gone.contains(orig)) gone.add(orig);
+                    writeHidden(a, gone);
+                }
                 ms.removeCategory(pdfPath, item);
                 marks.values().removeIf(v -> v.equals(item) || v.startsWith(item + SEP));
+                changed.run();
             }
 
             @Override public String deleteNote(String item) {
@@ -205,7 +315,7 @@ final class CategoryPicker {
 
     private static void drill(Activity a, String path, Consumer<String> onDone, Runnable up,
                               Map<Integer, String> marked) {
-        String[] subs = LegalStore.docSubOptions(path);
+        String[] subs = LegalStore.docSubOptions(originalPath(a, path));
         if (subs.length == 0) {
             onDone.accept(path);
             return;

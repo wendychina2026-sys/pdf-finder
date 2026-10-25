@@ -37,6 +37,7 @@ public class MarkActivity extends BaseActivity {
     private Map<Integer, String> marks;
     private PageAdapter pageAdapter;
     private String onlySub = "";
+    private String addCat = "";      // category preselected by the Vault's add button
     private int[] visible = null;   // null = all pages; else real page indexes to show
 
     @Override
@@ -58,6 +59,8 @@ public class MarkActivity extends BaseActivity {
         marks = store.all(path);
         String o = getIntent().getStringExtra("only_sub");
         onlySub = o == null ? "" : o;
+        String ac = getIntent().getStringExtra("add_cat");
+        addCat = ac == null ? "" : ac;
         rebuildVisible();
 
         LinearLayout root = new LinearLayout(this);
@@ -75,7 +78,9 @@ public class MarkActivity extends BaseActivity {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView hint = new TextView(this);
-        hint.setText(onlySub.isEmpty()
+        hint.setText(!addCat.isEmpty()
+                ? "Adding pages to: " + addCat + "  (long-press a page to mark it)"
+                : onlySub.isEmpty()
                 ? "Long-press a page to mark it"
                 : "Showing only pages marked: " + onlySub + "  (long-press to edit mark)");
         hint.setTextSize(12);
@@ -169,7 +174,7 @@ public class MarkActivity extends BaseActivity {
     // (search, add new category, drill-down) as the rest of the app.
     private void showMarkDialog(int page) {
         final String current = marks.get(page);
-        final String[] chosen = {current == null ? "" : current};
+        final String[] chosen = {current != null ? current : addCat};
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);

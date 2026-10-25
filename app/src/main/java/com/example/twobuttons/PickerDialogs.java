@@ -524,6 +524,19 @@ final class PickerDialogs {
                             String addLabel, String addFieldLabel, Consumer<String> onAdd,
                             Consumer<String> onPick, Runnable onBack, Function<String, String> note,
                             Manage manage) {
+        searchSheet(a, title, subtitle, source, selected, addLabel, addFieldLabel, onAdd, onPick, onBack,
+                note, manage, null);
+    }
+
+    /**
+     * As above; checked (may be null) marks every row it accepts with a green checked radio (several rows
+     * can be checked at once, e.g. every category already marked in a PDF). When null, only the row equal
+     * to selected is checked, in blue.
+     */
+    static void searchSheet(Activity a, String title, String subtitle, List<String> source, String selected,
+                            String addLabel, String addFieldLabel, Consumer<String> onAdd,
+                            Consumer<String> onPick, Runnable onBack, Function<String, String> note,
+                            Manage manage, java.util.function.Predicate<String> checked) {
         final Dialog d = shell(a);
         if (onBack != null) d.setOnCancelListener(x -> onBack.run());
         LinearLayout root = new LinearLayout(a);
@@ -578,8 +591,12 @@ final class PickerDialogs {
             for (int i = 0; i < items.size(); i++) {
                 final String it = items.get(i);
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
-                boolean on = it.equals(selected);
+                boolean on = checked != null ? checked.test(it) : it.equals(selected);
                 LinearLayout r = optionRow(a, it, on, note == null ? null : note.apply(it));
+                final int green = AppTheme.topics(a);
+                if (checked != null && on) {
+                    r.setBackground(CaseViews.box(a, (green & 0x00FFFFFF) | 0x1A000000, 16, green, 1));
+                }
                 if (manage != null) {
                     if (manage.hasPages(it)) {
                         ImageView pg = CaseViews.icon(a, R.drawable.ic_edit, BLUE, 36);
@@ -619,13 +636,14 @@ final class PickerDialogs {
                         r.addView(dl, new LinearLayout.LayoutParams(dp(a, 36), dp(a, 36)));
                     }
                 }
-                r.addView(selMark(a, on));
+                r.addView(checked != null && on ? CaseViews.icon(a, R.drawable.ic_check_circle, green, 26)
+                        : selMark(a, on));
                 r.setOnClickListener(v -> {
                     d.dismiss();
                     onPick.accept(it);
                 });
                 list.addView(r, topMargin(a, list.getChildCount() == 0 ? 14 : 8));
-                if (on) selRow = r;
+                if (on && selRow == null) selRow = r;
             }
             if (list.getChildCount() == 0) {
                 TextView none = CaseViews.text(a, "No matches", 14, soft(a), false);

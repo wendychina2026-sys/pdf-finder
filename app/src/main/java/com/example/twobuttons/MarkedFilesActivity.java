@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
@@ -17,6 +18,7 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -77,6 +79,8 @@ public class MarkedFilesActivity extends BaseActivity {
         adapter = new ItemAdapter();
         ListView list = new ListView(this);
         list.setAdapter(adapter);
+        list.setDivider(null);
+        list.setDividerHeight(0);
         list.setOnItemClickListener((parent, view, pos, id) -> {
             Intent i = new Intent(this, MarkActivity.class);
             i.putExtra("path", items.get(pos).path);
@@ -203,7 +207,7 @@ public class MarkedFilesActivity extends BaseActivity {
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(48, 24, 48, 24);
+        box.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 8), CaseViews.dp(this, 16), CaseViews.dp(this, 8));
 
         // keep MarkStore.SUBS order, then any unknown names
         List<String> order = new ArrayList<>();
@@ -222,52 +226,71 @@ public class MarkedFilesActivity extends BaseActivity {
             final String subName = sub;
             final String rangeText = ranges(pages);
 
-            TextView t = new TextView(this);
-            t.setText(sub + " (" + pages.size() + (pages.size() == 1 ? " page)" : " pages)")
-                    + "\n  Pages: " + rangeText);
-            t.setTextSize(15);
-            t.setTextColor(AppTheme.text(MarkedFilesActivity.this));
-            t.setPadding(0, 16, 0, 0);
+            // one round card per marked category: name, pages, View / Delete, and + to add more pages to it
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 12), CaseViews.dp(this, 14), CaseViews.dp(this, 12));
+            card.setBackground(CaseViews.box(this, AppTheme.card(this), 16, AppTheme.cardStroke(this), 1));
+
+            LinearLayout head = new LinearLayout(this);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            head.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title = CaseViews.text(this, sub, 15, AppTheme.text(this), true);
+            head.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 32);
+            add.setContentDescription("Add pages to " + sub);
+            add.setOnClickListener(v -> {
+                Intent i = new Intent(this, MarkActivity.class);
+                i.putExtra("path", it.path);
+                i.putExtra("add_cat", subName);
+                startActivity(i);
+                if (holder[0] != null) holder[0].dismiss();
+            });
+            head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 36), CaseViews.dp(this, 36)));
+            card.addView(head);
+
+            TextView info = CaseViews.text(this, pages.size() + (pages.size() == 1 ? " page" : " pages")
+                    + "  \u2022  Pages: " + rangeText, 13, AppTheme.sub(this), false);
+            info.setPadding(0, CaseViews.dp(this, 2), 0, CaseViews.dp(this, 10));
+            card.addView(info);
 
             LinearLayout btns = new LinearLayout(this);
             btns.setOrientation(LinearLayout.HORIZONTAL);
-
-            Button view = new Button(this);
-            view.setText("View");
-            view.setAllCaps(false);
-            view.setOnClickListener(v -> {
+            btns.addView(chipButton("View", R.drawable.ic_eye, AppTheme.accent(this), () -> {
                 Intent i = new Intent(this, MarkActivity.class);
                 i.putExtra("path", it.path);
                 i.putExtra("only_sub", subName);
                 startActivity(i);
                 if (holder[0] != null) holder[0].dismiss();
-            });
+            }));
+            LinearLayout delBtn = chipButton("Delete", R.drawable.ic_delete, LegalUi.RED, () ->
+                    new AlertDialog.Builder(this)
+                            .setTitle("Unmark " + subName + "?")
+                            .setMessage("Remove " + subName + " mark from pages " + rangeText + "?")
+                            .setPositiveButton("Delete", (d, w) -> {
+                                for (int pg : pages) store.remove(it.path, pg);
+                                if (holder[0] != null) holder[0].dismiss();
+                                loadAll();
+                                applyFilter();
+                                for (Item n : all) {
+                                    if (n.path.equals(it.path)) {
+                                        showDetails(n);
+                                        break;
+                                    }
+                                }
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show());
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            dlp.leftMargin = CaseViews.dp(this, 8);
+            btns.addView(delBtn, dlp);
+            card.addView(btns);
 
-            Button del = new Button(this);
-            del.setText("Delete");
-            del.setAllCaps(false);
-            del.setOnClickListener(v -> new AlertDialog.Builder(this)
-                    .setTitle("Unmark " + subName + "?")
-                    .setMessage("Remove " + subName + " mark from pages " + rangeText + "?")
-                    .setPositiveButton("Delete", (d, w) -> {
-                        for (int pg : pages) store.remove(it.path, pg);
-                        if (holder[0] != null) holder[0].dismiss();
-                        loadAll();
-                        applyFilter();
-                        for (Item n : all) {
-                            if (n.path.equals(it.path)) {
-                                showDetails(n);
-                                break;
-                            }
-                        }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show());
-
-            btns.addView(view);
-            btns.addView(del);
-            box.addView(t);
-            box.addView(btns);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.topMargin = CaseViews.dp(this, 10);
+            box.addView(card, clp);
         }
 
         int marked = it.marks.size();
@@ -296,6 +319,36 @@ public class MarkedFilesActivity extends BaseActivity {
                 .show();
     }
 
+    /** Small round outlined button: icon + label. */
+    private LinearLayout chipButton(String label, int iconRes, int color, Runnable onClick) {
+        LinearLayout b = new LinearLayout(this);
+        b.setOrientation(LinearLayout.HORIZONTAL);
+        b.setGravity(Gravity.CENTER_VERTICAL);
+        b.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 7), CaseViews.dp(this, 14), CaseViews.dp(this, 7));
+        b.setBackground(CaseViews.box(this, AppTheme.field(this), 20, color, 1));
+        b.addView(CaseViews.icon(this, iconRes, color, 18));
+        TextView t = CaseViews.text(this, label, 13, color, true);
+        t.setPadding(CaseViews.dp(this, 6), 0, 0, 0);
+        b.addView(t);
+        b.setOnClickListener(v -> onClick.run());
+        return b;
+    }
+
+    /** The complete path of a marked PDF, on request (the card itself stays short). */
+    private void showPath(Item it) {
+        TextView t = new TextView(this);
+        t.setText(it.path);
+        t.setTextSize(14);
+        t.setTextIsSelectable(true);
+        t.setTextColor(AppTheme.text(this));
+        t.setPadding(48, 24, 48, 0);
+        new AlertDialog.Builder(this)
+                .setTitle("File path")
+                .setView(t)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
     private class ItemAdapter extends BaseAdapter {
         @Override public int getCount() { return items.size(); }
         @Override public Object getItem(int i) { return items.get(i); }
@@ -304,32 +357,48 @@ public class MarkedFilesActivity extends BaseActivity {
         @Override
         public View getView(int i, View convertView, ViewGroup parent) {
             final Item it = items.get(i);
-            LinearLayout row = new LinearLayout(MarkedFilesActivity.this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(16, 20, 16, 20);
+            final MarkedFilesActivity c = MarkedFilesActivity.this;
+            LinearLayout outer = new LinearLayout(c);
+            outer.setPadding(0, CaseViews.dp(c, 6), 0, CaseViews.dp(c, 6));
 
-            TextView name = new TextView(MarkedFilesActivity.this);
-            name.setText(new File(it.path).getName());
-            name.setTextSize(16);
-            name.setTypeface(null, Typeface.BOLD);
-            name.setTextColor(AppTheme.text(MarkedFilesActivity.this));
+            LinearLayout card = new LinearLayout(c);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(CaseViews.dp(c, 16), CaseViews.dp(c, 14), CaseViews.dp(c, 16), CaseViews.dp(c, 14));
+            card.setBackground(CaseViews.box(c, AppTheme.card(c), 18, AppTheme.cardStroke(c), 1));
 
-            TextView path = new TextView(MarkedFilesActivity.this);
-            path.setText(it.path);
-            path.setTextSize(12);
-            path.setTextColor(Color.GRAY);
+            LinearLayout head = new LinearLayout(c);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            head.setGravity(Gravity.CENTER_VERTICAL);
+            head.addView(CaseViews.icon(c, R.drawable.ic_pdf, AppTheme.accent(c), 24));
+            TextView name = CaseViews.text(c, new File(it.path).getName(), 16, AppTheme.text(c), true);
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+            name.setPadding(CaseViews.dp(c, 10), 0, CaseViews.dp(c, 6), 0);
+            head.addView(name, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            // small icon button: shows the complete file path
+            ImageView pathBtn = CaseViews.icon(c, R.drawable.ic_info, AppTheme.accent(c), 24);
+            pathBtn.setContentDescription("Show file path");
+            pathBtn.setPadding(CaseViews.dp(c, 6), CaseViews.dp(c, 6), CaseViews.dp(c, 6), CaseViews.dp(c, 6));
+            pathBtn.setFocusable(false);
+            pathBtn.setOnClickListener(v -> showPath(it));
+            head.addView(pathBtn, new LinearLayout.LayoutParams(CaseViews.dp(c, 36), CaseViews.dp(c, 36)));
+            card.addView(head);
 
-            Button details = new Button(MarkedFilesActivity.this);
-            details.setText("Show details");
-            details.setAllCaps(false);
+            int n = it.marks.size();
+            TextView sub = CaseViews.text(c, n + (n == 1 ? " marked page" : " marked pages"), 12,
+                    AppTheme.sub(c), false);
+            sub.setPadding(0, CaseViews.dp(c, 4), 0, CaseViews.dp(c, 10));
+            card.addView(sub);
+
+            LinearLayout details = chipButton("Show details", R.drawable.ic_notes, AppTheme.accent(c),
+                    () -> showDetails(it));
             details.setFocusable(false);
-            details.setOnClickListener(v -> showDetails(it));
-
-            row.addView(name);
-            row.addView(path);
-            row.addView(details, new LinearLayout.LayoutParams(
+            card.addView(details, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            return row;
+
+            outer.addView(card, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            return outer;
         }
     }
 }
