@@ -60,6 +60,7 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DriveBackup.askNotificationPermission(this);
 
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(AppTheme.bg(this));

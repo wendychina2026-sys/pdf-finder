@@ -13,6 +13,7 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         DataFolder.install(this);
+        DriveBackup.schedule(this);
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
             SharedPreferences sp = getSharedPreferences("app_runtime", MODE_PRIVATE);

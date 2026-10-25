@@ -179,6 +179,58 @@ final class DataFolder {
         return root;
     }
 
+    // ------------------------------------------------------------------ zip for Google Drive
+
+    /**
+     * Writes the whole app data as one zip: PdfFinder/Data (every store, taken fresh from the app),
+     * PdfFinder/Documents, PdfFinder/Photos, PdfFinder/Cards and anything else in the PdfFinder folder.
+     * Files kept in the app's own storage (when the folder was not available) are included under the
+     * same names. Closes os.
+     */
+    static void zipTo(Context c, java.io.OutputStream os) throws Exception {
+        final Set<String> done = new LinkedHashSet<>();
+        try (java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(
+                new java.io.BufferedOutputStream(os))) {
+            for (String name : storeNames(c)) {
+                Map<String, ?> all = c.getSharedPreferences(name, Context.MODE_PRIVATE).getAll();
+                if (all.isEmpty()) continue;
+                String entry = ROOT_NAME + "/Data/" + name + ".json";
+                z.putNextEntry(new java.util.zip.ZipEntry(entry));
+                z.write(toJson(name, all).toString(1).getBytes(StandardCharsets.UTF_8));
+                z.closeEntry();
+                done.add(entry);
+            }
+            File root = root();
+            if (root != null) addDir(z, root, ROOT_NAME, done);
+            File ext = c.getExternalFilesDir(null);
+            if (ext != null) {
+                addDir(z, new File(ext, "case_photos"), ROOT_NAME + "/Photos", done);
+                addDir(z, new File(ext, "shared"), ROOT_NAME + "/Documents", done);
+            }
+            addDir(z, new File(c.getFilesDir(), "adv_cards"), ROOT_NAME + "/Cards", done);
+        }
+    }
+
+    private static void addDir(java.util.zip.ZipOutputStream z, File dir, String prefix, Set<String> done)
+            throws Exception {
+        File[] fs = dir.listFiles();
+        if (fs == null) return;
+        byte[] buf = new byte[16384];
+        for (File f : fs) {
+            String entry = prefix + "/" + f.getName();
+            if (f.isDirectory()) {
+                addDir(z, f, entry, done);
+            } else if (!f.getName().endsWith(".tmp") && done.add(entry)) {
+                z.putNextEntry(new java.util.zip.ZipEntry(entry));
+                try (FileInputStream in = new FileInputStream(f)) {
+                    int n;
+                    while ((n = in.read(buf)) > 0) z.write(buf, 0, n);
+                }
+                z.closeEntry();
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ restore
 
     /** True when the app holds no data of its own (fresh install). */
