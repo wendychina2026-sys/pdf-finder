@@ -67,7 +67,22 @@ class MarkStore {
     void move(Context c, String oldPath, String newPath) {
         if (oldPath.equals(newPath)) return;
         String v = prefs.getString(oldPath, null);
-        if (v != null) prefs.edit().remove(oldPath).putString(newPath, v).apply();
+        if (v != null) {
+            String have = prefs.getString(newPath, null);
+            if (have != null) {                      // the target already has marks: keep them, add the new pages
+                try {
+                    JSONObject keep = new JSONObject(have);
+                    JSONObject add = new JSONObject(v);
+                    Iterator<String> ks = add.keys();
+                    while (ks.hasNext()) {
+                        String k = ks.next();
+                        if (!keep.has(k)) keep.put(k, add.get(k));
+                    }
+                    v = keep.toString();
+                } catch (JSONException ignored) { }
+            }
+            prefs.edit().remove(oldPath).putString(newPath, v).apply();
+        }
         SharedPreferences mp = c.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE);
         String m = mp.getString(oldPath, null);
         if (m != null) mp.edit().remove(oldPath).putString(newPath, m).apply();

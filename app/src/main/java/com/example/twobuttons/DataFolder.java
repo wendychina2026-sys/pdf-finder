@@ -79,6 +79,42 @@ final class DataFolder {
         return fallback;
     }
 
+    private static String sha256(File f) {
+        try (FileInputStream in = new FileInputStream(f)) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[64 * 1024];
+            int r;
+            while ((r = in.read(buf)) > 0) md.update(buf, 0, r);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : md.digest()) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * A file already in {@code dir} that is the same document as {@code src} (same size and same content;
+     * the one with the same name is tried first), or null. Used so one PDF never exists twice in the folder.
+     */
+    static File findSameFile(File dir, File src) {
+        try {
+            File[] all = dir.listFiles();
+            if (all == null || src == null) return null;
+            String h = null;
+            File sameName = new File(dir, src.getName());
+            List<File> order = new ArrayList<>();
+            if (sameName.isFile()) order.add(sameName);
+            for (File f : all) if (f.isFile() && !f.equals(sameName)) order.add(f);
+            for (File f : order) {
+                if (f.equals(src) || f.getName().startsWith(".") || f.length() != src.length()) continue;
+                if (h == null) { h = sha256(src); if (h == null) return null; }
+                if (h.equals(sha256(f))) return f;
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
     /**
      * Moves a saved file from its original place into the app's Documents folder (PdfFinder/Documents).
      * Returns the new file, the same file when it already lives there, or null when it could not be moved
@@ -91,6 +127,12 @@ final class DataFolder {
             if (dir == null) return null;
             if (src.getParentFile() != null
                     && src.getParentFile().getCanonicalPath().equals(dir.getCanonicalPath())) return src;
+            File same = findSameFile(dir, src);
+            if (same != null) {                              // already in the folder: keep that one only
+                src.delete();
+                android.media.MediaScannerConnection.scanFile(c, new String[]{src.getAbsolutePath()}, null, null);
+                return same;
+            }
             String name = src.getName();
             int dot = name.lastIndexOf('.');
             String stem = dot > 0 ? name.substring(0, dot) : name;

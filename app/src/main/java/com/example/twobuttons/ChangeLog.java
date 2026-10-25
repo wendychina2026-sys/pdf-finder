@@ -20,6 +20,8 @@ final class ChangeLog {
     static final Entry[] ENTRIES = {
         new Entry("25 Oct 2026", "Document Vault, folders and change log",
             "Settings > Change log: this page, listing what every update adds.",
+            "No duplicate PDFs: a file that is already in PdfFinder/Documents (same content, same or different name) is never stored again; Share / Open with reuses it.",
+            "Marking even one page moves the PDF into PdfFinder/Documents automatically; its marks follow.",
             "Open folder (file information) marks your file in the folder: highlighted row, \"Your file\" tag, scrolled into view.",
             "Files saved while \"All files access\" was off now move from the app's private folder into PdfFinder/Documents once access is on; marks, matter and document records follow.",
             "Vault cards show the Document Name you gave the file, with its file icon; the real file name stays separate in the details.",
