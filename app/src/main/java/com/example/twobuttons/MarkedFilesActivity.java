@@ -87,6 +87,11 @@ public class MarkedFilesActivity extends BaseActivity {
             startActivity(i);
         });
 
+        list.setOnItemLongClickListener((parent, view, pos, id) -> {
+            showFileOptions(items.get(pos));
+            return true;
+        });
+
         Button addCase = LegalUi.outlineButton(this, "+  Add Case");
         addCase.setOnClickListener(v -> startActivity(new Intent(this, NewCaseActivity.class)));
         LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(
@@ -202,6 +207,37 @@ public class MarkedFilesActivity extends BaseActivity {
         return sb.toString();
     }
 
+    // long-press on a PDF: delete the file, or reset all its page marks
+    private void showFileOptions(final Item it) {
+        PickerDialogs.optionSheet(this, new File(it.path).getName(), null,
+                java.util.Arrays.asList("Delete file", "Reset marking"), -1, which -> {
+                    if (which == 0) {
+                        PickerDialogs.confirm(this, "Delete file?",
+                                "\"" + new File(it.path).getName() + "\" and all its page marks will be deleted from your phone. It cannot be undone.",
+                                "Delete", () -> {
+                                    boolean ok = new File(it.path).delete();
+                                    store.clear(it.path);
+                                    if (ok) android.media.MediaScannerConnection.scanFile(
+                                            this, new String[]{it.path}, null, null);
+                                    android.widget.Toast.makeText(this, ok ? "File deleted"
+                                            : "Marks cleared, but the file could not be deleted",
+                                            android.widget.Toast.LENGTH_LONG).show();
+                                    loadAll();
+                                    applyFilter();
+                                });
+                    } else {
+                        PickerDialogs.confirm(this, "Reset marking?",
+                                "All " + it.marks.size() + " page marks of \"" + new File(it.path).getName()
+                                        + "\" will be removed. The file is kept.",
+                                "Reset", () -> {
+                                    store.clear(it.path);
+                                    loadAll();
+                                    applyFilter();
+                                });
+                    }
+                });
+    }
+
     private void showDetails(Item it) {
         int total = totalPages(it.path);
 
@@ -249,8 +285,8 @@ public class MarkedFilesActivity extends BaseActivity {
             head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 36), CaseViews.dp(this, 36)));
             card.addView(head);
 
-            TextView info = CaseViews.text(this, pages.size() + (pages.size() == 1 ? " page" : " pages")
-                    + "  \u2022  Pages: " + rangeText, 13, AppTheme.sub(this), false);
+            TextView info = CaseViews.text(this, (pages.size() == 1 ? "Page " : "Pages ") + rangeText,
+                    13, AppTheme.sub(this), false);
             info.setPadding(0, CaseViews.dp(this, 2), 0, CaseViews.dp(this, 10));
             card.addView(info);
 

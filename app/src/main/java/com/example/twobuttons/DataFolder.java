@@ -79,6 +79,40 @@ final class DataFolder {
         return fallback;
     }
 
+    /**
+     * Moves a saved file from its original place into the app's Documents folder (PdfFinder/Documents).
+     * Returns the new file, the same file when it already lives there, or null when it could not be moved
+     * (the original is then left untouched).
+     */
+    static File moveIntoDocuments(Context c, File src) {
+        try {
+            if (src == null || !src.isFile()) return null;
+            File dir = dir("Documents", new File(c.getExternalFilesDir(null), "shared"));
+            if (dir == null) return null;
+            if (src.getParentFile() != null
+                    && src.getParentFile().getCanonicalPath().equals(dir.getCanonicalPath())) return src;
+            String name = src.getName();
+            int dot = name.lastIndexOf('.');
+            String stem = dot > 0 ? name.substring(0, dot) : name;
+            String ext = dot > 0 ? name.substring(dot) : "";
+            File dest = new File(dir, name);
+            for (int n = 1; dest.exists(); n++) dest = new File(dir, stem + " (" + n + ")" + ext);
+            if (!src.renameTo(dest)) {                       // different volume: copy, then delete the original
+                try (FileInputStream in = new FileInputStream(src); FileOutputStream out = new FileOutputStream(dest)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int r;
+                    while ((r = in.read(buf)) > 0) out.write(buf, 0, r);
+                }
+                if (dest.length() != src.length()) { dest.delete(); return null; }
+                if (!src.delete()) { /* copy is complete; the original could not be removed */ }
+            }
+            android.media.MediaScannerConnection.scanFile(c, new String[]{src.getAbsolutePath(), dest.getAbsolutePath()}, null, null);
+            return dest;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------ start up
 
     static void install(final Application app) {

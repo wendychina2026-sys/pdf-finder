@@ -58,6 +58,21 @@ class MarkStore {
         }
     }
 
+    /** Reset the whole file: every page mark of this PDF is removed. */
+    void clear(String path) {
+        prefs.edit().remove(path).apply();
+    }
+
+    /** The PDF moved to a new path: its page marks (and attached matter) follow it. */
+    void move(Context c, String oldPath, String newPath) {
+        if (oldPath.equals(newPath)) return;
+        String v = prefs.getString(oldPath, null);
+        if (v != null) prefs.edit().remove(oldPath).putString(newPath, v).apply();
+        SharedPreferences mp = c.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE);
+        String m = mp.getString(oldPath, null);
+        if (m != null) mp.edit().remove(oldPath).putString(newPath, m).apply();
+    }
+
     // every PDF path that has marks -> its marks
     Map<String, Map<Integer, String>> everything() {
         Map<String, Map<Integer, String>> out = new HashMap<>();

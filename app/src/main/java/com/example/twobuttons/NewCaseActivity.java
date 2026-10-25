@@ -1335,6 +1335,18 @@ public class NewCaseActivity extends BaseActivity {
             dupOk[0] = false;
             // all files chosen in this dialog belong to ONE group: one card, one Vault entry
             List<Uri> group = new ArrayList<>(dlgUris);
+            // a file saved from the marker leaves its original place and lives in the app's folder from now on
+            for (int gi = 0; gi < group.size(); gi++) {
+                String oldPath = markerFiles.get(group.get(gi).toString());
+                if (oldPath == null) continue;
+                File moved = DataFolder.moveIntoDocuments(this, new File(oldPath));
+                if (moved == null) continue;
+                new MarkStore(this).move(this, oldPath, moved.getAbsolutePath());
+                Uri nu = PhotoFlow.uri(this, moved);
+                markerFiles.remove(group.get(gi).toString());
+                markerFiles.put(nu.toString(), moved.getAbsolutePath());
+                group.set(gi, nu);
+            }
             Uri first = group.get(0);
             List<Uri> rest = new ArrayList<>(group.subList(1, group.size()));
             String shown = base + extOf(displayName(first));

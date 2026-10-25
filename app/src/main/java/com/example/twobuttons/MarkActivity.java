@@ -144,7 +144,8 @@ public class MarkActivity extends BaseActivity {
                         }), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
-        root.addView(bottom, wide);
+        // opened from Document Vault > Show details (View / + add): the file is already in the vault
+        if (onlySub.isEmpty() && addCat.isEmpty()) root.addView(bottom, wide);
         setContentView(root);
     }
 
