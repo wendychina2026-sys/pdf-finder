@@ -47,8 +47,6 @@ class PdfActions {
     // Top bar shown in selection mode: "N selected | All | Delete | Cancel"
     LinearLayout buildSelectionBar() {
         bar = new LinearLayout(activity);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setVisibility(View.GONE);
 
         countText = new TextView(activity);
@@ -76,12 +74,24 @@ class PdfActions {
         cancel.setText("Cancel");
         cancel.setOnClickListener(v -> exitSelection());
 
+        // Two lines: the count, then four equal buttons. (One line overflowed once Share was added and
+        // squeezed the count to zero width, which made the bar very tall.)
+        bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setGravity(Gravity.START);
         bar.addView(countText, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        bar.addView(all);
-        bar.addView(shareButton);
-        bar.addView(deleteButton);
-        bar.addView(cancel);
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout buttons = new LinearLayout(activity);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        for (Button b : new Button[]{all, shareButton, deleteButton, cancel}) {
+            b.setMinWidth(0);
+            b.setMinimumWidth(0);
+            b.setTextSize(13);
+            b.setPadding(4, 0, 4, 0);
+            buttons.addView(b, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        bar.addView(buttons, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return bar;
     }
 
