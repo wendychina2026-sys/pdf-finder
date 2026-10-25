@@ -32,6 +32,8 @@ public class FindPdfsActivity extends BaseActivity {
     private LinearLayout chips;
     private static final String[] KINDS = {"All", "PDF", "Images", "Videos"};
     private int kindSel = 0;
+    private static final String[] SORTS = {"Name A-Z", "Size: small to large", "Size: large to small"};
+    private TextView sortChip;
     private boolean scanned = false;
     private boolean waitingForPermission = false;
 
@@ -88,7 +90,21 @@ public class FindPdfsActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(actions.buildSelectionBar(), wide);
         root.addView(searchBox, wide);
+        sortChip = new TextView(this);
+        sortChip.setTextSize(14);
+        sortChip.setTextColor(AppTheme.accent(this));
+        sortChip.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 8), CaseViews.dp(this, 14), CaseViews.dp(this, 8));
+        sortChip.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
+        sortChip.setOnClickListener(v -> PickerDialogs.optionSheet(this, "Sort by", null,
+                java.util.Arrays.asList(SORTS), adapter.sortMode, which -> {
+                    adapter.sortMode = which;
+                    updateSortChip();
+                    if (scanned) applyFilter();
+                }));
+        updateSortChip();
         root.addView(chips, wide);
+        root.addView(sortChip, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         root.addView(rescanButton, wide);
         root.addView(status, wide);
         root.addView(list, new LinearLayout.LayoutParams(
@@ -164,6 +180,10 @@ public class FindPdfsActivity extends BaseActivity {
             lp.rightMargin = CaseViews.dp(this, 8);
             chips.addView(t, lp);
         }
+    }
+
+    private void updateSortChip() {
+        sortChip.setText("Sort: " + SORTS[adapter.sortMode] + " \u25BE");
     }
 
     private void applyFilter() {
