@@ -19,7 +19,7 @@ final class ChangeLog {
 
     static final Entry[] ENTRIES = {
         new Entry("26 Oct 2026", "Marked / unmarked in data folder; Documents is Document Vault",
-            "Left menu: Documents now opens the Document Vault (marked files).",
+            "Left menu: Document Vault entry removed.",
             "Data folder explorer: every PDF shows \"Marked file\" or \"Unmarked\".",
             "Data folder explorer: filter All / Marked / Unmarked."),
         new Entry("26 Oct 2026", "Replace resets marks; new files ask category; marks pending tag",
