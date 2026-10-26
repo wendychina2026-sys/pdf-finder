@@ -278,8 +278,45 @@ final class DataFolder {
         });
     }
 
+    /**
+     * A PDF saved to the General Document Vault with no page marked never showed in the Vault. Once per file:
+     * every page gets the document's own category, so the file appears in the Vault with its pages marked.
+     */
+    static void markUnmarkedVaultPdfs(final Context c) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    File[] files = documentsDir(c).listFiles();
+                    if (files == null) return;
+                    SharedPreferences done = c.getSharedPreferences("vault_repaired", Context.MODE_PRIVATE);
+                    MarkStore ms = new MarkStore(c);
+                    java.util.Map<String, String> catByUri = new java.util.HashMap<>();
+                    for (LegalStore.Doc d : new LegalStore(c).docs()) {
+                        if (d.category == null || d.category.isEmpty() || d.category.equals("Multiple")) continue;
+                        catByUri.put(d.uri, d.category);
+                        for (String m : d.more) catByUri.put(m, d.category);
+                    }
+                    for (File f : files) {
+                        if (!f.isFile() || !f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")) continue;
+                        String path = f.getAbsolutePath();
+                        if (done.getBoolean(path, false) || !ms.all(path).isEmpty()) continue;
+                        String cat = catByUri.get(PhotoFlow.uri(c, f).toString());
+                        if (cat == null) continue;
+                        try (android.os.ParcelFileDescriptor pf = android.os.ParcelFileDescriptor.open(f,
+                                android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+                             android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+                            for (int pg = 0; pg < pr.getPageCount(); pg++) ms.set(path, pg, cat);
+                            done.edit().putBoolean(path, true).apply();
+                        } catch (Exception ignored) { }
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
     private static void onResume(Application app, Activity a) {
         migrateStranded(app);
+        markUnmarkedVaultPdfs(app);
         try {
             SharedPreferences rt = app.getSharedPreferences(RUNTIME, Context.MODE_PRIVATE);
             if (rt.getBoolean(FLAG, false)) return;
