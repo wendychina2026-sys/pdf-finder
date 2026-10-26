@@ -150,8 +150,8 @@ public class MainActivity extends BaseActivity {
 
         col.addView(drawerRow(R.drawable.ic_person, "Clients",
                 "Contacts, cases and payments", ClientDetailsActivity.class), CaseViews.lp(this, 0, 10));
-        col.addView(drawerRow(R.drawable.ic_pdf, "Documents",
-                "Petitions, orders, evidence and files", DocumentsActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_pdf, "Document Vault",
+                "Marked files, categories and pages", MarkedFilesActivity.class), CaseViews.lp(this, 0, 10));
         col.addView(drawerRow(R.drawable.ic_bell, "Reminders",
                 "Hearing reminders sent to clients", ReminderDetailsActivity.class), CaseViews.lp(this, 0, 10));
         col.addView(drawerRow(R.drawable.ic_calendar, "Today & Weekly",

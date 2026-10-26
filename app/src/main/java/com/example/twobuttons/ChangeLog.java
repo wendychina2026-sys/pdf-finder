@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("26 Oct 2026", "Marked / unmarked in data folder; Documents is Document Vault",
+            "Left menu: Documents now opens the Document Vault (marked files).",
+            "Data folder explorer: every PDF shows \"Marked file\" or \"Unmarked\".",
+            "Data folder explorer: filter All / Marked / Unmarked."),
         new Entry("26 Oct 2026", "Replace resets marks; new files ask category; marks pending tag",
             "Documents > Manage files > Replace: page marks of that file are reset (a warning shows first) and the new PDF opens straight in the Category marker.",
             "Documents > Manage files > add files: asks if they are more files of this document's category or a new category; new category becomes its own document card.",

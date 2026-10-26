@@ -51,6 +51,10 @@ public class FileExplorerActivity extends BaseActivity {
     private int sort = 0;
     private boolean asc = true;
     private String query = "";
+    private int filterMode = 0;               // 0 all, 1 marked PDFs, 2 unmarked PDFs
+    private static final String[] FILTERS = {"All", "Marked", "Unmarked"};
+    private java.util.Set<String> markedPaths = new java.util.HashSet<>();
+    private TextView filterLabel;
 
     private final List<File> shown = new ArrayList<>();
     private final Map<File, Integer> childCount = new HashMap<>();
@@ -108,6 +112,17 @@ public class FileExplorerActivity extends BaseActivity {
         sortLabel = (TextView) sortChip.getChildAt(1);
         sortChip.setOnClickListener(v -> pickSort());
         bar.addView(sortChip);
+        LinearLayout filterChip = chip(R.drawable.ic_filter, "All");
+        filterLabel = (TextView) filterChip.getChildAt(1);
+        filterChip.setOnClickListener(v -> PickerDialogs.optionSheet(this, "Show files", "PDFs by marking",
+                Arrays.asList(FILTERS), filterMode, which -> {
+                    filterMode = which;
+                    reload(false);
+                }));
+        LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        flp.leftMargin = CaseViews.dp(this, 6);
+        bar.addView(filterChip, flp);
         ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 28);
         add.setContentDescription("New folder");
         add.setOnClickListener(v -> newFolder());
@@ -292,6 +307,8 @@ public class FileExplorerActivity extends BaseActivity {
         File[] kids = cur.listFiles();
         shown.clear();
         childCount.clear();
+        markedPaths = new MarkStore(this).everything().keySet();
+        filterLabel.setText(FILTERS[filterMode]);
         long bytes = 0;
         int folders = 0, files = 0;
         if (kids != null) {
@@ -305,6 +322,10 @@ public class FileExplorerActivity extends BaseActivity {
                     bytes += k.length();
                 }
                 if (!query.isEmpty() && !k.getName().toLowerCase(Locale.ROOT).contains(query)) continue;
+                if (filterMode != 0 && !k.isDirectory()) {      // folders stay, so you can still walk in
+                    if (!isPdf(k)) continue;
+                    if ((filterMode == 1) != markedPaths.contains(k.getAbsolutePath())) continue;
+                }
                 shown.add(k);
             }
         }
@@ -326,6 +347,10 @@ public class FileExplorerActivity extends BaseActivity {
                 }
             }
         }
+    }
+
+    private static boolean isPdf(File f) {
+        return f.getName().toLowerCase(Locale.ROOT).endsWith(".pdf");
     }
 
     private Comparator<File> comparator() {
@@ -745,6 +770,13 @@ public class FileExplorerActivity extends BaseActivity {
                 sub = size(f.length()) + "  \u2022  " + fmt.format(new Date(f.lastModified()));
             }
             col.addView(CaseViews.text(c, sub, 12, AppTheme.sub(c), false));
+            if (!f.isDirectory() && isPdf(f)) {
+                boolean m = markedPaths.contains(f.getAbsolutePath());
+                TextView mt = CaseViews.text(c, m ? "\u2605 Marked file" : "Unmarked", 11,
+                        m ? AppTheme.topics(c) : AppTheme.sub(c), true);
+                mt.setPadding(0, CaseViews.dp(c, 2), 0, 0);
+                col.addView(mt);
+            }
             if (mark) {
                 TextView tag = CaseViews.text(c, "\u2605 Your file", 11, AppTheme.accent(c), true);
                 tag.setPadding(0, CaseViews.dp(c, 2), 0, 0);
