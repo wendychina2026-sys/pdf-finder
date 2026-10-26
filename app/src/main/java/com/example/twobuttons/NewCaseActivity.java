@@ -1069,6 +1069,7 @@ public class NewCaseActivity extends BaseActivity {
         }
         final String[] stageSel = {""};
         final boolean[] dupOk = {false};
+        final boolean[] matterTouched = {false};   // matter changed in this popup (wins over the marker's latest pick)
 
         LinearLayout f = new LinearLayout(this);
         f.setOrientation(LinearLayout.VERTICAL);
@@ -1153,6 +1154,7 @@ public class NewCaseActivity extends BaseActivity {
                         final String pick = items.get(i);
                         if (pick.equals(matterSel[0])) return;
                         final Runnable apply = () -> {
+                            matterTouched[0] = true;
                             matterSel[0] = pick;
                             setChosen(matterTv, matterSel[0], general);
                         };
@@ -1314,6 +1316,18 @@ public class NewCaseActivity extends BaseActivity {
                 return false;
             }
             String base = LegalUi.str(name);
+            // matter changed later in the Category marker (View > Attach to Matter > OK) applies here too
+            if (fromMarker && !matterTouched[0]) {
+                String live = getSharedPreferences("pdf_matter_live", MODE_PRIVATE).getString(markerPath, "");
+                if (!live.isEmpty()) {
+                    if (live.equals(MatterPicker.VAULT) || live.equals("General Document Vault")) matterSel[0] = general;
+                    else if (live.equals("+ Create new case")) matterSel[0] = CREATE_NEW_CASE;
+                    else for (DiaryStore.HCase hc : cases) {
+                        String t = (!hc.first.isEmpty() && !hc.second.isEmpty()) ? hc.first + " vs. " + hc.second : hc.title();
+                        if (t.equals(live) || hc.title().equals(live)) matterSel[0] = hc.title();
+                    }
+                }
+            }
             final boolean newCase = matterSel[0].equals(CREATE_NEW_CASE);
             // a document for the case being created is kept in the Vault until the case is saved
             String matterName = matterSel[0].equals(general) || newCase ? "General Document Vault" : matterSel[0];
@@ -1342,6 +1356,18 @@ public class NewCaseActivity extends BaseActivity {
                 File moved = DataFolder.moveIntoDocuments(this, new File(oldPath));
                 if (moved == null) continue;
                 new MarkStore(this).move(this, oldPath, moved.getAbsolutePath());
+                // no page was marked: the whole PDF is one document of the chosen category, so mark every page
+                // with it; only then does the file show in the Document Vault
+                MarkStore ms = new MarkStore(this);
+                String wholeCat = catSel[0];
+                if (matterSel[0].equals(general) && ms.all(moved.getAbsolutePath()).isEmpty()
+                        && !wholeCat.isEmpty() && !wholeCat.equals(MULTIPLE)) {
+                    try (android.os.ParcelFileDescriptor pf = android.os.ParcelFileDescriptor.open(moved,
+                            android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+                         android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+                        for (int pg = 0; pg < pr.getPageCount(); pg++) ms.set(moved.getAbsolutePath(), pg, wholeCat);
+                    } catch (Exception ignored) { }
+                }
                 Uri nu = PhotoFlow.uri(this, moved);
                 markerFiles.remove(group.get(gi).toString());
                 markerFiles.put(nu.toString(), moved.getAbsolutePath());

@@ -126,6 +126,8 @@ public class MarkActivity extends BaseActivity {
                 PickerDialogs.optionSheetOk(this, "Attach to Matter", "Saved cases", matters,
                         matters.indexOf(matter[0]), i -> {
                             final String pick = matters.get(i);
+                            // the latest choice, read by the Upload Legal Document popup when it saves
+                            getSharedPreferences("pdf_matter_live", MODE_PRIVATE).edit().putString(path, pick).apply();
                             if (!pick.equals(createNew)) {
                                 matter[0] = pick;
                                 mp.edit().putString(path, pick).apply();
@@ -141,6 +143,7 @@ public class MarkActivity extends BaseActivity {
                             nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
                             nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, pick);
                             startActivity(nc);
+                            finish();           // no stale marker (old file path) left behind the popup
                         }), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
