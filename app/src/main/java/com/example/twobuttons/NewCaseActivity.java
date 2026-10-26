@@ -1069,6 +1069,8 @@ public class NewCaseActivity extends BaseActivity {
         }
         final String[] stageSel = {""};
         final boolean[] dupOk = {false};
+        final int[] wholeMode = {-1};              // multi-page PDF, one category: -1 not asked, 0 all pages, 1 some pages, 2 mark later
+        final String[] wholeRange = {""};
         final boolean[] matterTouched = {false};   // matter changed in this popup (wins over the marker's latest pick)
 
         LinearLayout f = new LinearLayout(this);
@@ -1333,6 +1335,49 @@ public class NewCaseActivity extends BaseActivity {
             String matterName = matterSel[0].equals(general) || newCase ? "General Document Vault" : matterSel[0];
             String shownMatter = newCase ? "This new case" : matterName;
             if (autoCat[0]) catSel[0] = markedCategory(marks);
+            // a multi-page PDF with no marked page and one category: ask how its pages should be marked
+            if (matterSel[0].equals(general) && wholeMode[0] < 0 && !catSel[0].isEmpty() && !catSel[0].equals(MULTIPLE)) {
+                for (Uri gu : dlgUris) {
+                    String gp = markerFiles.get(gu.toString());
+                    if (gp == null || !new MarkStore(this).all(gp).isEmpty()) continue;
+                    final int pc = pdfPageCount(new File(gp));
+                    if (pc < 2) continue;
+                    final String cat = catSel[0];
+                    final Runnable again = () -> { if (saver[0].getAsBoolean() && dlg[0] != null) dlg[0].dismiss(); };
+                    new android.app.AlertDialog.Builder(this)
+                            .setTitle("Mark pages")
+                            .setMessage("This file has " + pc + " pages. All of them will be marked as \"" + cat
+                                    + "\". Are all the pages of this category?")
+                            .setPositiveButton("All pages", (d, w) -> { wholeMode[0] = 0; again.run(); })
+                            .setNeutralButton("Some pages", (d, w) -> {
+                                final EditText er = new RoundEdit(this);
+                                FieldStyle.smallHint(er, "Pages of \"" + cat + "\", e.g. 1-4, 6");
+                                er.setSingleLine(true);
+                                LinearLayout bx = new LinearLayout(this);
+                                bx.setPadding(dp(20), dp(8), dp(20), 0);
+                                bx.addView(er, new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                                new android.app.AlertDialog.Builder(this)
+                                        .setTitle("Which pages (1 to " + pc + ")?")
+                                        .setMessage("The other pages stay unmarked; mark them later in the Category marker.")
+                                        .setView(bx)
+                                        .setPositiveButton("OK", (d2, w2) -> {
+                                            if (parsePages(LegalUi.str(er), pc).isEmpty()) {
+                                                Toast.makeText(this, "Enter valid page numbers", Toast.LENGTH_SHORT).show();
+                                                return;
+                                            }
+                                            wholeRange[0] = LegalUi.str(er);
+                                            wholeMode[0] = 1;
+                                            again.run();
+                                        })
+                                        .setNegativeButton("Cancel", null)
+                                        .show();
+                            })
+                            .setNegativeButton("Mark later", (d, w) -> { wholeMode[0] = 2; again.run(); })
+                            .show();
+                    return false;
+                }
+            }
             LegalStore ls = new LegalStore(this);
             LegalStore.Doc dup = matterSel[0].equals(general) || newCase || catSel[0].equals(MULTIPLE) ? null
                     : sameCategoryDoc(ls, cases, matterSel[0], catSel[0]);
@@ -1356,17 +1401,22 @@ public class NewCaseActivity extends BaseActivity {
                 File moved = DataFolder.moveIntoDocuments(this, new File(oldPath));
                 if (moved == null) continue;
                 new MarkStore(this).move(this, oldPath, moved.getAbsolutePath());
-                // no page was marked: the whole PDF is one document of the chosen category, so mark every page
-                // with it; only then does the file show in the Document Vault
+                // no page marked yet: mark by the choice made above (all pages / listed pages / later)
                 MarkStore ms = new MarkStore(this);
                 String wholeCat = catSel[0];
-                if (matterSel[0].equals(general) && ms.all(moved.getAbsolutePath()).isEmpty()
+                String mp2 = moved.getAbsolutePath();
+                if (matterSel[0].equals(general) && ms.all(mp2).isEmpty()
                         && !wholeCat.isEmpty() && !wholeCat.equals(MULTIPLE)) {
-                    try (android.os.ParcelFileDescriptor pf = android.os.ParcelFileDescriptor.open(moved,
-                            android.os.ParcelFileDescriptor.MODE_READ_ONLY);
-                         android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
-                        for (int pg = 0; pg < pr.getPageCount(); pg++) ms.set(moved.getAbsolutePath(), pg, wholeCat);
-                    } catch (Exception ignored) { }
+                    if (wholeMode[0] == 2) {
+                        // marked later by the user: the one-time auto repair must not mark it
+                        getSharedPreferences("vault_repaired", MODE_PRIVATE).edit().putBoolean(mp2, true).apply();
+                    } else {
+                        int pc = pdfPageCount(moved);
+                        java.util.Set<Integer> only = wholeMode[0] == 1 ? parsePages(wholeRange[0], pc) : null;
+                        for (int pg = 0; pg < pc; pg++) {
+                            if (only == null || only.contains(pg)) ms.set(mp2, pg, wholeCat);
+                        }
+                    }
                 }
                 Uri nu = PhotoFlow.uri(this, moved);
                 markerFiles.remove(group.get(gi).toString());
@@ -1435,6 +1485,36 @@ public class NewCaseActivity extends BaseActivity {
             if (d.caseName.equals(matter) && d.category.equalsIgnoreCase(cat)) { hit = d; break; }   // newest first
         }
         return hit;
+    }
+
+    private static int pdfPageCount(File f) {
+        try (android.os.ParcelFileDescriptor pf = android.os.ParcelFileDescriptor.open(f,
+                android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+             android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+            return pr.getPageCount();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** "1-4, 6" -> 0-based page indexes within 1..max; anything out of range is ignored. */
+    private static java.util.Set<Integer> parsePages(String text, int max) {
+        java.util.Set<Integer> out = new java.util.TreeSet<>();
+        for (String part : text.split("[,;\\s]+")) {
+            if (part.isEmpty()) continue;
+            try {
+                int a, b;
+                if (part.contains("-")) {
+                    String[] r = part.split("-");
+                    a = Integer.parseInt(r[0].trim());
+                    b = Integer.parseInt(r[1].trim());
+                } else {
+                    a = b = Integer.parseInt(part.trim());
+                }
+                for (int i = Math.max(1, Math.min(a, b)); i <= Math.min(max, Math.max(a, b)); i++) out.add(i - 1);
+            } catch (Exception ignored) { }
+        }
+        return out;
     }
 
     /** Small labelled button (icon + text) used under a chosen file in the upload dialog. */
