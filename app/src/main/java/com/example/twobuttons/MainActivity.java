@@ -113,6 +113,7 @@ public class MainActivity extends BaseActivity {
         frame.addView(drawer, new android.widget.FrameLayout.LayoutParams(
                 w, android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(frame);
+        if (savedInstanceState == null) frame.post(() -> WhatsNew.showIfNewVersion(this));
     }
 
     // ---------- left drawer: Legal Diary pages ----------

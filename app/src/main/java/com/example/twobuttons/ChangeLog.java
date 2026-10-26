@@ -18,6 +18,9 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("26 Oct 2026", "What's new popup on update",
+            "After an update, a What's new popup shows the latest change-log entry once at startup.",
+            "Full change log button opens Settings > Change log. Fresh installs show no popup."),
         new Entry("25 Oct 2026", "Find files: PDFs, images, videos; highlight; multi-select",
             "Find PDFs is now Find files: scans PDFs, images and videos, with All / PDF / Images / Videos filter chips.",
             "The scan skips the PdfFinder data folder (those PDFs are managed in Document Vault).",
