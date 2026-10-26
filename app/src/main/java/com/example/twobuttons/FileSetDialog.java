@@ -111,10 +111,20 @@ final class FileSetDialog {
                 btns.setOrientation(LinearLayout.HORIZONTAL);
                 btns.addView(btn(a, "View", AppTheme.info(a), () -> DocFileCard.open(a, u, nm)), blp(a, 0, 1f));
                 btns.addView(btn(a, "Replace", AppTheme.accent(a), () -> {
-                    pendIdx = idx;
-                    pendRedraw = draw[0];
-                    curFiles = files;
-                    source(a, flow);
+                    Runnable go = () -> {
+                        pendIdx = idx;
+                        pendRedraw = draw[0];
+                        curFiles = files;
+                        source(a, flow);
+                    };
+                    File vf = DataFolder.documentsByUri(a).get(u.toString());
+                    if (vf != null && !new MarkStore(a).all(vf.getAbsolutePath()).isEmpty()) {
+                        PickerDialogs.confirm(a, "Replace file?",
+                                "Page marks of this file will be reset. You mark the new file right after.",
+                                "Replace", go);
+                    } else {
+                        go.run();
+                    }
                 }), blp(a, 6, 1f));
                 btns.addView(btn(a, "Delete", RoundEdit.RED, () -> {
                     files.remove(idx);

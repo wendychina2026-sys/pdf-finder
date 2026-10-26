@@ -79,6 +79,79 @@ final class DataFolder {
         return fallback;
     }
 
+    /** The Documents folder of the data folder (private fallback while "all files" access is off). */
+    static File documentsDir(Context c) {
+        return dir("Documents", new File(c.getExternalFilesDir(null), "shared"));
+    }
+
+    /** FileProvider uri string -> file, for every file under the Documents folder (sub folders too). */
+    static Map<String, File> documentsByUri(Context c) {
+        Map<String, File> out = new java.util.HashMap<>();
+        java.util.ArrayDeque<File> st = new java.util.ArrayDeque<>();
+        File root = documentsDir(c);
+        if (root != null) st.push(root);
+        while (!st.isEmpty()) {
+            File[] ch = st.pop().listFiles();
+            if (ch == null) continue;
+            for (File f : ch) {
+                if (f.getName().startsWith(".")) continue;
+                if (f.isDirectory()) {
+                    st.push(f);
+                } else {
+                    try {
+                        out.put(PhotoFlow.uri(c, f).toString(), f);
+                    } catch (Exception ignored) { }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Copies a PDF from another app / the file picker into dir. The same document already in dir is
+     * reused (no second copy). Null when the file cannot be read. Run on the main thread only for small files.
+     */
+    static File importPdf(Context c, android.net.Uri uri, File dir) {
+        File tmp = null;
+        try {
+            if (!dir.exists()) dir.mkdirs();
+            String name = uriName(c, uri);
+            if (name == null || name.isEmpty()) name = "shared_" + System.currentTimeMillis();
+            name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+            if (!name.toLowerCase().endsWith(".pdf")) name += ".pdf";
+            tmp = new File(dir, ".incoming_" + System.currentTimeMillis());
+            try (java.io.InputStream is = c.getContentResolver().openInputStream(uri);
+                 java.io.OutputStream os = new FileOutputStream(tmp)) {
+                if (is == null) { tmp.delete(); return null; }
+                byte[] buf = new byte[16384];
+                int r;
+                while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+            }
+            File same = findSameFile(dir, tmp);
+            if (same != null) { tmp.delete(); return same; }
+            File out = new File(dir, name);
+            int n = 1;
+            while (out.exists()) {      // same name but a different document: keep both, numbered
+                out = new File(dir, name.replaceFirst("(?i)\\.pdf$", "") + "_" + n++ + ".pdf");
+            }
+            if (!tmp.renameTo(out)) { tmp.delete(); return null; }
+            return out;
+        } catch (Exception e) {
+            if (tmp != null) tmp.delete();
+            return null;
+        }
+    }
+
+    private static String uriName(Context c, android.net.Uri uri) {
+        if ("content".equals(uri.getScheme())) {
+            try (android.database.Cursor cur = c.getContentResolver().query(uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cur != null && cur.moveToFirst()) return cur.getString(0);
+            } catch (Exception ignored) { }
+        }
+        return uri.getLastPathSegment();
+    }
+
     private static String sha256(File f) {
         try (FileInputStream in = new FileInputStream(f)) {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");

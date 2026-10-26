@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("26 Oct 2026", "Replace resets marks; new files ask category; marks pending tag",
+            "Documents > Manage files > Replace: page marks of that file are reset (a warning shows first) and the new PDF opens straight in the Category marker.",
+            "Documents > Manage files > add files: asks if they are more files of this document's category or a new category; new category becomes its own document card.",
+            "PDF documents with no marked page show \"Marks pending - tap to mark\" on the card."),
         new Entry("26 Oct 2026", "Add Document routes; Find files date sort and filter",
             "Documents > Add Document now asks: Scan and mark, or Add new case. The manual form that made empty records is gone.",
             "Find files: sort by date (newest first / oldest first) for PDFs, images and videos.",

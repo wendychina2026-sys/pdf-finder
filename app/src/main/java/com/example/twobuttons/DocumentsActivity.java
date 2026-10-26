@@ -14,6 +14,7 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -134,8 +135,11 @@ public class DocumentsActivity extends BaseActivity {
         }
     }
 
+    private java.util.Map<String, File> vaultFiles = new java.util.HashMap<>();
+
     private void renderList() {
         if (list == null) return;
+        vaultFiles = DataFolder.documentsByUri(this);
         list.removeAllViews();
         String q = search.getText().toString().trim().toLowerCase(Locale.US);
         int shown = 0;
@@ -165,6 +169,13 @@ public class DocumentsActivity extends BaseActivity {
         info.size = d.size;
         info.date = d.date;
         info.uri = uri;
+        if (d.more.isEmpty() && DocFileCard.kind(d.name) == 0) {      // a PDF with no marked page yet
+            final File vf = vaultFiles.get(d.uri);
+            if (vf != null && new MarkStore(this).all(vf.getAbsolutePath()).isEmpty()) {
+                info.tag = "Marks pending \u2022 tap to mark";
+                info.tagClick = () -> openMarker(vf);
+            }
+        }
         DocFileCard.Actions act = new DocFileCard.Actions();
         final boolean grp = !d.more.isEmpty();
         info.count = 1 + d.more.size();
@@ -218,18 +229,98 @@ public class DocumentsActivity extends BaseActivity {
             return;
         }
         FileSetDialog.show(this, flow, "Files in this document", g, files -> {
-            android.net.Uri first = files.get(0);
-            d.uri = first.toString();
-            d.more.clear();
-            for (int k = 1; k < files.size(); k++) d.more.add(files.get(k).toString());
-            d.fileName = FileSetDialog.label(this, files);
-            d.size = FileSetDialog.totalSize(this, files);
-            String nm = FileSetDialog.displayName(this, first);
-            int dot = nm.lastIndexOf('.');
-            if (dot > 0) d.name = DocFileCard.stem(d.name) + nm.substring(dot);
-            store.saveDoc(d);
-            renderList();
+            final java.util.List<android.net.Uri> before = groupOf(d);
+            final java.util.List<android.net.Uri> after = new java.util.ArrayList<>(files);
+            final java.util.List<android.net.Uri> added = new java.util.ArrayList<>();
+            File toMark = null;
+            for (int i = 0; i < after.size(); i++) {
+                android.net.Uri n = after.get(i);
+                if (before.contains(n)) continue;
+                if (i < before.size() && !after.contains(before.get(i))) {
+                    // replaced file: its page marks are reset (pages may be in a different order)
+                    File old = vaultFiles.get(before.get(i).toString());
+                    if (old != null) new MarkStore(this).clear(old.getAbsolutePath());
+                    File imp = importIfPdf(n);
+                    if (imp != null) {
+                        after.set(i, PhotoFlow.uri(this, imp));
+                        if (toMark == null) toMark = imp;
+                    }
+                } else {
+                    added.add(n);
+                }
+            }
+            final File markFile = toMark;
+            if (added.isEmpty()) {
+                saveFiles(d, after);
+                openMarker(markFile);
+                return;
+            }
+            // new files: same category as this document, or a new category (own document card)?
+            PickerDialogs.optionSheet(this, "New files added",
+                    "Are these more files of \"" + d.category + "\", or of a new category?",
+                    java.util.Arrays.asList("Same category: " + d.category, "New category"), 0, which -> {
+                        if (which == 0) {
+                            saveFiles(d, after);
+                            openMarker(markFile);
+                            return;
+                        }
+                        CategoryPicker.pick(this, "", cat -> splitNewCategory(d, after, added, cat, markFile),
+                                new java.util.HashMap<>());
+                    });
         });
+    }
+
+    /** The added files become their own document under the chosen category; this document keeps the rest. */
+    private void splitNewCategory(LegalStore.Doc d, java.util.List<android.net.Uri> after,
+                                  java.util.List<android.net.Uri> added, String cat, File markFile) {
+        java.util.List<android.net.Uri> rest = new java.util.ArrayList<>(after);
+        rest.removeAll(added);
+        if (rest.isEmpty()) {                 // nothing of the old category is left: just re-categorise
+            d.category = cat;
+            saveFiles(d, after);
+            openMarker(markFile);
+            return;
+        }
+        saveFiles(d, rest);
+        LegalStore.Doc nd = new LegalStore.Doc();
+        nd.category = cat;
+        nd.caseName = d.caseName;
+        nd.stage = d.stage;
+        nd.date = new SimpleDateFormat("dd MMM yyyy", Locale.US).format(new Date());
+        nd.name = FileSetDialog.displayName(this, added.get(0));
+        saveFiles(nd, added);
+        openMarker(markFile);
+    }
+
+    private void saveFiles(LegalStore.Doc d, java.util.List<android.net.Uri> files) {
+        android.net.Uri first = files.get(0);
+        d.uri = first.toString();
+        d.more.clear();
+        for (int k = 1; k < files.size(); k++) d.more.add(files.get(k).toString());
+        d.fileName = FileSetDialog.label(this, files);
+        d.size = FileSetDialog.totalSize(this, files);
+        String nm = FileSetDialog.displayName(this, first);
+        int dot = nm.lastIndexOf('.');
+        if (dot > 0) d.name = DocFileCard.stem(d.name) + nm.substring(dot);
+        store.saveDoc(d);
+        renderList();
+    }
+
+    /** A PDF picked from outside the app is copied into the Documents folder (no duplicate); else null. */
+    private File importIfPdf(android.net.Uri n) {
+        if ((getPackageName() + ".fileprovider").equals(n.getAuthority())) return null;   // already ours
+        String type = getContentResolver().getType(n);
+        String nm = FileSetDialog.displayName(this, n);
+        boolean pdf = "application/pdf".equals(type) || (nm != null && nm.toLowerCase(Locale.ROOT).endsWith(".pdf"));
+        return pdf ? DataFolder.importPdf(this, n, DataFolder.documentsDir(this)) : null;
+    }
+
+    /** New or replaced PDF: straight into the Category marker, no "later". */
+    private void openMarker(File f) {
+        if (f == null) return;
+        android.content.Intent i = new android.content.Intent(this, MarkActivity.class);
+        i.putExtra("path", f.getAbsolutePath());
+        startActivity(i);
     }
 
     @Override

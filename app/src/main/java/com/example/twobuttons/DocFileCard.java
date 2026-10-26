@@ -28,6 +28,8 @@ final class DocFileCard {
         String pagesLine = "";  // Document Vault: marked / unmarked / total pages
         String rangeLine = "";  // Document Vault: category -> page range summary
         boolean hideMeta;       // Document Vault: type / size / date live in the info dialog instead
+        String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
+        Runnable tagClick;
     }
 
     static final class Actions {
@@ -138,6 +140,13 @@ final class DocFileCard {
             att.addView(d);
         }
         top.addView(att);
+
+        if (!in.tag.isEmpty()) {
+            TextView tg = CaseViews.text(a, in.tag, 12, IconPalette.pick(a, 0xFFE65100, 0xFFFFB74D), true);
+            tg.setPadding(0, dp(a, 4), 0, dp(a, 2));
+            if (in.tagClick != null) tg.setOnClickListener(v -> in.tagClick.run());
+            top.addView(tg);
+        }
 
         if (!in.pagesLine.isEmpty()) {
             TextView pl = CaseViews.text(a, in.pagesLine, 12, AppTheme.text(a), true);
