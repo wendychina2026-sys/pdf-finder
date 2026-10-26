@@ -18,6 +18,11 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("26 Oct 2026", "Add Document routes; Find files date sort and filter",
+            "Documents > Add Document now asks: Scan and mark, or Add new case. The manual form that made empty records is gone.",
+            "Find files: sort by date (newest first / oldest first) for PDFs, images and videos.",
+            "Find files: filter by date (today, last 7 days, last 30 days, this year, or a From-To range).",
+            "Find files: each row shows the file's last modified date."),
         new Entry("26 Oct 2026", "What's new popup on update",
             "After an update, a What's new popup shows the latest change-log entry once at startup.",
             "Full change log button opens Settings > Change log. Fresh installs show no popup."),

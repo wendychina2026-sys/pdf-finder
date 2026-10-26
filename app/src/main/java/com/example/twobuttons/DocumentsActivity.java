@@ -91,7 +91,12 @@ public class DocumentsActivity extends BaseActivity {
         add.setTextSize(15);
         add.setTextColor(AppTheme.accent(this));
         add.setBackground(CaseViews.box(this, AppTheme.isDark(this) ? 0xFF2A2C44 : 0xFFBFE3FA, 24, 0, 0));
-        add.setOnClickListener(v -> editDoc(null));
+        // No empty manual records: a document comes in through Scan and mark, or through New Case.
+        add.setOnClickListener(v -> PickerDialogs.optionSheet(this, "Add Document", "Choose how to add it",
+                java.util.Arrays.asList("Scan and mark", "Add new case"), -1, which -> {
+                    if (which == 0) startActivity(new android.content.Intent(this, FindPdfsActivity.class));
+                    else startActivity(new android.content.Intent(this, NewCaseActivity.class));
+                }));
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LegalUi.dp(this, 52));
         alp.setMargins(p, LegalUi.dp(this, 6), p, p);

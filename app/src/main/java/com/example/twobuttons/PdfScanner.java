@@ -48,7 +48,7 @@ class PdfScanner {
                         int kind = Pdf.kindOf(name);
                         if (kind < 0) continue;
                         if (!seen.add(canon(f))) continue;        // same file reached from two roots
-                        found.add(new Pdf(name, f.getAbsolutePath(), f.length(), kind));
+                        found.add(new Pdf(name, f.getAbsolutePath(), f.length(), kind, f.lastModified()));
                     }
                 }
             }

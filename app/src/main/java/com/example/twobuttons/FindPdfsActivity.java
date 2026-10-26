@@ -32,8 +32,13 @@ public class FindPdfsActivity extends BaseActivity {
     private LinearLayout chips;
     private static final String[] KINDS = {"All", "PDF", "Images", "Videos"};
     private int kindSel = 0;
-    private static final String[] SORTS = {"Name A-Z", "Size: small to large", "Size: large to small"};
-    private TextView sortChip;
+    private static final String[] SORTS = {"Name A-Z", "Size: small to large", "Size: large to small",
+            "Date: newest first", "Date: oldest first"};
+    private TextView sortChip, dateChip;
+    private static final String[] DATES = {"All dates", "Today", "Last 7 days", "Last 30 days", "This year",
+            "Pick date range..."};
+    private int dateSel = 0;
+    private String dateText = "All dates";
     private boolean scanned = false;
     private boolean waitingForPermission = false;
 
@@ -102,9 +107,24 @@ public class FindPdfsActivity extends BaseActivity {
                     if (scanned) applyFilter();
                 }));
         updateSortChip();
-        root.addView(chips, wide);
-        root.addView(sortChip, new LinearLayout.LayoutParams(
+        dateChip = new TextView(this);
+        dateChip.setTextSize(14);
+        dateChip.setTextColor(AppTheme.accent(this));
+        dateChip.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 8), CaseViews.dp(this, 14), CaseViews.dp(this, 8));
+        dateChip.setBackground(CaseViews.box(this, AppTheme.field(this), 10, AppTheme.fieldStroke(this), 1));
+        dateChip.setOnClickListener(v -> PickerDialogs.optionSheet(this, "Filter by date", "File last modified",
+                java.util.Arrays.asList(DATES), dateSel, this::pickDate));
+        updateDateChip();
+        LinearLayout sortRow = new LinearLayout(this);
+        sortRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        chipLp.rightMargin = CaseViews.dp(this, 8);
+        sortRow.addView(sortChip, chipLp);
+        sortRow.addView(dateChip, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(chips, wide);
+        root.addView(sortRow, wide);
         root.addView(rescanButton, wide);
         root.addView(status, wide);
         root.addView(list, new LinearLayout.LayoutParams(
@@ -180,6 +200,70 @@ public class FindPdfsActivity extends BaseActivity {
             lp.rightMargin = CaseViews.dp(this, 8);
             chips.addView(t, lp);
         }
+    }
+
+    private static long startOfDay(java.util.Calendar c) {
+        c.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        c.set(java.util.Calendar.MINUTE, 0);
+        c.set(java.util.Calendar.SECOND, 0);
+        c.set(java.util.Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
+    private void pickDate(int which) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        long today = startOfDay(c);
+        long day = 24L * 60 * 60 * 1000;
+        switch (which) {
+            case 0: setDate(which, "All dates", 0, 0); break;
+            case 1: setDate(which, "Today", today, 0); break;
+            case 2: setDate(which, "Last 7 days", today - 6 * day, 0); break;
+            case 3: setDate(which, "Last 30 days", today - 29 * day, 0); break;
+            case 4: {
+                java.util.Calendar y = java.util.Calendar.getInstance();
+                y.set(java.util.Calendar.DAY_OF_YEAR, 1);
+                setDate(which, "This year", startOfDay(y), 0);
+                break;
+            }
+            default: pickRange(); break;
+        }
+    }
+
+    /** From date, then To date (both inclusive). */
+    private void pickRange() {
+        final java.util.Calendar now = java.util.Calendar.getInstance();
+        new android.app.DatePickerDialog(this, (v1, y1, m1, d1) -> {
+            java.util.Calendar f = java.util.Calendar.getInstance();
+            f.set(y1, m1, d1);
+            final long from = startOfDay(f);
+            new android.app.DatePickerDialog(this, (v2, y2, m2, d2) -> {
+                java.util.Calendar t = java.util.Calendar.getInstance();
+                t.set(y2, m2, d2);
+                long to = startOfDay(t) + 24L * 60 * 60 * 1000 - 1;
+                if (to < from) {
+                    android.widget.Toast.makeText(this, "To date is before From date", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.US);
+                setDate(5, df.format(new java.util.Date(from)) + " - " + df.format(new java.util.Date(to)), from, to);
+            }, y1, m1, d1).show();
+            android.widget.Toast.makeText(this, "Pick the To date", android.widget.Toast.LENGTH_SHORT).show();
+        }, now.get(java.util.Calendar.YEAR), now.get(java.util.Calendar.MONTH),
+                now.get(java.util.Calendar.DAY_OF_MONTH)).show();
+        android.widget.Toast.makeText(this, "Pick the From date", android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    private void setDate(int sel, String text, long from, long to) {
+        dateSel = sel;
+        dateText = text;
+        adapter.dateFrom = from;
+        adapter.dateTo = to;
+        updateDateChip();
+        if (scanned) applyFilter();
+    }
+
+    private void updateDateChip() {
+        dateChip.setText("Date: " + dateText + " \u25BE");
     }
 
     private void updateSortChip() {

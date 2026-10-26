@@ -31,13 +31,18 @@ import java.util.Set;
 
 class PdfAdapter extends ArrayAdapter<Pdf> {
 
+    private static final java.text.SimpleDateFormat DATE_FMT =
+            new java.text.SimpleDateFormat("dd MMM yyyy", Locale.US);
+
     final Set<String> selected = new LinkedHashSet<>();
     boolean selectionMode = false;
     String query = "";
     /** -1 = all kinds, else Pdf.PDF / Pdf.IMAGE / Pdf.VIDEO */
     int kindFilter = -1;
-    /** 0 = name A-Z, 1 = size small to large, 2 = size large to small */
+    /** 0 = name A-Z, 1 = size small to large, 2 = size large to small, 3 = date newest, 4 = date oldest */
     int sortMode = 0;
+    /** Date filter on last modified (epoch millis, inclusive). 0 = no limit. Applies to PDFs, images and videos. */
+    long dateFrom = 0, dateTo = 0;
 
     private static final int THUMB_PX = 160;
     private final LruCache<String, Bitmap> thumbs = new LruCache<>(150);
@@ -57,6 +62,8 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
         List<Pdf> keep = new ArrayList<>();
         for (Pdf p : all) {
             if (kindFilter >= 0 && p.kind != kindFilter) continue;
+            if (dateFrom > 0 && p.modified < dateFrom) continue;
+            if (dateTo > 0 && p.modified > dateTo) continue;
             if (q.isEmpty() || p.name.toLowerCase(Locale.ROOT).contains(q)) {
                 keep.add(p);
                 visible.add(p.path);
@@ -67,6 +74,12 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
                     : a.name.compareToIgnoreCase(b.name));
         } else if (sortMode == 2) {
             Collections.sort(keep, (a, b) -> a.size != b.size ? Long.compare(b.size, a.size)
+                    : a.name.compareToIgnoreCase(b.name));
+        } else if (sortMode == 3) {
+            Collections.sort(keep, (a, b) -> a.modified != b.modified ? Long.compare(b.modified, a.modified)
+                    : a.name.compareToIgnoreCase(b.name));
+        } else if (sortMode == 4) {
+            Collections.sort(keep, (a, b) -> a.modified != b.modified ? Long.compare(a.modified, b.modified)
                     : a.name.compareToIgnoreCase(b.name));
         } else {
             Collections.sort(keep, (a, b) -> a.name.compareToIgnoreCase(b.name));
@@ -82,7 +95,9 @@ class PdfAdapter extends ArrayAdapter<Pdf> {
         Pdf p = getItem(position);
         r.name.setText(Highlight.apply(p.name, query));
         r.path.setText(Highlight.apply(p.path, query));
-        r.size.setText(Pdf.formatSize(p.size));
+        r.size.setText(p.modified > 0
+                ? Pdf.formatSize(p.size) + "  \u2022  " + DATE_FMT.format(new java.util.Date(p.modified))
+                : Pdf.formatSize(p.size));
         bindThumb(r.thumb, p);
         boolean isSelected = selected.contains(p.path);
         r.box.setVisibility(selectionMode ? View.VISIBLE : View.GONE);

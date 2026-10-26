@@ -8,16 +8,18 @@ class Pdf {
     final String path;
     final long size;   // bytes
     final int kind;    // PDF / IMAGE / VIDEO
+    final long modified;   // last modified, epoch millis
 
     Pdf(String name, String path, long size) {
-        this(name, path, size, PDF);
+        this(name, path, size, PDF, 0L);
     }
 
-    Pdf(String name, String path, long size, int kind) {
+    Pdf(String name, String path, long size, int kind, long modified) {
         this.name = name;
         this.path = path;
         this.size = size;
         this.kind = kind;
+        this.modified = modified;
     }
 
     /** PDF, image or video from the file name; -1 for anything else. */
