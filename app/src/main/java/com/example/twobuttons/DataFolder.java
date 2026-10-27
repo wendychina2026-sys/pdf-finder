@@ -64,7 +64,31 @@ final class DataFolder {
         if (APP == null) return null;
         File r = new File(APP.getFilesDir(), ROOT_NAME);
         if (!r.isDirectory() && !r.mkdirs()) return null;
+        noMedia(r);
         return r;
+    }
+
+    /** Puts an empty .nomedia file in a folder so galleries / WhatsApp never list its images. */
+    static void noMedia(File d) {
+        try {
+            if (d == null) return;
+            if (!d.isDirectory() && !d.mkdirs()) return;
+            File n = new File(d, ".nomedia");
+            if (!n.exists()) n.createNewFile();
+        } catch (Exception ignored) { }
+    }
+
+    /** .nomedia in the app's external folders (Android/data/.../files, case_photos, shared). */
+    static void hideExternal(Context c) {
+        try {
+            File ext = c.getExternalFilesDir(null);
+            if (ext == null) return;
+            noMedia(ext);
+            File p = new File(ext, "case_photos");
+            if (p.isDirectory()) noMedia(p);
+            File sh = new File(ext, "shared");
+            if (sh.isDirectory()) noMedia(sh);
+        } catch (Exception ignored) { }
     }
 
     /** A sub folder of the data folder; fallback is used when the folder is not available. */
@@ -73,10 +97,10 @@ final class DataFolder {
             File r = root();
             if (r != null) {
                 File d = new File(r, sub);
-                if (d.isDirectory() || d.mkdirs()) return d;
+                if (d.isDirectory() || d.mkdirs()) { noMedia(d); return d; }
             }
         } catch (Exception ignored) { }
-        if (fallback != null) fallback.mkdirs();
+        if (fallback != null) { fallback.mkdirs(); noMedia(fallback); }
         return fallback;
     }
 
@@ -272,6 +296,7 @@ final class DataFolder {
 
     static void install(final Application app) {
         APP = app.getApplicationContext();
+        hideExternal(APP);
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityResumed(Activity a) { onResume(app, a); }
             @Override public void onActivityPaused(Activity a) { backupAsync(app); DriveBackup.autoIfDue(app, false); }
