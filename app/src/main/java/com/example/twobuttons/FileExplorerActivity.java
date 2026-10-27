@@ -317,13 +317,14 @@ public class FileExplorerActivity extends BaseActivity {
                     folders++;
                     String[] in = k.list();
                     childCount.put(k, in == null ? 0 : in.length);
+                    bytes += tally(k, new int[2]);      // everything inside the folder counts
                 } else {
                     files++;
                     bytes += k.length();
                 }
                 if (!query.isEmpty() && !k.getName().toLowerCase(Locale.ROOT).contains(query)) continue;
                 if (filterMode != 0 && !k.isDirectory()) {      // folders stay, so you can still walk in
-                    if (!isPdf(k)) continue;
+                    if (!markable(k)) continue;
                     if ((filterMode == 1) != markedPaths.contains(k.getAbsolutePath())) continue;
                 }
                 shown.add(k);
@@ -347,6 +348,11 @@ public class FileExplorerActivity extends BaseActivity {
                 }
             }
         }
+    }
+
+    /** PDF, image or Word file: the kinds that can be marked and listed in Document Vault. */
+    private static boolean markable(File f) {
+        return DocFileCard.kind(f.getName()) != 3;
     }
 
     private static boolean isPdf(File f) {
@@ -770,7 +776,7 @@ public class FileExplorerActivity extends BaseActivity {
                 sub = size(f.length()) + "  \u2022  " + fmt.format(new Date(f.lastModified()));
             }
             col.addView(CaseViews.text(c, sub, 12, AppTheme.sub(c), false));
-            if (!f.isDirectory() && isPdf(f)) {
+            if (!f.isDirectory() && markable(f)) {
                 boolean m = markedPaths.contains(f.getAbsolutePath());
                 TextView mt = CaseViews.text(c, m ? "\u2605 Marked file" : "Unmarked", 11,
                         m ? AppTheme.topics(c) : AppTheme.sub(c), true);

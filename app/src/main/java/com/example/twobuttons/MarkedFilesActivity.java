@@ -260,33 +260,15 @@ public class MarkedFilesActivity extends BaseActivity {
     }
 
     // long-press on a PDF: delete the file, or reset all its page marks
+    /** Long-press: only Reset marking. The real file is never deleted from Document Vault. */
     private void showFileOptions(final Item it) {
-        PickerDialogs.optionSheet(this, new File(it.path).getName(), null,
-                java.util.Arrays.asList("Delete file", "Reset marking"), -1, which -> {
-                    if (which == 0) {
-                        PickerDialogs.confirm(this, "Delete file?",
-                                "\"" + new File(it.path).getName() + "\" and all its page marks will be deleted from your phone. It cannot be undone.",
-                                "Delete", () -> {
-                                    boolean ok = new File(it.path).delete();
-                                    store.clear(it.path);
-                                    if (ok) android.media.MediaScannerConnection.scanFile(
-                                            this, new String[]{it.path}, null, null);
-                                    android.widget.Toast.makeText(this, ok ? "File deleted"
-                                            : "Marks cleared, but the file could not be deleted",
-                                            android.widget.Toast.LENGTH_LONG).show();
-                                    loadAll();
-                                    applyFilter();
-                                });
-                    } else {
-                        PickerDialogs.confirm(this, "Reset marking?",
-                                "All " + it.marks.size() + " page marks of \"" + new File(it.path).getName()
-                                        + "\" will be removed. The file is kept.",
-                                "Reset", () -> {
-                                    store.clear(it.path);
-                                    loadAll();
-                                    applyFilter();
-                                });
-                    }
+        PickerDialogs.confirm(this, "Reset marking?",
+                "All " + it.marks.size() + " page marks of \"" + new File(it.path).getName()
+                        + "\" will be removed. The file is kept.",
+                "Reset", () -> {
+                    store.clear(it.path);
+                    loadAll();
+                    applyFilter();
                 });
     }
 
@@ -600,7 +582,6 @@ public class MarkedFilesActivity extends BaseActivity {
                     android.widget.Toast.makeText(c, "Cannot share this file", android.widget.Toast.LENGTH_SHORT).show();
                 }
             };
-            act.delete = () -> showFileOptions(it);
             LinearLayout card = DocFileCard.build(c, info, act);
             longPressAll(card, it);
             card.setOnLongClickListener(v -> { showFileOptions(it); return true; });

@@ -18,6 +18,11 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "Data folder sizes and marks; Document Vault cannot delete files",
+            "Data folder: folder size in the top line now counts everything inside the folders.",
+            "Data folder: image and Word files show Marked / Unmarked like PDFs, and the Marked / Unmarked filter works on them too.",
+            "Document Vault: delete button removed; long-press now only offers Reset marking (the file is kept).",
+            "Document Vault: \"Show details\" button is now \"Details\" so it fits."),
         new Entry("27 Oct 2026", "Edit button in Document Vault; no Save on upload card",
             "Document Vault cards now have an Edit button: change the Document name, Category, Stage and Attach to matter. The file itself and its name on disk are never changed.",
             "If a file's pages are marked in one category, changing the category re-marks all its pages; with several categories, change them from Show details.",

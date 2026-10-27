@@ -188,7 +188,7 @@ final class DocFileCard {
         row.setGravity(Gravity.CENTER_VERTICAL);
         int info = AppTheme.info(a), green = AppTheme.topics(a);
         if (act.open != null) row.addView(labelBtn(a, R.drawable.ic_eye, info, "Open", act.open), wlp(a, 0));
-        if (act.details != null) row.addView(labelBtn(a, R.drawable.ic_notes, gold, "Show details", act.details), wlp(a, 8));
+        if (act.details != null) row.addView(labelBtn(a, R.drawable.ic_notes, gold, "Details", act.details), wlp(a, 8));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
         if (act.path != null) row.addView(circleBtn(a, R.drawable.ic_info, info, "Show file path", act.path), ilp(a));
         if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
