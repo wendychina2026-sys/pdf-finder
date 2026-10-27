@@ -61,6 +61,9 @@ public class ShareReceiverActivity extends Activity {
             String nm = u.getLastPathSegment() == null ? "" : u.getLastPathSegment().toLowerCase(java.util.Locale.ROOT);
             boolean word = (type != null && (type.equals("application/msword") || type.contains("wordprocessingml")))
                     || nm.endsWith(".doc") || nm.endsWith(".docx");
+            boolean image = (type != null && type.startsWith("image/"))
+                    || nm.matches(".*\\.(jpe?g|png|webp|gif|bmp|heic|heif)$");
+            word = word || image;       // an image, like a Word file, has no pages to mark
             File f = word ? DataFolder.importFile(this, u, dir) : DataFolder.importPdf(this, u, dir);
             if (f == null) continue;
             if (word) {
@@ -80,7 +83,7 @@ public class ShareReceiverActivity extends Activity {
                         Toast.LENGTH_LONG).show();
             }
             if (wordCount > 0) {
-                Toast.makeText(this, wordCount + " Word file(s) saved in the Documents folder.",
+                Toast.makeText(this, wordCount + " file(s) saved in the Documents folder.",
                         Toast.LENGTH_LONG).show();
             }
             Intent i = new Intent(this, MarkActivity.class);
@@ -88,10 +91,10 @@ public class ShareReceiverActivity extends Activity {
             startActivity(i);
         } else {
             if (wordCount > 1) {
-                Toast.makeText(this, wordCount + " Word files saved. Opening the first; the rest are in the Documents folder.",
+                Toast.makeText(this, wordCount + " files saved. Opening the first; the rest are in the Documents folder.",
                         Toast.LENGTH_LONG).show();
             }
-            // a Word file has no pages to mark: choose its name, category and matter in Upload Legal Document
+            // a Word file or image has no pages to mark: choose its name, category and matter in Upload Legal Document
             Intent i = new Intent(this, NewCaseActivity.class);
             i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, firstWord.getAbsolutePath());
             startActivity(i);
