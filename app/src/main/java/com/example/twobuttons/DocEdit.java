@@ -59,23 +59,24 @@ final class DocEdit {
 
         final Set<String> cats = new TreeSet<>(marks.values());
         final CategoryPicker cp;
-        final String[] multiNew = {null};      // several categories: one category picked here is set on ALL marked pages
+        // several categories: page -> category edits are staged here and written only on Save
+        final Map<Integer, String> work = new java.util.HashMap<>(marks);
         if (cats.size() <= 1) {
             cp = new CategoryPicker(a, form, cats.isEmpty() ? "" : cats.iterator().next());
         } else {
             cp = null;
-            final String multiLabel = "Multiple (" + cats.size() + " categories)";
             LegalUi.label(a, form, "Category");
             final TextView[] mtv = new TextView[1];
-            mtv[0] = FieldStyle.dropdown(a, form, multiLabel, v ->
-                    CategoryPicker.pick(a, multiNew[0] == null ? "" : multiNew[0], s -> {
-                        multiNew[0] = s;
-                        FieldStyle.setDropdownValue(mtv[0], s + "  (all " + marks.size() + " marked pages)", multiLabel);
-                    }), new LinearLayout.LayoutParams(
+            final Runnable relabel = () -> {
+                String l = multiLabel(work);
+                FieldStyle.setDropdownValue(mtv[0], l, l);
+            };
+            mtv[0] = FieldStyle.dropdown(a, form, multiLabel(work), v ->
+                    showMulti(a, work, relabel), new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            FieldStyle.setDropdownValue(mtv[0], multiLabel, multiLabel);
-            TextView note = CaseViews.text(a, "Tap to give every marked page ONE category. Leave it as is to keep "
-                    + "the different page categories (single pages are changed in the viewer / Show details).",
+            relabel.run();
+            TextView note = CaseViews.text(a, "Tap to see which category each page has. Change a single page, "
+                    + "or give all marked pages ONE category.",
                     11, AppTheme.sub(a), false);
             note.setPadding(0, CaseViews.dp(a, 4), 0, CaseViews.dp(a, 2));
             form.addView(note);
@@ -90,8 +91,8 @@ final class DocEdit {
                 if (cp != null) {
                     String neu = cp.get();
                     for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
-                } else if (multiNew[0] != null) {
-                    for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
+                } else {
+                    applyWork(store, path, marks, work);
                 }
                 android.content.Intent nc = new android.content.Intent(a, NewCaseActivity.class);
                 nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
@@ -120,9 +121,10 @@ final class DocEdit {
                 d.category = neu;
                 for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
             }
-            if (cp == null && multiNew[0] != null) {
-                d.category = multiNew[0];
-                for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
+            if (cp == null) {
+                applyWork(store, path, marks, work);
+                Set<String> now = new TreeSet<>(work.values());
+                if (now.size() == 1) d.category = now.iterator().next();
             }
             ls.saveDoc(d);
             String m = mpk.matter();
@@ -130,5 +132,67 @@ final class DocEdit {
             if (after != null) after.run();
             return true;
         }, null);
+    }
+
+    private static String multiLabel(Map<Integer, String> work) {
+        Set<String> c = new TreeSet<>(work.values());
+        return c.size() == 1 ? c.iterator().next() : "Multiple (" + c.size() + " categories)";
+    }
+
+    private static void applyWork(MarkStore store, String path, Map<Integer, String> marks, Map<Integer, String> work) {
+        for (Map.Entry<Integer, String> e : work.entrySet()) {
+            if (!e.getValue().equals(marks.get(e.getKey()))) store.set(path, e.getKey(), e.getValue());
+        }
+    }
+
+    /** Lists every marked page with its current category; tap a page to change it, or set ONE category for all. */
+    private static void showMulti(final Activity a, final Map<Integer, String> work, final Runnable onClose) {
+        final LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(CaseViews.dp(a, 16), CaseViews.dp(a, 8), CaseViews.dp(a, 16), CaseViews.dp(a, 8));
+        final Runnable[] redraw = new Runnable[1];
+        redraw[0] = () -> {
+            box.removeAllViews();
+            java.util.List<Integer> pgs = new ArrayList<>(work.keySet());
+            java.util.Collections.sort(pgs);
+            for (final int pg : pgs) {
+                LinearLayout row = new LinearLayout(a);
+                row.setOrientation(LinearLayout.VERTICAL);
+                int pd = CaseViews.dp(a, 10);
+                row.setPadding(pd, pd, pd, pd);
+                row.setBackground(CaseViews.box(a, AppTheme.card(a), 12, AppTheme.cardStroke(a), 1));
+                row.addView(CaseViews.text(a, "Page " + (pg + 1), 12, AppTheme.sub(a), true));
+                row.addView(CaseViews.text(a, work.get(pg), 14, AppTheme.text(a), true));
+                row.setOnClickListener(v -> CategoryPicker.pick(a, work.get(pg), neu -> {
+                    work.put(pg, neu);
+                    redraw[0].run();
+                }, new java.util.HashMap<>(work), null, true));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                lp.topMargin = CaseViews.dp(a, 6);
+                box.addView(row, lp);
+            }
+        };
+        redraw[0].run();
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.addView(box);
+        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(a)
+                .setTitle("Marked pages")
+                .setView(sv)
+                .setPositiveButton("Done", null)
+                .setNeutralButton("Same for all", null)
+                .create();
+        dlg.setOnDismissListener(d -> onClose.run());
+        dlg.show();
+        dlg.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v ->
+                CategoryPicker.pick(a, "", s -> new android.app.AlertDialog.Builder(a)
+                        .setTitle("Same category for all?")
+                        .setMessage("All " + work.size() + " marked pages will be set to \"" + s + "\".")
+                        .setPositiveButton("Set all", (d, w) -> {
+                            for (Integer k : new ArrayList<>(work.keySet())) work.put(k, s);
+                            redraw[0].run();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show()));
     }
 }

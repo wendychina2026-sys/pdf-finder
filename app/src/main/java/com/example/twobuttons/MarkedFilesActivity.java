@@ -318,10 +318,7 @@ public class MarkedFilesActivity extends BaseActivity {
             head.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 26);
             add.setContentDescription("Add pages to " + sub);
-            add.setOnClickListener(v -> {
-                openMarker(it.path, null, subName);
-                if (holder[0] != null) holder[0].dismiss();
-            });
+            add.setOnClickListener(v -> addPagesTo(it, subName, holder[0]));
             head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 30), CaseViews.dp(this, 30)));
             card.addView(head);
 
@@ -390,6 +387,54 @@ public class MarkedFilesActivity extends BaseActivity {
                 .setTitle(new File(it.path).getName())
                 .setView(sv)
                 .setPositiveButton("Close", null)
+                .show();
+    }
+
+    /**
+     * "+" on a category card: asks which unmarked page(s) to add to this category. Only pages that are not
+     * marked yet are offered; when every page is already marked there is nothing to add until a page is
+     * removed from another category first.
+     */
+    private void addPagesTo(final Item it, final String cat, final AlertDialog parent) {
+        final int total = totalPages(it.path);
+        if (total < 0) {                      // cannot read the PDF: fall back to the marker
+            openMarker(it.path, null, cat);
+            if (parent != null) parent.dismiss();
+            return;
+        }
+        final List<Integer> free = new ArrayList<>();
+        for (int p = 0; p < total; p++) if (!it.marks.containsKey(p)) free.add(p);
+        if (free.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("No page left to add")
+                    .setMessage("All " + total + (total == 1 ? " page is" : " pages are") + " already marked. "
+                            + "To add a page to \"" + cat + "\", first remove it from another category "
+                            + "(Delete on that category's card).")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        final CharSequence[] labels = new CharSequence[free.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = "Page " + (free.get(i) + 1);
+        final boolean[] on = new boolean[labels.length];
+        if (labels.length == 1) on[0] = true;
+        new AlertDialog.Builder(this)
+                .setTitle("Add pages to " + cat)
+                .setMultiChoiceItems(labels, on, (d, which, checked) -> on[which] = checked)
+                .setPositiveButton("Add", (d, w) -> {
+                    int added = 0;
+                    for (int i = 0; i < on.length; i++) {
+                        if (on[i]) { store.set(it.path, free.get(i), cat); added++; }
+                    }
+                    if (added == 0) return;
+                    if (parent != null) parent.dismiss();
+                    loadAll();
+                    applyFilter();
+                    for (Item n : all) {
+                        if (n.path.equals(it.path)) { showDetails(n); break; }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
                 .show();
     }
 
