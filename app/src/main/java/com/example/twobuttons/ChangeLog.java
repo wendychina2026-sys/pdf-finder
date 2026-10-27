@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "One Attach to matter (with Create new case); change \"Multiple\" category",
+            "Category marker: the Attach to Matter box at the bottom is removed. Attaching is now only in \"Change details\" (details card is always shown on top).",
+            "Change details / Document Vault Edit: Attach to Matter now has \"+ Create new case\" (PDF files). OK opens New Case > Upload Legal Document with this file.",
+            "Category \"Multiple (n categories)\" is now tappable in the Edit box: pick one category to set it on all marked pages; leave it to keep the page-wise categories."),
         new Entry("27 Oct 2026", "Category marker shows document details; one Edit box everywhere",
             "Category marker: an already marked or saved file now shows a details card on top: Document name, Attached to matter, Stage and Category.",
             "\"Change details\" on that card opens the same Edit box as the Document Vault Edit button: Document name, Category, Stage and Attach to matter. The card and page marks refresh when you press OK.",

@@ -59,19 +59,48 @@ final class DocEdit {
 
         final Set<String> cats = new TreeSet<>(marks.values());
         final CategoryPicker cp;
+        final String[] multiNew = {null};      // several categories: one category picked here is set on ALL marked pages
         if (cats.size() <= 1) {
             cp = new CategoryPicker(a, form, cats.isEmpty() ? "" : cats.iterator().next());
         } else {
             cp = null;
-            TextView note = CaseViews.text(a, "Category: pages are marked in several categories. "
-                    + "Change them from Show details.", 12, AppTheme.sub(a), false);
-            note.setPadding(0, CaseViews.dp(a, 10), 0, CaseViews.dp(a, 2));
+            final String multiLabel = "Multiple (" + cats.size() + " categories)";
+            LegalUi.label(a, form, "Category");
+            final TextView[] mtv = new TextView[1];
+            mtv[0] = FieldStyle.dropdown(a, form, multiLabel, v ->
+                    CategoryPicker.pick(a, multiNew[0] == null ? "" : multiNew[0], s -> {
+                        multiNew[0] = s;
+                        FieldStyle.setDropdownValue(mtv[0], s + "  (all " + marks.size() + " marked pages)", multiLabel);
+                    }), new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            FieldStyle.setDropdownValue(mtv[0], multiLabel, multiLabel);
+            TextView note = CaseViews.text(a, "Tap to give every marked page ONE category. Leave it as is to keep "
+                    + "the different page categories (single pages are changed in the viewer / Show details).",
+                    11, AppTheme.sub(a), false);
+            note.setPadding(0, CaseViews.dp(a, 4), 0, CaseViews.dp(a, 2));
             form.addView(note);
         }
-        final MatterPicker mpk = new MatterPicker(a, form, savedMatter, cur == null ? "" : cur.stage);
+        final boolean pdf = f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
+        final MatterPicker mpk = new MatterPicker(a, form, savedMatter, cur == null ? "" : cur.stage, pdf);
 
         LegalUi.formDialog(a, "Edit document", form, () -> {
             if (!LegalUi.need(a, name, "Document name")) return false;
+            if (mpk.isCreateNew()) {
+                // attach this file to a NEW case: same route as the marker's old "Create new case"
+                if (cp != null) {
+                    String neu = cp.get();
+                    for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
+                } else if (multiNew[0] != null) {
+                    for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
+                }
+                android.content.Intent nc = new android.content.Intent(a, NewCaseActivity.class);
+                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
+                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, MatterPicker.CREATE_NEW);
+                a.startActivity(nc);
+                if (a instanceof MarkActivity) a.finish();      // no stale marker behind the New Case popup
+                else if (after != null) after.run();
+                return true;
+            }
             LegalStore.Doc d = cur;
             String newName = LegalUi.str(name);
             String stored = DocFileCard.ext(newName).isEmpty() ? newName + ext : newName;
@@ -90,6 +119,10 @@ final class DocEdit {
                 String neu = cp.get();
                 d.category = neu;
                 for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
+            }
+            if (cp == null && multiNew[0] != null) {
+                d.category = multiNew[0];
+                for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
             }
             ls.saveDoc(d);
             String m = mpk.matter();

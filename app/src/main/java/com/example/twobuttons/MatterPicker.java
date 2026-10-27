@@ -16,6 +16,8 @@ final class MatterPicker {
     static final String VAULT = "-- General Document Vault --";
     private static final String VAULT_SAVED = "General Document Vault";
 
+    static final String CREATE_NEW = "+ Create new case";
+
     private final List<String> items = new ArrayList<>();
     private String matter;
     private String stage;
@@ -23,14 +25,20 @@ final class MatterPicker {
     private final LinearLayout stageBox;
 
     MatterPicker(Activity a, LinearLayout f, String savedMatter, String savedStage) {
+        this(a, f, savedMatter, savedStage, false);
+    }
+
+    /** allowCreateNew adds "+ Create new case" right after the Vault (used when a PDF is being attached). */
+    MatterPicker(Activity a, LinearLayout f, String savedMatter, String savedStage, boolean allowCreateNew) {
         items.add(VAULT);
+        if (allowCreateNew) items.add(CREATE_NEW);
         for (DiaryStore.HCase hc : new DiaryStore(a).cases()) items.add(hc.title());
         String m = savedMatter == null ? "" : savedMatter.trim();
         if (m.isEmpty() || m.equals(VAULT_SAVED)) {
             matter = VAULT;
         } else {
             matter = m;
-            if (!items.contains(m)) items.add(1, m);   // older value stays selectable
+            if (!items.contains(m)) items.add(allowCreateNew ? 2 : 1, m);   // older value stays selectable
         }
         stage = savedStage == null ? "" : savedStage;
 
@@ -79,6 +87,10 @@ final class MatterPicker {
     /** Text saved on the document. */
     String matter() {
         return matter.equals(VAULT) ? VAULT_SAVED : matter;
+    }
+
+    boolean isCreateNew() {
+        return matter.equals(CREATE_NEW);
     }
 
     String stage() {

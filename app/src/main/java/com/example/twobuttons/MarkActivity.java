@@ -113,54 +113,6 @@ public class MarkActivity extends BaseActivity {
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // Attach to matter (optional): General Document Vault first, then "Create new case", then the saved cases.
-        // The list has OK and Cancel; the choice is only applied on OK.
-        final String createNew = "+ Create new case";
-        final java.util.List<String> matters = new java.util.ArrayList<>();
-        matters.add(MatterPicker.VAULT);
-        matters.add(createNew);
-        for (DiaryStore.HCase hc : new DiaryStore(this).cases()) {
-            String t = (!hc.first.isEmpty() && !hc.second.isEmpty())
-                    ? hc.first + " vs. " + hc.second : hc.title();
-            if (!matters.contains(t)) matters.add(t);
-        }
-        final android.content.SharedPreferences mp = getSharedPreferences("pdf_matters", MODE_PRIVATE);
-        String saved = mp.getString(path, "");
-        final String[] matter = {saved.isEmpty() ? MatterPicker.VAULT : saved};
-        if (!matters.contains(matter[0])) matters.add(2, matter[0]);   // older value stays selectable
-
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setOrientation(LinearLayout.VERTICAL);
-        bottom.setPadding(0, 8, 0, 0);
-        LegalUi.label(this, bottom, "Attach to Matter (Optional)");
-        final TextView[] mtv = new TextView[1];
-        mtv[0] = FieldStyle.dropdown(this, bottom, MatterPicker.VAULT, v ->
-                PickerDialogs.optionSheetOk(this, "Attach to Matter", "Saved cases", matters,
-                        matters.indexOf(matter[0]), i -> {
-                            final String pick = matters.get(i);
-                            // the latest choice, read by the Upload Legal Document popup when it saves
-                            getSharedPreferences("pdf_matter_live", MODE_PRIVATE).edit().putString(path, pick).apply();
-                            if (!pick.equals(createNew)) {
-                                matter[0] = pick;
-                                mp.edit().putString(path, pick).apply();
-                                FieldStyle.setDropdownValue(mtv[0], pick, MatterPicker.VAULT);
-                            }
-                            if (getIntent().getBooleanExtra("from_new_case", false)) {
-                                finish();       // the Upload Legal Document popup is still open underneath
-                                return;
-                            }
-                            // OK on any choice (General Document Vault, a saved case or Create new case) goes straight to
-                            // New Case > Upload Legal Document: this PDF in "Tap to choose", Attach to Matter preselected.
-                            Intent nc = new Intent(this, NewCaseActivity.class);
-                            nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
-                            nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, pick);
-                            startActivity(nc);
-                            finish();           // no stale marker (old file path) left behind the popup
-                        }), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        FieldStyle.setDropdownValue(mtv[0], matter[0], MatterPicker.VAULT);
-        // opened from Document Vault > Show details (View / + add): the file is already in the vault
-        if (onlySub.isEmpty() && addCat.isEmpty()) root.addView(bottom, wide);
         setContentView(root);
     }
 
@@ -168,10 +120,6 @@ public class MarkActivity extends BaseActivity {
     private void refreshInfo() {
         infoBox.removeAllViews();
         LegalStore.Doc d = DocEdit.docFor(this, path);
-        if (d == null && marks.isEmpty()) {
-            infoBox.setVisibility(View.GONE);
-            return;
-        }
         infoBox.setVisibility(View.VISIBLE);
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
