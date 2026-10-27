@@ -45,7 +45,7 @@ public class ShareReceiverActivity extends Activity {
         }
 
         if (uris.isEmpty()) {
-            Toast.makeText(this, "No PDF received", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "No file received", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -53,25 +53,47 @@ public class ShareReceiverActivity extends Activity {
         File dir = DataFolder.dir("Documents", new File(getExternalFilesDir(null), "shared"));
         if (!dir.exists()) dir.mkdirs();
 
-        File first = null;
-        int copied = 0;
+        File first = null;          // first PDF -> Category marker
+        File firstWord = null;      // first Word file -> Upload Legal Document popup
+        int copied = 0, wordCount = 0;
         for (Uri u : uris) {
-            File f = DataFolder.importPdf(this, u, dir);
-            if (f != null) {
+            String type = getContentResolver().getType(u);
+            String nm = u.getLastPathSegment() == null ? "" : u.getLastPathSegment().toLowerCase(java.util.Locale.ROOT);
+            boolean word = (type != null && (type.equals("application/msword") || type.contains("wordprocessingml")))
+                    || nm.endsWith(".doc") || nm.endsWith(".docx");
+            File f = word ? DataFolder.importFile(this, u, dir) : DataFolder.importPdf(this, u, dir);
+            if (f == null) continue;
+            if (word) {
+                wordCount++;
+                if (firstWord == null) firstWord = f;
+            } else {
                 copied++;
                 if (first == null) first = f;
             }
         }
 
-        if (first == null) {
-            Toast.makeText(this, "Cannot read PDF", Toast.LENGTH_LONG).show();
-        } else {
+        if (first == null && firstWord == null) {
+            Toast.makeText(this, "Cannot read the shared file", Toast.LENGTH_LONG).show();
+        } else if (first != null) {
             if (copied > 1) {
                 Toast.makeText(this, copied + " PDFs saved. Opening the first.",
                         Toast.LENGTH_LONG).show();
             }
+            if (wordCount > 0) {
+                Toast.makeText(this, wordCount + " Word file(s) saved in the Documents folder.",
+                        Toast.LENGTH_LONG).show();
+            }
             Intent i = new Intent(this, MarkActivity.class);
             i.putExtra("path", first.getAbsolutePath());
+            startActivity(i);
+        } else {
+            if (wordCount > 1) {
+                Toast.makeText(this, wordCount + " Word files saved. Opening the first; the rest are in the Documents folder.",
+                        Toast.LENGTH_LONG).show();
+            }
+            // a Word file has no pages to mark: choose its name, category and matter in Upload Legal Document
+            Intent i = new Intent(this, NewCaseActivity.class);
+            i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, firstWord.getAbsolutePath());
             startActivity(i);
         }
         finish();

@@ -1422,7 +1422,8 @@ public class NewCaseActivity extends BaseActivity {
                         // marked later by the user: the one-time auto repair must not mark it
                         getSharedPreferences("vault_repaired", MODE_PRIVATE).edit().putBoolean(mp2, true).apply();
                     } else {
-                        int pc = DocFileCard.kind(moved.getName()) == 2 ? 1 : pdfPageCount(moved);   // an image is one page
+                        int pc = DocFileCard.kind(moved.getName()) == 1 || DocFileCard.kind(moved.getName()) == 2
+                                ? 1 : pdfPageCount(moved);   // an image or a Word file is one unit = page 1
                         java.util.Set<Integer> only = wholeMode[0] == 1 ? parsePages(wholeRange[0], pc) : null;
                         for (int pg = 0; pg < pc; pg++) {
                             if (only == null || only.contains(pg)) ms.set(mp2, pg, wholeCat);

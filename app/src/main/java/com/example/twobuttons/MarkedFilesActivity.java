@@ -185,7 +185,7 @@ public class MarkedFilesActivity extends BaseActivity {
         for (Item it : all) {
             if (q.isEmpty() || matches(it, q)) items.add(it);
         }
-        status.setText(items.size() + " marked PDFs");
+        status.setText(items.size() + " marked files");
         adapter.notifyDataSetChanged();
     }
 
@@ -199,7 +199,7 @@ public class MarkedFilesActivity extends BaseActivity {
         return false;
     }
 
-    /** PDFs open in the Category marker; an image (or any other file) opens in the phone's viewer. */
+    /** PDFs open in the Category marker; an image, Word file (or any other file) opens in the phone's viewer. */
     private void openMarker(String path, String onlySub, String addCat) {
         if (path.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
             Intent i = new Intent(this, MarkActivity.class);
@@ -225,7 +225,8 @@ public class MarkedFilesActivity extends BaseActivity {
     }
 
     private int totalPages(String path) {
-        if (DocFileCard.kind(new File(path).getName()) == 2) return 1;      // a single image = one page
+        int fk = DocFileCard.kind(new File(path).getName());
+        if (fk == 1 || fk == 2) return 1;      // a single image / Word file = one page
         try (ParcelFileDescriptor pfd =
                      ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.MODE_READ_ONLY);
              PdfRenderer r = new PdfRenderer(pfd)) {

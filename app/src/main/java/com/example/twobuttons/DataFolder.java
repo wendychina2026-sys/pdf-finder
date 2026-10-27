@@ -379,7 +379,8 @@ final class DataFolder {
                         ls.saveDoc(d);
                         boolean general = d.caseName == null || d.caseName.isEmpty()
                                 || d.caseName.equals("General Document Vault");
-                        if (general && DocFileCard.kind(f.getName()) == 2 && ms.all(f.getAbsolutePath()).isEmpty()
+                        if (general && (DocFileCard.kind(f.getName()) == 1 || DocFileCard.kind(f.getName()) == 2)
+                                && ms.all(f.getAbsolutePath()).isEmpty()
                                 && d.category != null && !d.category.isEmpty() && !d.category.equals("Multiple")) {
                             ms.set(f.getAbsolutePath(), 0, d.category);
                         }

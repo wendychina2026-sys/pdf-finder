@@ -243,7 +243,12 @@ public class DocumentsActivity extends BaseActivity {
                     File imp = importIfPdf(n);
                     if (imp != null) {
                         after.set(i, PhotoFlow.uri(this, imp));
-                        if (toMark == null) toMark = imp;
+                        if (imp.getName().toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+                            if (toMark == null) toMark = imp;
+                        } else if (d.category != null && !d.category.isEmpty() && !d.category.equals("Multiple")
+                                && DocFileCard.kind(imp.getName()) != 3) {
+                            new MarkStore(this).set(imp.getAbsolutePath(), 0, d.category);   // image / Word = page 1
+                        }
                     }
                 } else {
                     added.add(n);
@@ -306,13 +311,10 @@ public class DocumentsActivity extends BaseActivity {
         renderList();
     }
 
-    /** A PDF picked from outside the app is copied into the Documents folder (no duplicate); else null. */
+    /** A file picked from outside the app is copied into the Documents folder (no duplicate); null if already ours. */
     private File importIfPdf(android.net.Uri n) {
         if ((getPackageName() + ".fileprovider").equals(n.getAuthority())) return null;   // already ours
-        String type = getContentResolver().getType(n);
-        String nm = FileSetDialog.displayName(this, n);
-        boolean pdf = "application/pdf".equals(type) || (nm != null && nm.toLowerCase(Locale.ROOT).endsWith(".pdf"));
-        return pdf ? DataFolder.importPdf(this, n, DataFolder.documentsDir(this)) : null;
+        return DataFolder.importFile(this, n, DataFolder.documentsDir(this));
     }
 
     /** New or replaced PDF: straight into the Category marker, no "later". */
@@ -350,6 +352,15 @@ public class DocumentsActivity extends BaseActivity {
                 }
             } catch (Exception ignored) {
                 // keep old name / size
+            }
+            File rep = importIfPdf(u);                 // the new file lives in the app folder, not at the picker's link
+            if (rep != null) {
+                u = PhotoFlow.uri(this, rep);
+                if (!rep.getName().toLowerCase(Locale.ROOT).endsWith(".pdf") && DocFileCard.kind(rep.getName()) != 3
+                        && replacing.category != null && !replacing.category.isEmpty()
+                        && !replacing.category.equals("Multiple")) {
+                    new MarkStore(this).set(rep.getAbsolutePath(), 0, replacing.category);
+                }
             }
             String ext = nm != null && nm.lastIndexOf('.') > 0 ? nm.substring(nm.lastIndexOf('.')) : "";
             replacing.name = DocFileCard.stem(replacing.name) + ext;
