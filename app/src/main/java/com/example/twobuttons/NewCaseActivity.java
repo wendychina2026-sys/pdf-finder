@@ -1043,6 +1043,8 @@ public class NewCaseActivity extends BaseActivity {
         markerMatter = "";
         final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
         final boolean fromMarker = marked != null && marked.isFile();
+        // only a PDF coming from the Category marker had a matter chosen there; a shared image / Word file did not
+        final boolean markerChoseMatter = fromMarker && marked.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
         final java.util.Map<Integer, String> marks = fromMarker
                 ? new MarkStore(this).all(markerPath) : new java.util.HashMap<>();
         if (fromMarker) {
@@ -1056,7 +1058,7 @@ public class NewCaseActivity extends BaseActivity {
         final String[] catSel = {fromMarker ? markedCategory(marks) : "Other"};
         final boolean[] autoCat = {fromMarker && !marks.isEmpty()};   // category still follows the marked pages
         final List<DiaryStore.HCase> cases = store.cases();
-        final String[] matterSel = {fromMarker ? CREATE_NEW_CASE : general};
+        final String[] matterSel = {markerChoseMatter ? CREATE_NEW_CASE : general};
         if (fromMarker && !markerMatterPick.isEmpty()) {      // the choice made in the marker's Attach to Matter
             if (markerMatterPick.equals(MatterPicker.VAULT) || markerMatterPick.equals("General Document Vault")) {
                 matterSel[0] = general;
@@ -1160,7 +1162,7 @@ public class NewCaseActivity extends BaseActivity {
                             matterSel[0] = pick;
                             setChosen(matterTv, matterSel[0], general);
                         };
-                        if (fromMarker) {       // it was chosen in the marker already: ask before changing it
+                        if (markerChoseMatter) {       // it was chosen in the marker already: ask before changing it
                             PickerDialogs.confirm(this, "Change matter?", "Attach to Matter is \"" + matterSel[0]
                                     + "\". Change it to \"" + pick + "\"?", "Change", apply);
                         } else {
