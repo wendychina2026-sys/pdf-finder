@@ -70,6 +70,20 @@ public class FileExplorerActivity extends BaseActivity {
     private TextView selCount, selShare, selDelete;
     private final SimpleDateFormat fmt = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US);
 
+    /**
+     * A canonical path (symlinks resolved, e.g. /data/user/0/... vs /data/data/...) re-based onto root, so every
+     * child path has the same form the marks were saved under (otherwise marked files show as Unmarked).
+     */
+    private File underRoot(File f) {
+        try {
+            String r = root.getCanonicalPath();
+            String c = f.getCanonicalPath();
+            if (c.equals(r)) return root;
+            if (c.startsWith(r + File.separator)) return new File(root, c.substring(r.length() + 1));
+        } catch (java.io.IOException ignored) { }
+        return f;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -82,12 +96,12 @@ public class FileExplorerActivity extends BaseActivity {
         }
         cur = root;
         String focusPath = getIntent().getStringExtra("focus");
-        if (focusPath != null && !focusPath.isEmpty()) focus = new File(focusPath);
+        if (focusPath != null && !focusPath.isEmpty()) focus = underRoot(new File(focusPath));
         String startDir = getIntent().getStringExtra("dir");
-        if (startDir != null && inRoot(new File(startDir)) && new File(startDir).isDirectory()) cur = new File(startDir);
+        if (startDir != null && inRoot(new File(startDir)) && new File(startDir).isDirectory()) cur = underRoot(new File(startDir));
         if (savedInstanceState != null) {
             String p = savedInstanceState.getString("cur");
-            if (p != null && inRoot(new File(p)) && new File(p).isDirectory()) cur = new File(p);
+            if (p != null && inRoot(new File(p)) && new File(p).isDirectory()) cur = underRoot(new File(p));
         }
 
         LinearLayout page = new LinearLayout(this);
