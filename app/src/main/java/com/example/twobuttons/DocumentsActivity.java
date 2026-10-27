@@ -195,6 +195,7 @@ public class DocumentsActivity extends BaseActivity {
                             "application/msword",
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/*"});
                     i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            | android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                             | android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                     try {
                         startActivityForResult(i, REQ_REPLACE);
@@ -314,7 +315,9 @@ public class DocumentsActivity extends BaseActivity {
     /** A file picked from outside the app is copied into the Documents folder (no duplicate); null if already ours. */
     private File importIfPdf(android.net.Uri n) {
         if ((getPackageName() + ".fileprovider").equals(n.getAuthority())) return null;   // already ours
-        return DataFolder.importFile(this, n, DataFolder.documentsDir(this));
+        File f = DataFolder.importFile(this, n, DataFolder.documentsDir(this));
+        if (f != null) DataFolder.deleteOriginal(this, n, f);     // move, not copy
+        return f;
     }
 
     /** New or replaced PDF: straight into the Category marker, no "later". */

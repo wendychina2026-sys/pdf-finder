@@ -66,6 +66,7 @@ public class ShareReceiverActivity extends Activity {
             word = word || image;       // an image, like a Word file, has no pages to mark
             File f = word ? DataFolder.importFile(this, u, dir) : DataFolder.importPdf(this, u, dir);
             if (f == null) continue;
+            if (!Intent.ACTION_VIEW.equals(action)) DataFolder.deleteOriginal(this, u, f);   // shared: move, not copy
             if (word) {
                 wordCount++;
                 if (firstWord == null) firstWord = f;
