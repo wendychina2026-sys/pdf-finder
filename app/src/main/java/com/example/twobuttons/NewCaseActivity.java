@@ -1335,6 +1335,17 @@ public class NewCaseActivity extends BaseActivity {
             String matterName = matterSel[0].equals(general) || newCase ? "General Document Vault" : matterSel[0];
             String shownMatter = newCase ? "This new case" : matterName;
             if (autoCat[0]) catSel[0] = markedCategory(marks);
+            // a file from the picker / camera is copied into the app's Documents folder first, like a marker file
+            for (Uri pu : dlgUris) {
+                if (markerFiles.containsKey(pu.toString())) continue;
+                File docsDir = DataFolder.documentsDir(this);
+                File cp = docsDir == null ? null : DataFolder.importFile(this, pu, docsDir);
+                if (cp == null) {
+                    Toast.makeText(this, "Could not copy this file into the app folder", Toast.LENGTH_LONG).show();
+                    return false;
+                }
+                markerFiles.put(pu.toString(), cp.getAbsolutePath());
+            }
             // a multi-page PDF with no marked page and one category: ask how its pages should be marked
             if (matterSel[0].equals(general) && wholeMode[0] < 0 && !catSel[0].isEmpty() && !catSel[0].equals(MULTIPLE)) {
                 for (Uri gu : dlgUris) {
@@ -1411,7 +1422,7 @@ public class NewCaseActivity extends BaseActivity {
                         // marked later by the user: the one-time auto repair must not mark it
                         getSharedPreferences("vault_repaired", MODE_PRIVATE).edit().putBoolean(mp2, true).apply();
                     } else {
-                        int pc = pdfPageCount(moved);
+                        int pc = DocFileCard.kind(moved.getName()) == 2 ? 1 : pdfPageCount(moved);   // an image is one page
                         java.util.Set<Integer> only = wholeMode[0] == 1 ? parsePages(wholeRange[0], pc) : null;
                         for (int pg = 0; pg < pc; pg++) {
                             if (only == null || only.contains(pg)) ms.set(mp2, pg, wholeCat);
@@ -1604,7 +1615,8 @@ public class NewCaseActivity extends BaseActivity {
 
     private void openUri(Uri u) {
         String markedPath = markerFiles.get(u.toString());
-        if (markedPath != null && new java.io.File(markedPath).isFile()) {      // a marked PDF: open the Category marker
+        if (markedPath != null && markedPath.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")
+                && new java.io.File(markedPath).isFile()) {      // a marked PDF: open the Category marker
             Intent mv = new Intent(this, MarkActivity.class);
             mv.putExtra("path", markedPath);
             mv.putExtra("from_new_case", true);

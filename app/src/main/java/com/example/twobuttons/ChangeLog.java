@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "Images and other files now reach the app folder and Document Vault",
+            "Fix: a file chosen with Tap to choose (image, PDF, Word) or a photo is now copied into the PdfFinder Documents folder when saved; before, it stayed in its old place and could vanish.",
+            "A single image saved to General Document Vault is marked with its category and now shows in Document Vault; tapping it opens the image viewer.",
+            "Earlier uploads that kept only the picker's link are copied into the app folder once (if the phone still allows access)."),
         new Entry("26 Oct 2026", "Marked / unmarked in data folder; Documents is Document Vault",
             "Left menu: Document Vault entry removed.",
             "Data folder explorer: every PDF shows \"Marked file\" or \"Unmarked\".",

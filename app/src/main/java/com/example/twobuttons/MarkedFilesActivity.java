@@ -85,9 +85,7 @@ public class MarkedFilesActivity extends BaseActivity {
         list.setDivider(null);
         list.setDividerHeight(0);
         list.setOnItemClickListener((parent, view, pos, id) -> {
-            Intent i = new Intent(this, MarkActivity.class);
-            i.putExtra("path", items.get(pos).path);
-            startActivity(i);
+            openMarker(items.get(pos).path, null, null);
         });
 
         list.setOnItemLongClickListener((parent, view, pos, id) -> {
@@ -201,7 +199,33 @@ public class MarkedFilesActivity extends BaseActivity {
         return false;
     }
 
+    /** PDFs open in the Category marker; an image (or any other file) opens in the phone's viewer. */
+    private void openMarker(String path, String onlySub, String addCat) {
+        if (path.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            Intent i = new Intent(this, MarkActivity.class);
+            i.putExtra("path", path);
+            if (onlySub != null) i.putExtra("only_sub", onlySub);
+            if (addCat != null) i.putExtra("add_cat", addCat);
+            startActivity(i);
+            return;
+        }
+        try {
+            File f = new File(path);
+            android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", f);
+            String ext = DocFileCard.ext(f.getName());
+            String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+            Intent v = new Intent(Intent.ACTION_VIEW);
+            v.setDataAndType(u, mime == null ? "*/*" : mime);
+            v.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(v);
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "No app found to open this file", android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private int totalPages(String path) {
+        if (DocFileCard.kind(new File(path).getName()) == 2) return 1;      // a single image = one page
         try (ParcelFileDescriptor pfd =
                      ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.MODE_READ_ONLY);
              PdfRenderer r = new PdfRenderer(pfd)) {
@@ -307,10 +331,7 @@ public class MarkedFilesActivity extends BaseActivity {
             ImageView add = CaseViews.icon(this, R.drawable.ic_add_circle, AppTheme.accent(this), 26);
             add.setContentDescription("Add pages to " + sub);
             add.setOnClickListener(v -> {
-                Intent i = new Intent(this, MarkActivity.class);
-                i.putExtra("path", it.path);
-                i.putExtra("add_cat", subName);
-                startActivity(i);
+                openMarker(it.path, null, subName);
                 if (holder[0] != null) holder[0].dismiss();
             });
             head.addView(add, new LinearLayout.LayoutParams(CaseViews.dp(this, 30), CaseViews.dp(this, 30)));
@@ -325,10 +346,7 @@ public class MarkedFilesActivity extends BaseActivity {
             LinearLayout btns = new LinearLayout(this);
             btns.setOrientation(LinearLayout.HORIZONTAL);
             btns.addView(chipButton("View", R.drawable.ic_eye, AppTheme.accent(this), () -> {
-                Intent i = new Intent(this, MarkActivity.class);
-                i.putExtra("path", it.path);
-                i.putExtra("only_sub", subName);
-                startActivity(i);
+                openMarker(it.path, subName, null);
                 if (holder[0] != null) holder[0].dismiss();
             }));
             LinearLayout delBtn = chipButton("Delete", R.drawable.ic_delete, LegalUi.RED, () ->
@@ -562,9 +580,7 @@ public class MarkedFilesActivity extends BaseActivity {
 
             DocFileCard.Actions act = new DocFileCard.Actions();
             act.open = () -> {
-                Intent in = new Intent(c, MarkActivity.class);
-                in.putExtra("path", it.path);
-                startActivity(in);
+                openMarker(it.path, null, null);
             };
             act.details = () -> showDetails(it);
             act.path = () -> showPath(it);

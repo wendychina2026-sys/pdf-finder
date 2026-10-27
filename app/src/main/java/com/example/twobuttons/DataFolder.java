@@ -142,6 +142,45 @@ final class DataFolder {
         }
     }
 
+    /**
+     * Copies any picked file (PDF, Word, image, photo) into dir, keeping its extension. The same document
+     * already in dir is reused (no second copy). Null when the file cannot be read.
+     */
+    static File importFile(Context c, android.net.Uri uri, File dir) {
+        File tmp = null;
+        try {
+            if (!dir.exists()) dir.mkdirs();
+            String name = uriName(c, uri);
+            if (name == null || name.isEmpty()) name = "file_" + System.currentTimeMillis();
+            name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+            if (name.lastIndexOf('.') <= 0) {
+                String mt = c.getContentResolver().getType(uri);
+                String ext = mt == null ? null : android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mt);
+                if (ext != null && !ext.isEmpty()) name += "." + ext;
+            }
+            tmp = new File(dir, ".incoming_" + System.currentTimeMillis());
+            try (java.io.InputStream is = c.getContentResolver().openInputStream(uri);
+                 java.io.OutputStream os = new FileOutputStream(tmp)) {
+                if (is == null) { tmp.delete(); return null; }
+                byte[] buf = new byte[16384];
+                int r;
+                while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+            }
+            File same = findSameFile(dir, tmp);
+            if (same != null) { tmp.delete(); return same; }
+            int dot = name.lastIndexOf('.');
+            String stem = dot > 0 ? name.substring(0, dot) : name;
+            String ext2 = dot > 0 ? name.substring(dot) : "";
+            File out = new File(dir, name);
+            for (int n = 1; out.exists(); n++) out = new File(dir, stem + "_" + n + ext2);
+            if (!tmp.renameTo(out)) { tmp.delete(); return null; }
+            return out;
+        } catch (Exception e) {
+            if (tmp != null) tmp.delete();
+            return null;
+        }
+    }
+
     private static String uriName(Context c, android.net.Uri uri) {
         if ("content".equals(uri.getScheme())) {
             try (android.database.Cursor cur = c.getContentResolver().query(uri,
@@ -314,9 +353,46 @@ final class DataFolder {
         });
     }
 
+    /**
+     * Documents saved to the General Document Vault from the file picker kept only the picker's own
+     * link and never reached the app folder. Once per record: copy the file in, point the record at the
+     * copy and, for a single image, mark it with the record's category so the Vault lists it.
+     */
+    static void rescueOutsideDocs(final Context c) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    File dir = documentsDir(c);
+                    if (dir == null) return;
+                    SharedPreferences tried = c.getSharedPreferences("rescue_tried", Context.MODE_PRIVATE);
+                    LegalStore ls = new LegalStore(c);
+                    MarkStore ms = new MarkStore(c);
+                    for (LegalStore.Doc d : ls.docs()) {
+                        if (d.uri == null || d.uri.isEmpty() || !d.more.isEmpty() || tried.getBoolean(d.id, false)) continue;
+                        android.net.Uri u = android.net.Uri.parse(d.uri);
+                        if (!"content".equals(u.getScheme())
+                                || (c.getPackageName() + ".fileprovider").equals(u.getAuthority())) continue;
+                        tried.edit().putBoolean(d.id, true).apply();
+                        File f = importFile(c, u, dir);
+                        if (f == null) continue;
+                        d.uri = PhotoFlow.uri(c, f).toString();
+                        ls.saveDoc(d);
+                        boolean general = d.caseName == null || d.caseName.isEmpty()
+                                || d.caseName.equals("General Document Vault");
+                        if (general && DocFileCard.kind(f.getName()) == 2 && ms.all(f.getAbsolutePath()).isEmpty()
+                                && d.category != null && !d.category.isEmpty() && !d.category.equals("Multiple")) {
+                            ms.set(f.getAbsolutePath(), 0, d.category);
+                        }
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
     private static void onResume(Application app, Activity a) {
         migrateStranded(app);
         markUnmarkedVaultPdfs(app);
+        rescueOutsideDocs(app);
         try {
             SharedPreferences rt = app.getSharedPreferences(RUNTIME, Context.MODE_PRIVATE);
             if (rt.getBoolean(FLAG, false)) return;
