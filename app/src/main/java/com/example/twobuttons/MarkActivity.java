@@ -39,6 +39,7 @@ public class MarkActivity extends BaseActivity {
     private String onlySub = "";
     private String addCat = "";      // category preselected by the Vault's add button
     private int[] visible = null;   // null = all pages; else real page indexes to show
+    private LinearLayout infoBox;   // details strip: Document name, Attached to matter, Stage + Change details
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +98,17 @@ public class MarkActivity extends BaseActivity {
         LinearLayout.LayoutParams wide = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         root.addView(top, wide);
+        // an already marked / saved file: show the details filled in Upload Legal Document and let them be changed
+        infoBox = new LinearLayout(this);
+        infoBox.setOrientation(LinearLayout.VERTICAL);
+        if (!getIntent().getBooleanExtra("from_new_case", false)) {
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            ip.topMargin = CaseViews.dp(this, 6);
+            ip.bottomMargin = CaseViews.dp(this, 4);
+            root.addView(infoBox, ip);
+            refreshInfo();
+        }
         root.addView(hint, wide);
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -150,6 +162,60 @@ public class MarkActivity extends BaseActivity {
         // opened from Document Vault > Show details (View / + add): the file is already in the vault
         if (onlySub.isEmpty() && addCat.isEmpty()) root.addView(bottom, wide);
         setContentView(root);
+    }
+
+    /** Details strip for a marked / saved file: Document name, Attached to matter, Stage, Change details. */
+    private void refreshInfo() {
+        infoBox.removeAllViews();
+        LegalStore.Doc d = DocEdit.docFor(this, path);
+        if (d == null && marks.isEmpty()) {
+            infoBox.setVisibility(View.GONE);
+            return;
+        }
+        infoBox.setVisibility(View.VISIBLE);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int pad = CaseViews.dp(this, 10);
+        card.setPadding(pad, pad, pad, pad);
+        card.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.sub(this) & 0x55FFFFFF, 1));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        String docName = d == null || d.name.isEmpty() ? new File(path).getName() : d.name;
+        TextView nm = CaseViews.text(this, docName, 14, AppTheme.text(this), true);
+        nm.setSingleLine(true);
+        nm.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        head.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView chg = CaseViews.text(this, "Change details", 12, IconPalette.pick(this, 0xFF1A237E, 0xFFFFD54F), true);
+        chg.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 4), CaseViews.dp(this, 10), CaseViews.dp(this, 4));
+        chg.setBackground(CaseViews.box(this, 0x00000000, 8, IconPalette.pick(this, 0xFF1A237E, 0xFFFFD54F), 1));
+        chg.setOnClickListener(v -> DocEdit.show(this, path, () -> {
+            marks = store.all(path);        // a category change re-marks every page
+            pageAdapter.notifyDataSetChanged();
+            refreshInfo();
+        }));
+        head.addView(chg);
+        card.addView(head);
+
+        java.util.Set<String> cats = new java.util.TreeSet<>(marks.values());
+        String cat = cats.isEmpty() ? "" : cats.size() == 1 ? cats.iterator().next() : "Multiple";
+        addRow(card, "Attached to matter", DocEdit.matterOf(this, path));
+        if (d != null && !d.stage.isEmpty()) addRow(card, "Stage", d.stage);
+        if (!cat.isEmpty()) addRow(card, "Category", cat);
+        infoBox.addView(card);
+    }
+
+    private void addRow(LinearLayout card, String label, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, CaseViews.dp(this, 3), 0, 0);
+        row.addView(CaseViews.text(this, label + ": ", 11, AppTheme.sub(this), true));
+        TextView v = CaseViews.text(this, value, 12, AppTheme.text(this), false);
+        v.setSingleLine(true);
+        v.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(v, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(row);
     }
 
     @Override

@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "Category marker shows document details; one Edit box everywhere",
+            "Category marker: an already marked or saved file now shows a details card on top: Document name, Attached to matter, Stage and Category.",
+            "\"Change details\" on that card opens the same Edit box as the Document Vault Edit button: Document name, Category, Stage and Attach to matter. The card and page marks refresh when you press OK.",
+            "Attached to matter never shows an empty value or []: it reads General Document Vault when no case is attached."),
         new Entry("27 Oct 2026", "Private data folder, auto backup, restore",
             "Data folder is now private to the app: file managers and other apps cannot see it. Old files move in once; marks, cases and documents follow.",
             "Settings > Save data as zip: whole folder in one zip, to any folder or Google Drive.",
