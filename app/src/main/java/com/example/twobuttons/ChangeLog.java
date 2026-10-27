@@ -18,6 +18,13 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "Private data folder, auto backup, restore",
+            "Data folder is now private to the app: file managers and other apps cannot see it. Old files move in once; marks, cases and documents follow.",
+            "Settings > Save data as zip: whole folder in one zip, to any folder or Google Drive.",
+            "Settings > Auto backup folder: choose a folder once; the app saves a fresh zip by itself (two files in turn).",
+            "Settings > Restore from backup zip: use after reinstalling or on a new phone.",
+            "Main page tells you once a day when the last backup is more than 3 days old. Uninstalling deletes the private folder.",
+            "Extracted PDFs now go to PdfFinder/Extracted inside the private folder."),
         new Entry("27 Oct 2026", "Data folder sizes and marks; Document Vault cannot delete files",
             "Data folder: folder size in the top line now counts everything inside the folders.",
             "Data folder: image and Word files show Marked / Unmarked like PDFs, and the Marked / Unmarked filter works on them too.",

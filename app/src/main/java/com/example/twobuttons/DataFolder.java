@@ -26,15 +26,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The app's own folder on the phone's internal storage: /storage/emulated/0/PdfFinder
+ * The app's own PRIVATE folder: <app files dir>/PdfFinder. No file manager and no other app can see it;
+ * only this app can. Data is kept safe by zip backups (Settings > Backup), not by a public folder.
  *
  *   PdfFinder/Data       one JSON file per store (cases, clients, diary, options ...), kept up to date
  *   PdfFinder/Documents  PDFs received through Share / Open with
  *   PdfFinder/Photos     camera photos taken inside the app
  *   PdfFinder/Cards      visiting-card pictures of opposing advocates
  *
- * Because the folder lives outside the app's private storage it survives uninstall / reinstall.
- * When the app starts with no data of its own and the folder holds a backup, the data is restored.
+ * Uninstalling the app deletes this folder. Restore comes from a zip backup (Settings > Backup).
+ * Folders of older versions (public PdfFinder, Android/data, Documents/PDFFinder) are moved in once.
  */
 final class DataFolder {
     static final String ROOT_NAME = "PdfFinder";
@@ -48,20 +49,20 @@ final class DataFolder {
     }
 
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+    private static final String K_MIGRATED = "private_migrated_v1";
+    private static final String K_DIRTY = "private_migrate_dirty";
+    private static Context APP;
 
     private DataFolder() {}
 
     // ------------------------------------------------------------------ folder access
 
-    static boolean canWrite() {
-        if (Build.VERSION.SDK_INT >= 30) return Environment.isExternalStorageManager();
-        return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
-    }
+    static boolean canWrite() { return APP != null; }
 
-    /** /storage/emulated/0/PdfFinder, or null while the "all files" access is not granted. */
+    /** The private data folder (files dir / PdfFinder), created on demand. */
     static File root() {
-        if (!canWrite()) return null;
-        File r = new File(Environment.getExternalStorageDirectory(), ROOT_NAME);
+        if (APP == null) return null;
+        File r = new File(APP.getFilesDir(), ROOT_NAME);
         if (!r.isDirectory() && !r.mkdirs()) return null;
         return r;
     }
@@ -270,9 +271,10 @@ final class DataFolder {
     // ------------------------------------------------------------------ start up
 
     static void install(final Application app) {
+        APP = app.getApplicationContext();
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityResumed(Activity a) { onResume(app, a); }
-            @Override public void onActivityPaused(Activity a) { backupAsync(app); }
+            @Override public void onActivityPaused(Activity a) { backupAsync(app); DriveBackup.autoIfDue(app, false); }
             @Override public void onActivityCreated(Activity a, Bundle b) { }
             @Override public void onActivityStarted(Activity a) { }
             @Override public void onActivityStopped(Activity a) { }
@@ -390,23 +392,25 @@ final class DataFolder {
         });
     }
 
-    private static void onResume(Application app, Activity a) {
+    private static void onResume(Application app, final Activity a) {
+        migrateToPrivate(app, a);
         migrateStranded(app);
         markUnmarkedVaultPdfs(app);
         rescueOutsideDocs(app);
+        DriveBackup.warnIfStale(a);
         try {
             SharedPreferences rt = app.getSharedPreferences(RUNTIME, Context.MODE_PRIVATE);
             if (rt.getBoolean(FLAG, false)) return;
             File root = root();
-            if (root == null) return;                       // wait until access is granted
+            if (root == null) return;
             File data = new File(root, "Data");
             boolean restored = false;
             if (isEmpty(app) && data.isDirectory()) restored = restore(app, data);
             rt.edit().putBoolean(FLAG, true).apply();
-            Toast.makeText(app, restored
-                    ? "Data restored from " + root.getAbsolutePath()
-                    : "Your data is saved in " + root.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            if (restored) a.recreate();
+            if (restored) {
+                Toast.makeText(app, "Data restored", Toast.LENGTH_LONG).show();
+                a.recreate();
+            }
         } catch (Exception ignored) { }
     }
 
@@ -587,5 +591,266 @@ final class DataFolder {
             while ((n = is.read(buf)) > 0) bo.write(buf, 0, n);
             return new String(bo.toByteArray(), StandardCharsets.UTF_8);
         }
+    }
+
+    // ------------------------------------------------------------------ move into the private folder
+
+    /**
+     * Once: moves everything older versions kept in public places (PdfFinder on internal storage,
+     * Android/data/.../files, Documents/PDFFinder, files/adv_cards) into the private folder, then rewrites
+     * every stored path / link so marks, cases and documents still point at their files.
+     * Needs "All files access" only to read the old public folder; runs again at each start until done.
+     */
+    static void migrateToPrivate(final Context c, final Activity a) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (doMigrate(c)) {
+                        a.runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                Toast.makeText(c, "Your data folder is now private to this app", Toast.LENGTH_LONG).show();
+                                a.recreate();
+                            }
+                        });
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
+    private static boolean canReadPublic(Context c) {
+        if (Build.VERSION.SDK_INT >= 30) return Environment.isExternalStorageManager();
+        return c.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private static String canon(File f) {
+        try { return f.getCanonicalPath(); } catch (Exception e) { return f.getAbsolutePath(); }
+    }
+
+    /** from, to for plain paths, to for FileProvider links (canonical). */
+    private static void addMap(List<String[]> out, File src, File dst) {
+        String toAbs = dst.getAbsolutePath(), toCan = canon(dst);
+        Set<String> froms = new LinkedHashSet<>();
+        froms.add(src.getAbsolutePath());
+        froms.add(canon(src));
+        for (String f : froms) out.add(new String[]{f, toAbs, toCan});
+    }
+
+    private static List<String[]> legacyMaps(Context c, File newRoot) {
+        List<String[]> m = new ArrayList<>();
+        File pubRoot = new File(Environment.getExternalStorageDirectory(), ROOT_NAME);
+        addMap(m, pubRoot, newRoot);
+        addMap(m, new File("/storage/emulated/0/" + ROOT_NAME), newRoot);
+        File ext = c.getExternalFilesDir(null);
+        if (ext != null) {
+            addMap(m, new File(ext, "shared"), new File(newRoot, "Documents"));
+            addMap(m, new File(ext, "case_photos"), new File(newRoot, "Photos"));
+        }
+        addMap(m, new File(c.getFilesDir(), "adv_cards"), new File(newRoot, "Cards"));
+        addMap(m, new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "PDFFinder"),
+                new File(newRoot, "Extracted"));
+        return m;
+    }
+
+    private static boolean doMigrate(Context c) {
+        SharedPreferences rt = c.getSharedPreferences(RUNTIME, Context.MODE_PRIVATE);
+        if (rt.getBoolean(K_MIGRATED, false)) return false;
+        File newRoot = root();
+        if (newRoot == null) return false;
+        boolean pubOk = canReadPublic(c);
+        File pubRoot = new File(Environment.getExternalStorageDirectory(), ROOT_NAME);
+        File pubDocs = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "PDFFinder");
+        File ext = c.getExternalFilesDir(null);
+        boolean changed = false;
+
+        // fresh install over an old public backup: bring the data back first
+        File pubData = new File(pubRoot, "Data");
+        if (pubOk && pubData.isDirectory() && isEmpty(c) && restore(c, pubData)) {
+            changed = true;
+            rt.edit().putBoolean(K_DIRTY, true).apply();
+        }
+
+        List<String[]> exact = new ArrayList<>();
+        int[] fails = {0};
+        int[] moved = {0};
+        if (pubOk && pubRoot.isDirectory()) moveTree(pubRoot, newRoot, true, exact, fails, moved);
+        if (pubOk && pubDocs.isDirectory()) moveTree(pubDocs, new File(newRoot, "Extracted"), false, exact, fails, moved);
+        if (ext != null) {
+            moveTree(new File(ext, "shared"), new File(newRoot, "Documents"), false, exact, fails, moved);
+            moveTree(new File(ext, "case_photos"), new File(newRoot, "Photos"), false, exact, fails, moved);
+        }
+        moveTree(new File(c.getFilesDir(), "adv_cards"), new File(newRoot, "Cards"), false, exact, fails, moved);
+        if (moved[0] > 0) {
+            changed = true;
+            rt.edit().putBoolean(K_DIRTY, true).apply();
+        }
+        if (fails[0] > 0) return changed;                      // try the rest at the next start
+
+        if (rt.getBoolean(K_DIRTY, false) || !exact.isEmpty()) {
+            List<String[]> maps = new ArrayList<>(exact);
+            maps.addAll(legacyMaps(c, newRoot));
+            rewriteStores(c, maps);
+            rt.edit().putBoolean(K_DIRTY, false).apply();
+            changed = true;
+        }
+        if (pubOk) {
+            deleteTree(pubData);
+            pubRoot.delete();
+            pubDocs.delete();
+            rt.edit().putBoolean(K_MIGRATED, true).apply();
+        }
+        return changed;
+    }
+
+    private static void deleteTree(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) deleteTree(k);
+        f.delete();
+    }
+
+    /** Moves src into dst (merging). skipData: leave the top-level Data folder (rebuilt by the backup). */
+    private static void moveTree(File src, File dst, boolean skipData, List<String[]> exact, int[] fails, int[] moved) {
+        if (!src.isDirectory()) return;
+        if (!dst.isDirectory() && !dst.mkdirs()) { fails[0]++; return; }
+        File[] kids = src.listFiles();
+        if (kids == null) return;
+        for (File f : kids) {
+            if (f.isDirectory()) {
+                if (skipData && f.getName().equals("Data")) continue;
+                moveTree(f, new File(dst, f.getName()), false, exact, fails, moved);
+            } else if (f.getName().startsWith(".incoming_") || f.getName().endsWith(".tmp")) {
+                f.delete();
+            } else {
+                moveOne(f, dst, exact, fails, moved);
+            }
+        }
+        src.delete();       // only succeeds when empty
+    }
+
+    private static void moveOne(File f, File dstDir, List<String[]> exact, int[] fails, int[] moved) {
+        try {
+            File target = new File(dstDir, f.getName());
+            if (target.exists()) {
+                if (target.length() == f.length()) {
+                    String h1 = sha256(f), h2 = sha256(target);
+                    if (h1 != null && h1.equals(h2)) { f.delete(); return; }
+                }
+                String name = f.getName();
+                int dot = name.lastIndexOf('.');
+                String stem = dot > 0 ? name.substring(0, dot) : name;
+                String ext = dot > 0 ? name.substring(dot) : "";
+                for (int n = 1; target.exists(); n++) target = new File(dstDir, stem + "_" + n + ext);
+                String[] m = {f.getAbsolutePath(), target.getAbsolutePath(), canon(target)};
+                exact.add(m);
+                exact.add(new String[]{android.net.Uri.encode(f.getAbsolutePath(), "/"),
+                        android.net.Uri.encode(target.getAbsolutePath(), "/"),
+                        android.net.Uri.encode(canon(target), "/")});
+            }
+            File tmp = new File(dstDir, ".mig_" + target.getName());
+            try (FileInputStream in = new FileInputStream(f); FileOutputStream out = new FileOutputStream(tmp)) {
+                byte[] buf = new byte[64 * 1024];
+                int r;
+                while ((r = in.read(buf)) > 0) out.write(buf, 0, r);
+                out.getFD().sync();
+            }
+            if (tmp.length() != f.length() || !tmp.renameTo(target)) { tmp.delete(); fails[0]++; return; }
+            target.setLastModified(f.lastModified());
+            f.delete();
+            moved[0]++;
+        } catch (Exception e) {
+            fails[0]++;
+        }
+    }
+
+    private static String rewrite(String s, List<String[]> maps) {
+        if (s == null || s.isEmpty()) return s;
+        for (String[] m : maps) {
+            if (!s.contains(m[0])) continue;
+            s = s.replace("/root" + m[0], "/root" + m[2]);      // FileProvider links
+            s = s.replace(m[0], m[1]);                            // plain paths
+        }
+        return s;
+    }
+
+    /** Rewrites old paths / links in every stored key and value. True when anything changed. */
+    private static boolean rewriteStores(Context c, List<String[]> maps) {
+        boolean any = false;
+        for (String name : storeNames(c)) {
+            SharedPreferences sp = c.getSharedPreferences(name, Context.MODE_PRIVATE);
+            Map<String, ?> all = sp.getAll();
+            SharedPreferences.Editor ed = sp.edit();
+            boolean ch = false;
+            for (Map.Entry<String, ?> e : all.entrySet()) {
+                String k = e.getKey(), nk = rewrite(k, maps);
+                Object v = e.getValue(), nv = v;
+                if (v instanceof String) {
+                    nv = rewrite((String) v, maps);
+                } else if (v instanceof Set) {
+                    Set<String> ns = new LinkedHashSet<>();
+                    boolean sc = false;
+                    for (Object o : (Set<?>) v) {
+                        String so = String.valueOf(o), sn = rewrite(so, maps);
+                        if (!so.equals(sn)) sc = true;
+                        ns.add(sn);
+                    }
+                    if (sc) nv = ns;
+                }
+                if (nk.equals(k) && nv.equals(v)) continue;
+                ch = true;
+                if (!nk.equals(k)) ed.remove(k);
+                if (nv instanceof String) ed.putString(nk, (String) nv);
+                else if (nv instanceof Boolean) ed.putBoolean(nk, (Boolean) nv);
+                else if (nv instanceof Integer) ed.putInt(nk, (Integer) nv);
+                else if (nv instanceof Long) ed.putLong(nk, (Long) nv);
+                else if (nv instanceof Float) ed.putFloat(nk, (Float) nv);
+                else if (nv instanceof Set) {
+                    Set<String> ss = new LinkedHashSet<>();
+                    for (Object o : (Set<?>) nv) ss.add(String.valueOf(o));
+                    ed.putStringSet(nk, ss);
+                }
+            }
+            if (ch) { ed.commit(); any = true; }
+        }
+        return any;
+    }
+
+    // ------------------------------------------------------------------ restore from a zip
+
+    /**
+     * Restores a zip made by zipTo(): files go into the private folder, stores are loaded from
+     * PdfFinder/Data, old paths are rewritten. Returns the number of files restored (0 = not a backup).
+     */
+    static int restoreZip(Context c, java.io.InputStream in) throws Exception {
+        File root = root();
+        if (root == null) throw new IllegalStateException("Data folder not available");
+        String rootCanon = canon(root);
+        int count = 0;
+        byte[] buf = new byte[16384];
+        try (java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(new java.io.BufferedInputStream(in))) {
+            java.util.zip.ZipEntry e;
+            while ((e = z.getNextEntry()) != null) {
+                String name = e.getName().replace('\\', '/');
+                if (!name.startsWith(ROOT_NAME + "/")) continue;
+                File out = new File(root, name.substring(ROOT_NAME.length() + 1));
+                String oc = canon(out);
+                if (!oc.equals(rootCanon) && !oc.startsWith(rootCanon + "/")) continue;   // zip-slip guard
+                if (e.isDirectory()) { out.mkdirs(); continue; }
+                File parent = out.getParentFile();
+                if (parent != null) parent.mkdirs();
+                File tmp = new File(parent, ".rst_" + out.getName());
+                try (FileOutputStream os = new FileOutputStream(tmp)) {
+                    int n;
+                    while ((n = z.read(buf)) > 0) os.write(buf, 0, n);
+                }
+                if (!tmp.renameTo(out)) { out.delete(); tmp.renameTo(out); }
+                count++;
+            }
+        }
+        if (count == 0) return 0;
+        File data = new File(root, "Data");
+        if (data.isDirectory()) restore(c, data);
+        rewriteStores(c, legacyMaps(c, root));
+        return count;
     }
 }

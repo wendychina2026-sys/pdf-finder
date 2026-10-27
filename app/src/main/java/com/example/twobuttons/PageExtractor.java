@@ -17,15 +17,14 @@ import java.util.List;
 
 class PageExtractor {
 
-    // Copy pages (0-based) of srcPath into a new PDF under Documents/PDFFinder/<category>/.
+    // Copy pages (0-based) of srcPath into a new PDF under the private PdfFinder/Extracted/<category>/.
     // Run off the main thread.
     static File extract(Context c, String srcPath, List<Integer> pages, String category)
             throws IOException {
         PDFBoxResourceLoader.init(c.getApplicationContext());
 
-        File dir = new File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-                "PDFFinder/" + safe(category));
+        File dir = new File(DataFolder.dir("Extracted", new File(c.getFilesDir(), "Extracted")),
+                safe(category));
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("Cannot create folder " + dir.getAbsolutePath());
         }
