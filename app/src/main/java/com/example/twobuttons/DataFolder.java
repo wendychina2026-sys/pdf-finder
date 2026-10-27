@@ -292,37 +292,69 @@ final class DataFolder {
         }
     }
 
+    private static final String PENDING = "pending_originals";
+
     /**
-     * After a picked file is safely stored in the app folder, removes the original from where it came from
-     * (so it no longer looks like pending work). Best effort: SAF delete, then direct file delete
-     * (all files access), then ContentResolver delete. Never touches the app's own files or the stored copy.
+     * A file was copied into the app folder from somewhere else. Its original is NOT touched yet: it is
+     * remembered here and removed only when the user saves the file (Save to Vault / attach to matter),
+     * see releaseFor(). The real path is resolved now, while the picker / share grant is still valid.
      */
-    static boolean deleteOriginal(Context c, android.net.Uri uri, File stored) {
+    static void registerOriginal(Context c, android.net.Uri uri, File stored) {
         try {
-            if (uri == null || stored == null || !stored.isFile() || stored.length() <= 0) return false;
-            if (uri.toString().equals(PhotoFlow.uri(c, stored).toString())) return false;
+            if (uri == null || stored == null) return;
             String auth = uri.getAuthority();
-            if (auth != null && auth.equals(c.getPackageName() + ".fileprovider")) return false;
+            if (auth != null && auth.equals(c.getPackageName() + ".fileprovider")) return;   // already ours
             File path = null;
             if ("file".equals(uri.getScheme())) path = new File(uri.getPath());
             else if ("content".equals(uri.getScheme())) path = resolvePath(c, uri);
-            String appDir = c.getApplicationInfo().dataDir;
+            c.getSharedPreferences(PENDING, Context.MODE_PRIVATE).edit()
+                    .putString(stored.getAbsolutePath(), (path == null ? "" : path.getAbsolutePath()) + "\n" + uri)
+                    .apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** The user saved these documents (their app-folder uris): remove the originals they were copied from. */
+    static void releaseFor(Context c, java.util.Collection<String> savedUris) {
+        try {
+            SharedPreferences sp = c.getSharedPreferences(PENDING, Context.MODE_PRIVATE);
+            Map<String, ?> all = sp.getAll();
+            if (all.isEmpty() || savedUris == null) return;
+            SharedPreferences.Editor ed = sp.edit();
+            for (Map.Entry<String, ?> e : all.entrySet()) {
+                File stored = new File(e.getKey());
+                if (!savedUris.contains(PhotoFlow.uri(c, stored).toString())) continue;
+                String v = String.valueOf(e.getValue());
+                int nl = v.indexOf('\n');
+                String pth = nl < 0 ? "" : v.substring(0, nl);
+                String uri = nl < 0 ? v : v.substring(nl + 1);
+                removeOriginal(c, pth.isEmpty() ? null : new File(pth), android.net.Uri.parse(uri), stored);
+                ed.remove(e.getKey());
+            }
+            ed.apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Deletes the original (never the stored copy, never anything inside the app's own folders). */
+    private static boolean removeOriginal(Context c, File path, android.net.Uri uri, File stored) {
+        try {
+            if (stored == null || !stored.isFile() || stored.length() <= 0) return false;
             if (path != null) {
                 String cp = path.getCanonicalPath();
-                if (cp.startsWith(appDir) || cp.equals(stored.getCanonicalPath())) return false;
-                String ext = c.getExternalFilesDir(null) == null ? null : c.getExternalFilesDir(null).getParentFile().getCanonicalPath();
-                if (ext != null && cp.startsWith(ext)) return false;
+                if (cp.equals(stored.getCanonicalPath())) return false;
+                if (cp.startsWith(c.getApplicationInfo().dataDir)) return false;
+                File ext = c.getExternalFilesDir(null);
+                if (ext != null && ext.getParentFile() != null && cp.startsWith(ext.getParentFile().getCanonicalPath())) return false;
             }
             boolean gone = false;
-            if ("content".equals(uri.getScheme())) {
+            if (path != null && path.isFile()) gone = path.delete();
+            if (!gone && uri != null && "content".equals(uri.getScheme())) {
                 try {
                     if (android.provider.DocumentsContract.isDocumentUri(c, uri))
                         gone = android.provider.DocumentsContract.deleteDocument(c.getContentResolver(), uri);
                 } catch (Exception ignored) { }
-            }
-            if (!gone && path != null && path.isFile()) gone = path.delete();
-            if (!gone && "content".equals(uri.getScheme())) {
-                try { gone = c.getContentResolver().delete(uri, null, null) > 0; } catch (Exception ignored) { }
+                if (!gone) {
+                    try { gone = c.getContentResolver().delete(uri, null, null) > 0; } catch (Exception ignored) { }
+                }
             }
             if (gone && path != null) {
                 android.media.MediaScannerConnection.scanFile(c, new String[]{path.getAbsolutePath()}, null, null);

@@ -142,8 +142,6 @@ public class NewCaseActivity extends BaseActivity {
     private String markerMatter = "";
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
-    /** picked files copied into the app folder: their originals are removed once the document is saved */
-    private final java.util.Map<String, Uri> importedOriginals = new java.util.HashMap<>();
     /** Uris of documents saved with "Create new case": they join this case when it is created. */
     private final List<String> pendingNewCaseDocs = new ArrayList<>();
     private LinearLayout uploadCardView;
@@ -1347,7 +1345,7 @@ public class NewCaseActivity extends BaseActivity {
                     return false;
                 }
                 markerFiles.put(pu.toString(), cp.getAbsolutePath());
-                importedOriginals.put(pu.toString(), pu);
+                DataFolder.registerOriginal(this, pu, cp);   // original removed when the document is saved
             }
             // a multi-page PDF with no marked page and one category: ask how its pages should be marked
             if (matterSel[0].equals(general) && wholeMode[0] < 0 && !catSel[0].isEmpty() && !catSel[0].equals(MULTIPLE)) {
@@ -1434,8 +1432,6 @@ public class NewCaseActivity extends BaseActivity {
                     }
                 }
                 Uri nu = PhotoFlow.uri(this, moved);
-                Uri orig = importedOriginals.remove(group.get(gi).toString());
-                if (orig != null) DataFolder.deleteOriginal(this, orig, moved);   // move, not copy
                 markerFiles.remove(group.get(gi).toString());
                 markerFiles.put(nu.toString(), moved.getAbsolutePath());
                 group.set(gi, nu);

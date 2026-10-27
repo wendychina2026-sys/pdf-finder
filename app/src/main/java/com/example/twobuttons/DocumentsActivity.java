@@ -316,7 +316,7 @@ public class DocumentsActivity extends BaseActivity {
     private File importIfPdf(android.net.Uri n) {
         if ((getPackageName() + ".fileprovider").equals(n.getAuthority())) return null;   // already ours
         File f = DataFolder.importFile(this, n, DataFolder.documentsDir(this));
-        if (f != null) DataFolder.deleteOriginal(this, n, f);     // move, not copy
+        if (f != null) DataFolder.registerOriginal(this, n, f);   // original removed when the document is saved
         return f;
     }
 

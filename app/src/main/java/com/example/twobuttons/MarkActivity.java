@@ -256,16 +256,11 @@ public class MarkActivity extends BaseActivity {
     }
 
     /**
-     * A PDF with even one marked page lives in the app's folder (PdfFinder/Documents): it is moved there from
-     * wherever it was opened, and its marks follow. The open viewer keeps working (the file handle stays valid).
+     * Marking a page no longer moves the PDF. It moves into the app folder (PdfFinder/Documents) when the user
+     * saves it in the Vault or attaches it to a matter (NewCaseActivity), and its marks follow.
      */
     private void keepInFolder() {
-        File moved = DataFolder.moveIntoDocuments(this, new File(path));
-        if (moved == null || moved.getAbsolutePath().equals(path)) return;
-        String old = path;
-        path = moved.getAbsolutePath();
-        store.move(this, old, path);
-        marks = store.all(path);
+        // marking alone does not move the file: it moves when it is saved in the Vault / attached to a matter
     }
 
     private Bitmap render(int index) {

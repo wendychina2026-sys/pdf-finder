@@ -77,8 +77,10 @@ final class LegalStore {
     static final String[] REM_STATUS = {"DELIVERED", "SENT", "PENDING", "FAILED"};
 
     private final SharedPreferences p;
+    private final Context appCtx;
 
     LegalStore(Context c) {
+        appCtx = c.getApplicationContext();
         p = c.getSharedPreferences("legal_diary", Context.MODE_PRIVATE);
         if (!p.getBoolean("seeded_v1", false)) seed();
     }
@@ -237,6 +239,11 @@ final class LegalStore {
         }
         if (!found) list.add(0, d);
         writeDocs(list);
+        // saved in the Vault / attached to a matter: the originals these files were copied from are removed now
+        java.util.Set<String> saved = new java.util.HashSet<>();
+        if (d.uri != null) saved.add(d.uri);
+        if (d.more != null) saved.addAll(d.more);
+        DataFolder.releaseFor(appCtx, saved);
     }
 
     void deleteDoc(String id) {
