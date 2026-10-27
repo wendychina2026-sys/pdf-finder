@@ -60,7 +60,7 @@ public class FileExplorerActivity extends BaseActivity {
     private final Map<File, Integer> childCount = new HashMap<>();
     private LinearLayout crumbs;
     private HorizontalScrollView crumbScroll;
-    private TextView summary, empty, sortLabel;
+    private TextView summary, empty, sortLabel, pathView;
     private BaseAdapter adapter;
     private ListView listView;
     private File focus;          // the file the user came here for: marked and scrolled into view
@@ -144,6 +144,11 @@ public class FileExplorerActivity extends BaseActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         clp.topMargin = CaseViews.dp(this, 6);
         page.addView(crumbScroll, clp);
+
+        pathView = CaseViews.text(this, "", 11, AppTheme.sub(this), false);
+        pathView.setPadding(CaseViews.dp(this, 4), CaseViews.dp(this, 6), CaseViews.dp(this, 4), 0);
+        pathView.setTextIsSelectable(true);
+        page.addView(pathView);
 
         if (limited) {
             TextView note = CaseViews.text(this, "All-files access is not granted, so this shows the app's private"
@@ -332,6 +337,9 @@ public class FileExplorerActivity extends BaseActivity {
         }
         Collections.sort(shown, comparator());
         drawCrumbs();
+        if (pathView != null) {
+            pathView.setText("Path: " + cur.getAbsolutePath() + "\nPrivate to this app. File managers and other apps cannot open it.");
+        }
         sortLabel.setText(SORTS[sort] + (asc ? " \u2191" : " \u2193"));
         summary.setText(folders + (folders == 1 ? " folder" : " folders") + ", " + files
                 + (files == 1 ? " file" : " files") + "  \u2022  " + size(bytes)

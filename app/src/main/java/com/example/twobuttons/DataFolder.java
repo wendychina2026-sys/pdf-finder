@@ -394,6 +394,7 @@ final class DataFolder {
 
     private static void onResume(Application app, final Activity a) {
         migrateToPrivate(app, a);
+        repairDocUris(app);
         migrateStranded(app);
         markUnmarkedVaultPdfs(app);
         rescueOutsideDocs(app);
@@ -712,7 +713,6 @@ final class DataFolder {
     /** Moves src into dst (merging). skipData: leave the top-level Data folder (rebuilt by the backup). */
     private static void moveTree(File src, File dst, boolean skipData, List<String[]> exact, int[] fails, int[] moved) {
         if (!src.isDirectory()) return;
-        if (!dst.isDirectory() && !dst.mkdirs()) { fails[0]++; return; }
         File[] kids = src.listFiles();
         if (kids == null) return;
         for (File f : kids) {
@@ -730,6 +730,7 @@ final class DataFolder {
 
     private static void moveOne(File f, File dstDir, List<String[]> exact, int[] fails, int[] moved) {
         try {
+            if (!dstDir.isDirectory() && !dstDir.mkdirs()) { fails[0]++; return; }
             File target = new File(dstDir, f.getName());
             if (target.exists()) {
                 if (target.length() == f.length()) {
@@ -813,6 +814,69 @@ final class DataFolder {
             if (ch) { ed.commit(); any = true; }
         }
         return any;
+    }
+
+    // ------------------------------------------------------------------ keep document links in step with the files
+
+    /**
+     * Document records find their file by the exact FileProvider link. When a stored link is not the
+     * current form of an existing file (or the file only moved), the link is re-made from the file, so the
+     * record keeps its own name, category and stage.
+     */
+    static void repairDocUris(final Context c) {
+        IO.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    LegalStore ls = new LegalStore(c);
+                    for (LegalStore.Doc d : ls.docs()) {
+                        boolean ch = false;
+                        String u = fixUri(c, d.uri);
+                        if (!u.equals(d.uri)) { d.uri = u; ch = true; }
+                        for (int k = 0; k < d.more.size(); k++) {
+                            String m = fixUri(c, d.more.get(k));
+                            if (!m.equals(d.more.get(k))) { d.more.set(k, m); ch = true; }
+                        }
+                        if (ch) ls.saveDoc(d);
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
+    private static String fixUri(Context c, String u) {
+        try {
+            if (u == null || u.isEmpty()) return u;
+            android.net.Uri p = android.net.Uri.parse(u);
+            if (!(c.getPackageName() + ".fileprovider").equals(p.getAuthority())) return u;
+            String path = p.getPath();
+            if (path == null || !path.startsWith("/root/")) return u;
+            File f = new File(path.substring("/root".length()));
+            if (!f.isFile()) {
+                File found = findByName(documentsDir(c), f.getName());
+                if (found == null) return u;
+                f = found;
+            }
+            return PhotoFlow.uri(c, f).toString();
+        } catch (Exception e) {
+            return u;
+        }
+    }
+
+    /** The one file with this name under dir, or null when none or several. */
+    private static File findByName(File dir, String name) {
+        if (dir == null) return null;
+        List<File> hits = new ArrayList<>();
+        java.util.ArrayDeque<File> st = new java.util.ArrayDeque<>();
+        st.push(dir);
+        while (!st.isEmpty()) {
+            File[] kids = st.pop().listFiles();
+            if (kids == null) continue;
+            for (File k : kids) {
+                if (k.isDirectory()) st.push(k);
+                else if (k.getName().equals(name)) hits.add(k);
+            }
+        }
+        return hits.size() == 1 ? hits.get(0) : null;
     }
 
     // ------------------------------------------------------------------ restore from a zip
