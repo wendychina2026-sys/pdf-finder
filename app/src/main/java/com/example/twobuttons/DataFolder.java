@@ -292,6 +292,85 @@ final class DataFolder {
         }
     }
 
+    /**
+     * After a picked file is safely stored in the app folder, removes the original from where it came from
+     * (so it no longer looks like pending work). Best effort: SAF delete, then direct file delete
+     * (all files access), then ContentResolver delete. Never touches the app's own files or the stored copy.
+     */
+    static boolean deleteOriginal(Context c, android.net.Uri uri, File stored) {
+        try {
+            if (uri == null || stored == null || !stored.isFile() || stored.length() <= 0) return false;
+            if (uri.toString().equals(PhotoFlow.uri(c, stored).toString())) return false;
+            String auth = uri.getAuthority();
+            if (auth != null && auth.equals(c.getPackageName() + ".fileprovider")) return false;
+            File path = null;
+            if ("file".equals(uri.getScheme())) path = new File(uri.getPath());
+            else if ("content".equals(uri.getScheme())) path = resolvePath(c, uri);
+            String appDir = c.getApplicationInfo().dataDir;
+            if (path != null) {
+                String cp = path.getCanonicalPath();
+                if (cp.startsWith(appDir) || cp.equals(stored.getCanonicalPath())) return false;
+                String ext = c.getExternalFilesDir(null) == null ? null : c.getExternalFilesDir(null).getParentFile().getCanonicalPath();
+                if (ext != null && cp.startsWith(ext)) return false;
+            }
+            boolean gone = false;
+            if ("content".equals(uri.getScheme())) {
+                try {
+                    if (android.provider.DocumentsContract.isDocumentUri(c, uri))
+                        gone = android.provider.DocumentsContract.deleteDocument(c.getContentResolver(), uri);
+                } catch (Exception ignored) { }
+            }
+            if (!gone && path != null && path.isFile()) gone = path.delete();
+            if (!gone && "content".equals(uri.getScheme())) {
+                try { gone = c.getContentResolver().delete(uri, null, null) > 0; } catch (Exception ignored) { }
+            }
+            if (gone && path != null) {
+                android.media.MediaScannerConnection.scanFile(c, new String[]{path.getAbsolutePath()}, null, null);
+            }
+            return gone;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Best guess at the real file behind a picked content uri; null when it cannot be told. */
+    private static File resolvePath(Context c, android.net.Uri uri) {
+        try {
+            if (android.provider.DocumentsContract.isDocumentUri(c, uri)) {
+                String id = android.provider.DocumentsContract.getDocumentId(uri);
+                String auth = uri.getAuthority();
+                if ("com.android.externalstorage.documents".equals(auth) && id.contains(":")) {
+                    String vol = id.substring(0, id.indexOf(':'));
+                    String rel = id.substring(id.indexOf(':') + 1);
+                    File base = "primary".equalsIgnoreCase(vol)
+                            ? Environment.getExternalStorageDirectory() : new File("/storage/" + vol);
+                    return new File(base, rel);
+                }
+                if (id.startsWith("raw:")) return new File(id.substring(4));
+            }
+            try (android.database.Cursor cur = c.getContentResolver().query(uri,
+                    new String[]{android.provider.MediaStore.MediaColumns.DATA}, null, null, null)) {
+                if (cur != null && cur.moveToFirst() && cur.getString(0) != null) return new File(cur.getString(0));
+            } catch (Exception ignored) { }
+            if (android.provider.DocumentsContract.isDocumentUri(c, uri)) {
+                String id = android.provider.DocumentsContract.getDocumentId(uri);
+                int k = id.lastIndexOf(':');
+                if (k > 0 && uri.getAuthority() != null && uri.getAuthority().equals("com.android.providers.media.documents")) {
+                    String type = id.substring(0, k);
+                    android.net.Uri tbl = "image".equals(type) ? android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                            : "video".equals(type) ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                            : android.provider.MediaStore.Files.getContentUri("external");
+                    try (android.database.Cursor cur = c.getContentResolver().query(tbl,
+                            new String[]{android.provider.MediaStore.MediaColumns.DATA},
+                            "_id=?", new String[]{id.substring(k + 1)}, null)) {
+                        if (cur != null && cur.moveToFirst() && cur.getString(0) != null) return new File(cur.getString(0));
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
     // ------------------------------------------------------------------ start up
 
     static void install(final Application app) {
