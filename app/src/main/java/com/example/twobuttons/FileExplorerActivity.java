@@ -420,9 +420,34 @@ public class FileExplorerActivity extends BaseActivity {
         }
     }
 
+    /** PDF: opens the page marker. Image / Word file: one category marks the whole file (page 1). */
+    private void markFile(final File f) {
+        if (isPdf(f)) { open(f); return; }
+        CategoryPicker.pick(this, "", cat -> {
+            if (cat == null || cat.isEmpty()) return;
+            new MarkStore(this).set(f.getAbsolutePath(), 0, cat);
+            reload(false);
+        });
+    }
+
+    /** Removes every mark of the file; the one-time auto repair must not mark it again. */
+    private void resetMarking(final File f) {
+        PickerDialogs.confirm(this, "Reset marking?",
+                "All marks of \"" + f.getName() + "\" will be removed. The file stays in the app folder.",
+                "Reset", () -> {
+                    new MarkStore(this).clear(f.getAbsolutePath());
+                    getSharedPreferences("vault_repaired", MODE_PRIVATE).edit()
+                            .putBoolean(f.getAbsolutePath(), true).apply();
+                    reload(false);
+                });
+    }
+
     private void options(final File f) {
         List<String> items = new ArrayList<>();
         items.add("Open");
+        final boolean canMark = f.isFile() && markable(f);
+        final boolean isMarked = canMark && markedPaths.contains(f.getAbsolutePath());
+        if (canMark) items.add(isMarked ? "Reset marking" : "Mark");
         items.add("Rename");
         items.add("Delete");
         if (f.isFile()) items.add("Share");
@@ -432,6 +457,8 @@ public class FileExplorerActivity extends BaseActivity {
             String s = items.get(which);
             if (s.equals("Select multiple")) startSelection(f);
             else if (s.equals("Open")) open(f);
+            else if (s.equals("Mark")) markFile(f);
+            else if (s.equals("Reset marking")) resetMarking(f);
             else if (s.equals("Rename")) rename(f);
             else if (s.equals("Delete")) delete(f);
             else if (s.equals("Share")) share(f);
