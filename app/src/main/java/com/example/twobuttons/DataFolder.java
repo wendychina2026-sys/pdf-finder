@@ -404,6 +404,52 @@ final class DataFolder {
     }
 
     /** Best guess at the real file behind a picked content uri; null when it cannot be told. */
+    /**
+     * A shared uri that gives no path: the file usually still sits in shared storage (WhatsApp keeps received
+     * media in Android/media/com.whatsapp/..., reachable with all files access). Same name and same size = same file.
+     */
+    private static File findByNameSize(Context c, android.net.Uri uri) {
+        try {
+            String name = null;
+            long size = -1;
+            try (android.database.Cursor cur = c.getContentResolver().query(uri, null, null, null, null)) {
+                if (cur != null && cur.moveToFirst()) {
+                    int ni = cur.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    int si = cur.getColumnIndex(android.provider.OpenableColumns.SIZE);
+                    if (ni >= 0) name = cur.getString(ni);
+                    if (si >= 0 && !cur.isNull(si)) size = cur.getLong(si);
+                }
+            }
+            if (name == null || name.isEmpty() || size <= 0) return null;
+            File sd = Environment.getExternalStorageDirectory();
+            String[] roots = {
+                    "Android/media/com.whatsapp/WhatsApp/Media", "Android/media/com.whatsapp.w4b/WhatsApp Business/Media",
+                    "WhatsApp/Media", "Download", "Documents", "DCIM", "Pictures"};
+            for (String r : roots) {
+                File hit = searchName(new File(sd, r), name, size, 4);
+                if (hit != null) return hit;
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    private static File searchName(File dir, String name, long size, int depth) {
+        File[] kids = dir.listFiles();
+        if (kids == null) return null;
+        for (File f : kids) {
+            if (f.isFile() && f.getName().equals(name) && f.length() == size) return f;
+        }
+        if (depth > 0) {
+            for (File f : kids) {
+                if (f.isDirectory() && !f.getName().startsWith(".")) {
+                    File hit = searchName(f, name, size, depth - 1);
+                    if (hit != null) return hit;
+                }
+            }
+        }
+        return null;
+    }
+
     static File resolvePath(Context c, android.net.Uri uri) {
         try {
             if (android.provider.DocumentsContract.isDocumentUri(c, uri)) {
@@ -437,6 +483,9 @@ final class DataFolder {
                     }
                 }
             }
+            // other app's provider with no path (WhatsApp share, ...): find the same file by name + size
+            File byName = findByNameSize(c, uri);
+            if (byName != null) return byName;
         } catch (Exception ignored) { }
         return null;
     }
