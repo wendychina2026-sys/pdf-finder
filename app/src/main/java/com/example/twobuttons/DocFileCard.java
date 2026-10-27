@@ -233,6 +233,7 @@ final class DocFileCard {
         b.setBackground(CaseViews.box(a, (color & 0x00FFFFFF) | 0x1A000000, 10, (color & 0x00FFFFFF) | 0x66000000, 1));
         b.addView(CaseViews.icon(a, icon, color, 14));
         TextView t = CaseViews.text(a, label, 12, color, true);
+        t.setSingleLine(true);
         t.setPadding(dp(a, 5), 0, 0, 0);
         b.addView(t);
         b.setOnClickListener(v -> click.run());

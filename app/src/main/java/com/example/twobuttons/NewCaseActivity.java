@@ -1827,7 +1827,6 @@ public class NewCaseActivity extends BaseActivity {
             final boolean grp = !pickedMore.get(i).isEmpty();
             info.count = 1 + pickedMore.get(i).size();
             act.open = grp ? () -> manageFiles(idx) : () -> openFile(idx);
-            act.save = grp ? null : () -> DocFileCard.startSave(this, REQ_SAVE, pickedUris.get(idx), pickedNames.get(idx));
             act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(idx))
                     : () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
             act.files = () -> manageFiles(idx);

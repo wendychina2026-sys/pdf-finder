@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("27 Oct 2026", "Edit button in Document Vault; no Save on upload card",
+            "Document Vault cards now have an Edit button: change the Document name, Category, Stage and Attach to matter. The file itself and its name on disk are never changed.",
+            "If a file's pages are marked in one category, changing the category re-marks all its pages; with several categories, change them from Show details.",
+            "Upload Legal Document card: the Save button is removed, because the file is already stored in the app folder and Document Vault."),
         new Entry("27 Oct 2026", "Images and Word files now reach the app folder and Document Vault",
             "Fix: a file chosen with Tap to choose (image, PDF, Word) or a photo is now copied into the PdfFinder Documents folder when saved; before, it stayed in its old place and could vanish.",
             "A single image saved to General Document Vault is marked with its category and now shows in Document Vault; tapping it opens the image viewer.",

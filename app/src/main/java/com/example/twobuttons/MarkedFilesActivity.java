@@ -43,6 +43,7 @@ public class MarkedFilesActivity extends BaseActivity {
         int total = -1;
         String size = "", date = "";
         String refName = "", stage = "";    // the name the user gave the document when uploading it
+        LegalStore.Doc doc;                 // the uploaded-document record behind this file (null for plain marked PDFs)
 
         Item(String path, Map<Integer, String> marks) {
             this.path = path;
@@ -130,6 +131,10 @@ public class MarkedFilesActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        reload();
+    }
+
+    private void reload() {
         // File.exists() per marked PDF is disk work; keep it off the UI thread so the tab opens instantly.
         new Thread(() -> {
             final List<Item> loaded = readAll();
@@ -170,7 +175,7 @@ public class MarkedFilesActivity extends BaseActivity {
             n.total = totalPages(p);
             try {
                 LegalStore.Doc d = byUri.get(PhotoFlow.uri(this, f).toString());
-                if (d != null) { n.refName = d.name; n.stage = d.stage; }
+                if (d != null) { n.refName = d.name; n.stage = d.stage; n.doc = d; }
             } catch (Exception ignored) { }
             n.size = android.text.format.Formatter.formatShortFileSize(this, f.length());
             n.date = df.format(new java.util.Date(f.lastModified()));
@@ -584,6 +589,7 @@ public class MarkedFilesActivity extends BaseActivity {
                 openMarker(it.path, null, null);
             };
             act.details = () -> showDetails(it);
+            act.edit = () -> editItem(it);
             act.path = () -> showPath(it);
             act.share = () -> {
                 try {
@@ -603,6 +609,65 @@ public class MarkedFilesActivity extends BaseActivity {
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             return outer;
         }
+    }
+
+    /**
+     * Edit button on a Document Vault card: Document name, Category, Stage and Attach to matter.
+     * The real file (and its name on disk) is never touched. Category changes the page marks only when
+     * all marked pages share one category; with several categories they are edited in Show details.
+     */
+    private void editItem(final Item it) {
+        final File f = new File(it.path);
+        final LegalStore ls = new LegalStore(this);
+        final String ext = DocFileCard.ext(f.getName()).isEmpty() ? "" : "." + DocFileCard.ext(f.getName());
+        final android.content.SharedPreferences mp = getSharedPreferences("pdf_matters", MODE_PRIVATE);
+        String savedMatter = mp.getString(it.path, "");
+        if (savedMatter.isEmpty() && it.doc != null) savedMatter = it.doc.caseName;
+
+        LinearLayout form = LegalUi.form(this);
+        String shown = it.refName.isEmpty() ? f.getName() : it.refName;
+        final EditText name = LegalUi.text(this, form, "Document name / caption", DocFileCard.stem(shown));
+
+        final java.util.Set<String> cats = new TreeSet<>(it.marks.values());
+        final CategoryPicker cp;
+        if (cats.size() <= 1) {
+            cp = new CategoryPicker(this, form, cats.isEmpty() ? "" : cats.iterator().next());
+        } else {
+            cp = null;
+            TextView note = CaseViews.text(this, "Category: pages are marked in several categories. "
+                    + "Change them from Show details.", 12, AppTheme.sub(this), false);
+            note.setPadding(0, CaseViews.dp(this, 10), 0, CaseViews.dp(this, 2));
+            form.addView(note);
+        }
+        final MatterPicker mpk = new MatterPicker(this, form, savedMatter, it.stage);
+
+        LegalUi.formDialog(this, "Edit document", form, () -> {
+            if (!LegalUi.need(this, name, "Document name")) return false;
+            LegalStore.Doc d = it.doc;
+            String newName = LegalUi.str(name);
+            String stored = DocFileCard.ext(newName).isEmpty() ? newName + ext : newName;
+            if (d == null) {
+                // a plain marked PDF has no document record yet: create one so name and stage can be kept
+                d = new LegalStore.Doc();
+                d.date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(new java.util.Date());
+                d.size = it.size;
+                d.fileName = f.getName();
+                try { d.uri = PhotoFlow.uri(this, f).toString(); } catch (Exception ignored) { }
+            }
+            d.name = stored;
+            d.caseName = mpk.matter();
+            d.stage = mpk.stage();
+            if (cp != null) {
+                String neu = cp.get();
+                d.category = neu;
+                for (Integer pg : new ArrayList<>(it.marks.keySet())) store.set(it.path, pg, neu);
+            }
+            ls.saveDoc(d);
+            String m = mpk.matter();
+            mp.edit().putString(it.path, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
+            reload();
+            return true;
+        }, null);
     }
 
     /** Long-press anywhere on a card (its tappable parts too) offers Delete file / Reset marking. */
