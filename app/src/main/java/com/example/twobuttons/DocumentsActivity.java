@@ -315,9 +315,7 @@ public class DocumentsActivity extends BaseActivity {
     /** A file picked from outside the app is copied into the Documents folder (no duplicate); null if already ours. */
     private File importIfPdf(android.net.Uri n) {
         if ((getPackageName() + ".fileprovider").equals(n.getAuthority())) return null;   // already ours
-        File f = DataFolder.importFile(this, n, DataFolder.documentsDir(this));
-        if (f != null) DataFolder.registerOriginal(this, n, f);   // original removed when the document is saved
-        return f;
+        return DataFolder.takeIn(this, n);      // saved right after: moved (one copy), copied only when no path
     }
 
     /** New or replaced PDF: straight into the Category marker, no "later". */

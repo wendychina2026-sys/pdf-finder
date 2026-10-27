@@ -1335,9 +1335,14 @@ public class NewCaseActivity extends BaseActivity {
             String matterName = matterSel[0].equals(general) || newCase ? "General Document Vault" : matterSel[0];
             String shownMatter = newCase ? "This new case" : matterName;
             if (autoCat[0]) catSel[0] = markedCategory(marks);
-            // a file from the picker / camera is copied into the app's Documents folder first, like a marker file
+            // a picked file is used in place (moved on save); only a stream-only file is copied into the Documents folder
             for (Uri pu : dlgUris) {
                 if (markerFiles.containsKey(pu.toString())) continue;
+                File inPlace = DataFolder.localOriginal(this, pu);
+                if (inPlace != null) {          // reachable file: used where it is, moved into the app folder on save
+                    markerFiles.put(pu.toString(), inPlace.getAbsolutePath());
+                    continue;
+                }
                 File docsDir = DataFolder.documentsDir(this);
                 File cp = docsDir == null ? null : DataFolder.importFile(this, pu, docsDir);
                 if (cp == null) {

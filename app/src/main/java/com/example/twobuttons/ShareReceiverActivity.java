@@ -64,9 +64,12 @@ public class ShareReceiverActivity extends Activity {
             boolean image = (type != null && type.startsWith("image/"))
                     || nm.matches(".*\\.(jpe?g|png|webp|gif|bmp|heic|heif)$");
             word = word || image;       // an image, like a Word file, has no pages to mark
-            File f = word ? DataFolder.importFile(this, u, dir) : DataFolder.importPdf(this, u, dir);
+            File f = DataFolder.localOriginal(this, u);     // reachable file: used in place, moved when saved
+            if (f == null) {
+                f = word ? DataFolder.importFile(this, u, dir) : DataFolder.importPdf(this, u, dir);
+                if (f != null) DataFolder.registerOriginal(this, u, f);
+            }
             if (f == null) continue;
-            DataFolder.registerOriginal(this, u, f);   // original removed when the document is saved
             if (word) {
                 wordCount++;
                 if (firstWord == null) firstWord = f;

@@ -292,6 +292,44 @@ final class DataFolder {
         }
     }
 
+    /**
+     * The real file behind a picked / shared uri when it can be reached by path (all files access):
+     * the file is then used in place and moved (not copied) when saved. Null when only a stream is available.
+     */
+    static File localOriginal(Context c, android.net.Uri uri) {
+        try {
+            if (uri == null) return null;
+            if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) return null;
+            File f = null;
+            if ("file".equals(uri.getScheme())) f = new File(uri.getPath());
+            else if ("content".equals(uri.getScheme())) f = resolvePath(c, uri);
+            if (f == null || !f.isFile() || !f.canRead() || f.length() <= 0) return null;
+            String cp = f.getCanonicalPath();
+            if (cp.startsWith(c.getApplicationInfo().dataDir)) return null;
+            File ext = c.getExternalFilesDir(null);
+            if (ext != null && ext.getParentFile() != null && cp.startsWith(ext.getParentFile().getCanonicalPath())) return null;
+            return f;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Takes a picked file into the Documents folder right now. Reachable file: really moved (one copy only).
+     * Stream only: copied, and its original removed later by releaseFor() when possible.
+     */
+    static File takeIn(Context c, android.net.Uri uri) {
+        File src = localOriginal(c, uri);
+        if (src != null) {
+            File moved = moveIntoDocuments(c, src);
+            if (moved != null) return moved;
+        }
+        File dir = documentsDir(c);
+        File cp = dir == null ? null : importFile(c, uri, dir);
+        if (cp != null) registerOriginal(c, uri, cp);
+        return cp;
+    }
+
     private static final String PENDING = "pending_originals";
 
     /**
@@ -366,7 +404,7 @@ final class DataFolder {
     }
 
     /** Best guess at the real file behind a picked content uri; null when it cannot be told. */
-    private static File resolvePath(Context c, android.net.Uri uri) {
+    static File resolvePath(Context c, android.net.Uri uri) {
         try {
             if (android.provider.DocumentsContract.isDocumentUri(c, uri)) {
                 String id = android.provider.DocumentsContract.getDocumentId(uri);
