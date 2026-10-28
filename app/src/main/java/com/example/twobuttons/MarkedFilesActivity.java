@@ -44,6 +44,7 @@ public class MarkedFilesActivity extends BaseActivity {
         String size = "", date = "";
         String refName = "", stage = "";    // the name the user gave the document when uploading it
         LegalStore.Doc doc;                 // the uploaded-document record behind this file (null for plain marked PDFs)
+        boolean grouped;                    // one of several files on a single card
         final List<Item> extras = new ArrayList<>();   // further files of the same document group: shown on this ONE card
 
         Item(String path, Map<Integer, String> marks) {
@@ -200,6 +201,11 @@ public class MarkedFilesActivity extends BaseActivity {
             } else {
                 head.extras.add(n);
             }
+        }
+        for (Item h : merged) {
+            if (h.extras.isEmpty()) continue;
+            h.grouped = true;
+            for (Item x : h.extras) x.grouped = true;
         }
         return merged;
     }
@@ -428,6 +434,41 @@ public class MarkedFilesActivity extends BaseActivity {
         return b;
     }
 
+    private void shareFile(String path) {
+        try {
+            File f = new File(path);
+            android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", f);
+            DocFileCard.share(this, u, f.getName());
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "Cannot share this file", android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** "1600 x 1200 px" for an image, else "". */
+    private static String imageSize(File f) {
+        try {
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+            return o.outWidth > 0 ? o.outWidth + " \u00D7 " + o.outHeight + " px" : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** The small line under a file's name in a multi-file card: what tells the files apart. */
+    private String fileMeta(Item g, int kind) {
+        StringBuilder b = new StringBuilder(DocFileCard.kindLabel(kind, new File(g.path).getName()));
+        if (kind == 2) {
+            String d = imageSize(new File(g.path));
+            if (!d.isEmpty()) b.append("  \u2022  ").append(d);
+        }
+        if (!g.size.isEmpty()) b.append("  \u2022  ").append(g.size);
+        if (!g.date.isEmpty()) b.append("  \u2022  ").append(g.date);
+        return b.toString();
+    }
+
     /** The (i) dialog: type, size, dates, marked pages and the complete path, plus a way to reach the folder. */
     private void showPath(final Item it) {
         final File f = new File(it.path);
@@ -440,7 +481,7 @@ public class MarkedFilesActivity extends BaseActivity {
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(CaseViews.icon(this, DocFileCard.kindIcon(k), DocFileCard.kindColor(this, k), 30));
-        TextView nm = CaseViews.text(this, it.refName.isEmpty() ? f.getName() : it.refName, 15, AppTheme.text(this), true);
+        TextView nm = CaseViews.text(this, it.refName.isEmpty() || it.grouped ? f.getName() : it.refName, 15, AppTheme.text(this), true);
         nm.setPadding(CaseViews.dp(this, 10), 0, 0, 0);
         head.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(head);
@@ -451,13 +492,18 @@ public class MarkedFilesActivity extends BaseActivity {
         card.setBackground(CaseViews.box(this, AppTheme.field(this), 14, AppTheme.fieldStroke(this), 1));
         java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(
                 java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT);
-        if (!it.refName.isEmpty()) infoRow(card, "Document name", it.refName);
+        if (!it.refName.isEmpty() && !it.grouped) infoRow(card, "Document name", it.refName);
         infoRow(card, "File name", f.getName());
+        if (it.grouped) infoRow(card, "Part of", it.refName.isEmpty() ? "this document" : it.refName);
         infoRow(card, "Type", DocFileCard.kindLabel(k, f.getName()));
+        if (k == 2) {
+            String dim = imageSize(f);
+            if (!dim.isEmpty()) infoRow(card, "Dimensions", dim);
+        }
         infoRow(card, "Size", it.size.isEmpty() ? "-" : it.size);
         infoRow(card, "Last edited", df.format(new java.util.Date(f.lastModified())));
         int n = it.marks.size();
-        infoRow(card, "Marked pages", n + (it.total >= 0 ? " of " + it.total : ""));
+        if (k == 0) infoRow(card, "Marked pages", n + (it.total >= 0 ? " of " + it.total : ""));
         infoRow(card, "Location", f.getParent() == null ? "" : f.getParent());
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -613,6 +659,8 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.kind = gk;
                     sb.open = () -> openMarker(g.path, null, null);
                     sb.details = () -> showPath(g);
+                    sb.share = () -> shareFile(g.path);
+                    sb.meta = fileMeta(g, gk);
                     info.subs.add(sb);
                 }
                 // images / Word files are one page each: only PDFs get the marked / unmarked / total line
@@ -625,7 +673,8 @@ public class MarkedFilesActivity extends BaseActivity {
             }
 
             DocFileCard.Actions act = new DocFileCard.Actions();
-            act.open = () -> {
+            // a multi-file card opens each file from its own row; no card-level Open
+            act.open = !it.extras.isEmpty() ? null : () -> {
                 if (it.extras.isEmpty()) { openMarker(it.path, null, null); return; }
                 final List<Item> grp = new ArrayList<>();
                 grp.add(it);

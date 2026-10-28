@@ -23,9 +23,9 @@ final class DocFileCard {
 
     /** One file inside a multi-file card: shown as a small row with its own Open and Details. */
     static final class Sub {
-        String name = "";
+        String name = "", meta = "";     // meta: what tells this file apart (type, size, dimensions, date)
         int kind;
-        Runnable open, details;
+        Runnable open, details, share;
     }
 
     static final class Info {
@@ -168,16 +168,26 @@ final class DocFileCard {
             r.setPadding(dp(a, 8), dp(a, 2), dp(a, 2), dp(a, 2));
             r.setBackground(CaseViews.box(a, AppTheme.field(a), 10, AppTheme.fieldStroke(a), 1));
             r.addView(CaseViews.icon(a, kindIcon(sb.kind), kindColor(a, sb.kind), 16));
-            TextView t = CaseViews.text(a, sb.name, 12, AppTheme.text(a), false);
+            LinearLayout txt = new LinearLayout(a);
+            txt.setOrientation(LinearLayout.VERTICAL);
+            txt.setPadding(dp(a, 8), 0, dp(a, 4), 0);
+            TextView t = CaseViews.text(a, sb.name, 12, AppTheme.text(a), true);
             t.setSingleLine(true);
             t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-            t.setPadding(dp(a, 8), 0, dp(a, 4), 0);
-            r.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            txt.addView(t);
+            if (!sb.meta.isEmpty()) {
+                TextView mt = CaseViews.text(a, sb.meta, 10, AppTheme.sub(a), false);
+                mt.setSingleLine(true);
+                mt.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                txt.addView(mt);
+            }
+            r.addView(txt, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             if (sb.open != null) {
                 r.addView(tinyBtn(a, R.drawable.ic_eye, AppTheme.info(a), "Open", sb.open));
                 r.setOnClickListener(v -> sb.open.run());
             }
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
+            if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             slp.topMargin = dp(a, 4);
