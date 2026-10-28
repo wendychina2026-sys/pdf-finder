@@ -41,9 +41,10 @@ public class SplashActivity extends Activity {
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.justice_logo);
-        logo.setScaleType(ImageView.ScaleType.FIT_XY);   // stretch to box: taller statue
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);   // square scene, no distortion
+        int side = getResources().getDisplayMetrics().widthPixels;   // full screen width
         col.addView(logo, new LinearLayout.LayoutParams(
-                CaseViews.dp(this, 300), CaseViews.dp(this, 440)));
+                side, side));
 
         View line = new View(this);
         line.setBackgroundColor(0xFF0B0B8E);
