@@ -41,10 +41,12 @@ public class SplashActivity extends Activity {
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.justice_logo);
-        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);   // square scene, no distortion
+        logo.setScaleType(ImageView.ScaleType.FIT_XY);   // stretched taller
         int side = getResources().getDisplayMetrics().widthPixels;   // full screen width
+        int tall = Math.min((int) (side * 1.3f),
+                getResources().getDisplayMetrics().heightPixels - CaseViews.dp(this, 150));   // 1.3x taller, always leaves room for name
         col.addView(logo, new LinearLayout.LayoutParams(
-                side, side));
+                side, tall));
 
         View line = new View(this);
         line.setBackgroundColor(0xFF0B0B8E);
