@@ -27,6 +27,7 @@ final class DocFileCard {
         int count = 1;          // files in this group
         String pagesLine = "";  // Document Vault: marked / unmarked / total pages
         String rangeLine = "";  // Document Vault: category -> page range summary
+        String filesLine = "";  // Document Vault: one line per file when a card holds several files
         boolean hideMeta;       // Document Vault: type / size / date live in the info dialog instead
         String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
         Runnable tagClick;
@@ -152,6 +153,13 @@ final class DocFileCard {
             TextView pl = CaseViews.text(a, in.pagesLine, 12, AppTheme.text(a), true);
             pl.setPadding(0, dp(a, 4), 0, 0);
             top.addView(pl);
+        }
+        if (!in.filesLine.isEmpty()) {
+            TextView fl = CaseViews.text(a, in.filesLine, 12, AppTheme.text(a), false);
+            fl.setMaxLines(6);
+            fl.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            fl.setPadding(0, dp(a, 3), 0, 0);
+            top.addView(fl);
         }
         if (!in.rangeLine.isEmpty()) {
             TextView rl = CaseViews.text(a, in.rangeLine, 11, AppTheme.sub(a), false);

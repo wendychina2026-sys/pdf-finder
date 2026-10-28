@@ -570,7 +570,6 @@ public class MarkedFilesActivity extends BaseActivity {
             int n = it.marks.size();
             info.pagesLine = "Marked pages: " + n
                     + (it.total >= 0 ? "  \u2022  Unmarked: " + Math.max(0, it.total - n) + "  \u2022  Total: " + it.total : "");
-            if (!it.extras.isEmpty()) info.pagesLine = (1 + it.extras.size()) + " files in this document  \u2022  " + info.pagesLine;
             StringBuilder rs = new StringBuilder();
             List<String> ord = new ArrayList<>(cats);
             final Map<String, Integer> first = new java.util.HashMap<>();
@@ -587,6 +586,34 @@ public class MarkedFilesActivity extends BaseActivity {
                 rs.append(cat).append(": ").append(ranges(pg));
             }
             info.rangeLine = rs.toString();
+            if (!it.extras.isEmpty()) {
+                // one card, several files: totals over ALL files, and every file named with its own marking
+                final List<Item> grp = new ArrayList<>();
+                grp.add(it);
+                grp.addAll(it.extras);
+                int marked = 0, totalPg = 0;
+                boolean totalKnown = true;
+                StringBuilder fl = new StringBuilder();
+                StringBuilder names = new StringBuilder();
+                for (int gi = 0; gi < grp.size(); gi++) {
+                    Item g = grp.get(gi);
+                    marked += g.marks.size();
+                    if (g.total >= 0) totalPg += g.total; else totalKnown = false;
+                    String gname = new File(g.path).getName();
+                    java.util.Set<String> gc = new TreeSet<>(g.marks.values());
+                    if (fl.length() > 0) fl.append("\n");
+                    fl.append(gi + 1).append(". ").append(gname);
+                    if (!gc.isEmpty()) fl.append("  \u2014  ").append(TextUtils.join(", ", gc));
+                    if (names.length() > 0) names.append("\n");
+                    names.append(gi + 1).append(". ").append(gname);
+                }
+                info.pagesLine = grp.size() + " files in this document  \u2022  Marked pages: " + marked
+                        + (totalKnown ? "  \u2022  Unmarked: " + Math.max(0, totalPg - marked)
+                        + "  \u2022  Total: " + totalPg : "");
+                info.filesLine = fl.toString();
+                info.fileName = names.toString();
+                info.rangeLine = "";
+            }
 
             DocFileCard.Actions act = new DocFileCard.Actions();
             act.open = () -> {
