@@ -45,6 +45,7 @@ public class MarkedFilesActivity extends BaseActivity {
         String refName = "", stage = "";    // the name the user gave the document when uploading it
         LegalStore.Doc doc;                 // the uploaded-document record behind this file (null for plain marked PDFs)
         boolean grouped;                    // one of several files on a single card
+        String label = "";                  // the name shown for this file inside a multi-file card
         final List<Item> extras = new ArrayList<>();   // further files of the same document group: shown on this ONE card
 
         Item(String path, Map<Integer, String> marks) {
@@ -224,6 +225,11 @@ public class MarkedFilesActivity extends BaseActivity {
         if (new File(it.path).getName().toLowerCase(Locale.ROOT).contains(q)) return true;
         if (it.refName.toLowerCase(Locale.ROOT).contains(q)) return true;
         if (it.path.toLowerCase(Locale.ROOT).contains(q)) return true;
+        if (FileCaption.get(this, it.path).toLowerCase(Locale.ROOT).contains(q)) return true;
+        for (Item x : it.extras) {
+            if (FileCaption.get(this, x.path).toLowerCase(Locale.ROOT).contains(q)) return true;
+            if (new File(x.path).getName().toLowerCase(Locale.ROOT).contains(q)) return true;
+        }
         for (String sub : it.marks.values()) {
             if (sub.toLowerCase(Locale.ROOT).contains(q)) return true;
         }
@@ -434,6 +440,18 @@ public class MarkedFilesActivity extends BaseActivity {
         return b;
     }
 
+    /** Renames the file as the user sees it (one file inside a multi-file card); the file on disk is untouched. */
+    private void editFileName(final Item g, String current) {
+        LinearLayout form = LegalUi.form(this);
+        final EditText et = LegalUi.text(this, form, "File name / caption", current);
+        LegalUi.formDialog(this, "Edit file name", form, () -> {
+            if (!LegalUi.need(this, et, "File name")) return false;
+            FileCaption.set(this, g.path, LegalUi.str(et));
+            reload();
+            return true;
+        }, null);
+    }
+
     private void shareFile(String path) {
         try {
             File f = new File(path);
@@ -481,7 +499,7 @@ public class MarkedFilesActivity extends BaseActivity {
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(CaseViews.icon(this, DocFileCard.kindIcon(k), DocFileCard.kindColor(this, k), 30));
-        TextView nm = CaseViews.text(this, it.refName.isEmpty() || it.grouped ? f.getName() : it.refName, 15, AppTheme.text(this), true);
+        TextView nm = CaseViews.text(this, it.grouped ? (it.label.isEmpty() ? f.getName() : it.label) : (it.refName.isEmpty() ? f.getName() : it.refName), 15, AppTheme.text(this), true);
         nm.setPadding(CaseViews.dp(this, 10), 0, 0, 0);
         head.addView(nm, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         box.addView(head);
@@ -655,10 +673,18 @@ public class MarkedFilesActivity extends BaseActivity {
                     if (names.length() > 0) names.append("\n");
                     names.append(gi + 1).append(". ").append(gname);
                     DocFileCard.Sub sb = new DocFileCard.Sub();
-                    sb.name = gname;
+                    String label = FileCaption.get(c, g.path);
+                    if (label.isEmpty()) {
+                        String base = DocFileCard.stem(it.refName.isEmpty() ? new File(it.path).getName() : it.refName);
+                        label = base + " (" + (gi + 1) + ")";
+                    }
+                    g.label = label;
+                    final String shownLabel = label;
+                    sb.name = label;
                     sb.kind = gk;
                     sb.open = () -> openMarker(g.path, null, null);
                     sb.details = () -> showPath(g);
+                    sb.edit = () -> editFileName(g, shownLabel);
                     sb.share = () -> shareFile(g.path);
                     sb.meta = fileMeta(g, gk);
                     info.subs.add(sb);
@@ -684,10 +710,11 @@ public class MarkedFilesActivity extends BaseActivity {
                 PickerDialogs.optionSheet(c, "Files in this document", null, names, -1,
                         which -> openMarker(grp.get(which).path, null, null));
             };
-            act.details = () -> showDetails(it);
+            act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
             act.edit = () -> editItem(it);
-            act.path = () -> showPath(it);
-            act.share = () -> {
+            act.path = !it.extras.isEmpty() ? null : () -> showPath(it);
+            // a multi-file card has Open / info / edit / share on every file row
+            act.share = !it.extras.isEmpty() ? null : () -> {
                 try {
                     if (!it.extras.isEmpty()) {
                         List<android.net.Uri> us = new ArrayList<>();

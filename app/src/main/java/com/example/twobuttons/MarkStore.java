@@ -66,6 +66,7 @@ class MarkStore {
     /** The PDF moved to a new path: its page marks (and attached matter) follow it. */
     void move(Context c, String oldPath, String newPath) {
         if (oldPath.equals(newPath)) return;
+        FileCaption.move(c, oldPath, newPath);
         String v = prefs.getString(oldPath, null);
         if (v != null) {
             String have = prefs.getString(newPath, null);

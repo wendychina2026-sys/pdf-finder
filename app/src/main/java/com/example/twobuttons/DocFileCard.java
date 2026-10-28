@@ -25,7 +25,7 @@ final class DocFileCard {
     static final class Sub {
         String name = "", meta = "";     // meta: what tells this file apart (type, size, dimensions, date)
         int kind;
-        Runnable open, details, share;
+        Runnable open, details, edit, share;
     }
 
     static final class Info {
@@ -187,6 +187,7 @@ final class DocFileCard {
                 r.setOnClickListener(v -> sb.open.run());
             }
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
+            if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
