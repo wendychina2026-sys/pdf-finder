@@ -55,6 +55,7 @@ public class ShareReceiverActivity extends Activity {
 
         File first = null;          // first PDF -> Category marker
         File firstWord = null;      // first Word file -> Upload Legal Document popup
+        final ArrayList<File> words = new ArrayList<>();   // every shared image / Word file
         int copied = 0, wordCount = 0;
         for (Uri u : uris) {
             String type = getContentResolver().getType(u);
@@ -72,6 +73,7 @@ public class ShareReceiverActivity extends Activity {
             if (f == null) continue;
             if (word) {
                 wordCount++;
+                words.add(f);
                 if (firstWord == null) firstWord = f;
             } else {
                 copied++;
@@ -98,11 +100,93 @@ public class ShareReceiverActivity extends Activity {
                 Toast.makeText(this, wordCount + " files saved. Opening the first; the rest are in the Documents folder.",
                         Toast.LENGTH_LONG).show();
             }
-            // a Word file or image has no pages to mark: choose its name, category and matter in Upload Legal Document
-            Intent i = new Intent(this, NewCaseActivity.class);
-            i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, firstWord.getAbsolutePath());
-            startActivity(i);
+            // a Word file or image has no pages to mark: new document, or attach to a document already in the Vault
+            if (!attachableDocs().isEmpty()) {
+                askNewOrAttach(words);
+                return;                 // finishes after the choice
+            }
+            openNew(firstWord);
         }
+        finish();
+    }
+
+    /** Upload Legal Document popup: the shared file becomes a NEW document. */
+    private void openNew(File f) {
+        Intent i = new Intent(this, NewCaseActivity.class);
+        i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, f.getAbsolutePath());
+        startActivity(i);
+    }
+
+    /** Saved documents an image / Word file can join (PDF documents are marked page by page, so they stay out). */
+    private java.util.List<LegalStore.Doc> attachableDocs() {
+        java.util.List<LegalStore.Doc> out = new ArrayList<>();
+        for (LegalStore.Doc d : new LegalStore(this).docs()) {
+            if (d.uri == null || d.uri.isEmpty()) continue;
+            if (DocFileCard.kind(d.name) == 0) continue;
+            out.add(d);
+        }
+        return out;
+    }
+
+    private void askNewOrAttach(final ArrayList<File> files) {
+        java.util.List<String> items = new ArrayList<>();
+        items.add("New document");
+        items.add("Add to an existing document");
+        PickerDialogs.optionSheet(this, "Shared file",
+                files.size() + (files.size() == 1 ? " file" : " files"), items, -1, which -> {
+                    if (which == 0) { openNew(files.get(0)); finish(); }
+                    else pickDocument(files);
+                }, this::finish);
+    }
+
+    private void pickDocument(final ArrayList<File> files) {
+        final java.util.List<LegalStore.Doc> docs = attachableDocs();
+        java.util.List<String> items = new ArrayList<>();
+        for (LegalStore.Doc d : docs) {
+            String m = d.caseName == null ? "" : d.caseName.trim();
+            if (m.isEmpty() || m.equals("[]")) m = "General Document Vault";
+            items.add(d.name + "  \u2022  " + m + "  \u2022  " + d.category
+                    + (d.more.isEmpty() ? "" : "  \u2022  " + (1 + d.more.size()) + " files"));
+        }
+        PickerDialogs.optionSheet(this, "Add to which document?", null, items, -1,
+                which -> attach(files, docs.get(which)), () -> askNewOrAttach(files));
+    }
+
+    /** The shared files join the chosen document: same card, same name / category / stage / matter. */
+    private void attach(ArrayList<File> files, LegalStore.Doc d) {
+        LegalStore ls = new LegalStore(this);
+        MarkStore ms = new MarkStore(this);
+        String m = d.caseName == null ? "" : d.caseName.trim();
+        boolean general = m.isEmpty() || m.equals("[]") || m.equals("General Document Vault");
+        int added = 0;
+        for (File f : files) {
+            File moved = DataFolder.moveIntoDocuments(this, f);
+            if (moved == null) continue;
+            String u = PhotoFlow.uri(this, moved).toString();
+            if (u.equals(d.uri) || d.more.contains(u)) continue;      // already part of this document
+            d.more.add(u);
+            String path = moved.getAbsolutePath();
+            if (general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
+                    && !d.category.equals("Multiple")) {
+                ms.set(path, 0, d.category);          // an image / Word file = one page, marked like the first file
+            }
+            added++;
+        }
+        if (added == 0) {
+            Toast.makeText(this, "Nothing added (already in this document, or file could not be moved)",
+                    Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        java.util.List<Uri> group = new ArrayList<>();
+        group.add(Uri.parse(d.uri));
+        for (String x : d.more) group.add(Uri.parse(x));
+        d.size = FileSetDialog.totalSize(this, group);
+        d.fileName = FileSetDialog.label(this, group);
+        ls.saveDoc(d);            // also removes the originals the files were taken from
+        Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
+                Toast.LENGTH_LONG).show();
+        startActivity(new Intent(this, DocumentsActivity.class));
         finish();
     }
 }
