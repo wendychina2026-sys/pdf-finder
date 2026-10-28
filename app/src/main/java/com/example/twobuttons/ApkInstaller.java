@@ -122,10 +122,10 @@ final class ApkInstaller {
         new AlertDialog.Builder(a).setTitle(title).setMessage(msg).setPositiveButton("OK", null).show();
     }
 
-    private static void install(Activity a, File f) {
+    static void install(Activity a, File f) {
         if (Build.VERSION.SDK_INT >= 26 && !a.getPackageManager().canRequestPackageInstalls()) {
             new AlertDialog.Builder(a).setTitle("Allow installs")
-                    .setMessage("Allow this app to install apps, then pick the APK again.")
+                    .setMessage("Allow this app to install apps, come back and try the update again.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Open settings", (d, w) -> a.startActivity(new Intent(
                             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,

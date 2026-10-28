@@ -63,6 +63,18 @@ public class SettingsActivity extends BaseActivity {
         app.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
         root.addView(app);
 
+        LinearLayout gh = new LinearLayout(this);
+        gh.setOrientation(LinearLayout.VERTICAL);
+        gh.setGravity(Gravity.CENTER_VERTICAL);
+        gh.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        gh.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        gh.addView(CaseViews.text(this, "Check for update", 16, AppTheme.text(this), true));
+        gh.addView(CaseViews.text(this, "Looks on GitHub for a newer version, downloads it and opens the installer. Needs internet.",
+                14, AppTheme.sub(this), false));
+        gh.setOnClickListener(v -> UpdateChecker.check(this));
+        root.addView(gh, CaseViews.lp(this, 0, 0));
+
         LinearLayout upd = new LinearLayout(this);
         upd.setOrientation(LinearLayout.VERTICAL);
         upd.setGravity(Gravity.CENTER_VERTICAL);
@@ -73,7 +85,7 @@ public class SettingsActivity extends BaseActivity {
         upd.addView(CaseViews.text(this, "Installed version " + ApkInstaller.installedLabel(this)
                 + ". Warns if the APK is the same or older.", 14, AppTheme.sub(this), false));
         upd.setOnClickListener(v -> ApkInstaller.pick(this));
-        root.addView(upd, CaseViews.lp(this, 0, 0));
+        root.addView(upd, CaseViews.lp(this, 8, 0));
 
         LinearLayout log = new LinearLayout(this);
         log.setOrientation(LinearLayout.VERTICAL);
