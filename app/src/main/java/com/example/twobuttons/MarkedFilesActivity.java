@@ -44,6 +44,7 @@ public class MarkedFilesActivity extends BaseActivity {
         String size = "", date = "";
         String refName = "", stage = "";    // the name the user gave the document when uploading it
         LegalStore.Doc doc;                 // the uploaded-document record behind this file (null for plain marked PDFs)
+        final List<Item> extras = new ArrayList<>();   // further files of the same document group: shown on this ONE card
 
         Item(String path, Map<Integer, String> marks) {
             this.path = path;
@@ -181,7 +182,26 @@ public class MarkedFilesActivity extends BaseActivity {
             n.date = df.format(new java.util.Date(f.lastModified()));
             out.add(n);
         }
-        return out;
+        // files saved together in one document (Add to an existing document) are ONE card, not one card per file
+        Map<String, Item> lead = new java.util.HashMap<>();
+        List<Item> merged = new ArrayList<>();
+        for (Item n : out) {
+            if (n.doc == null || n.doc.more.isEmpty()) { merged.add(n); continue; }
+            Item head = lead.get(n.doc.id);
+            if (head == null) { lead.put(n.doc.id, n); merged.add(n); continue; }
+            boolean nIsFirst = false;
+            try { nIsFirst = PhotoFlow.uri(this, new File(n.path)).toString().equals(n.doc.uri); } catch (Exception ignored) { }
+            if (nIsFirst) {                       // the document's own first file leads its card
+                n.extras.add(head);
+                n.extras.addAll(head.extras);
+                head.extras.clear();
+                lead.put(n.doc.id, n);
+                merged.set(merged.indexOf(head), n);
+            } else {
+                head.extras.add(n);
+            }
+        }
+        return merged;
     }
 
     private void applyFilter() {
@@ -546,9 +566,11 @@ public class MarkedFilesActivity extends BaseActivity {
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
             info.hideMeta = true;       // type, size and date are in the (i) dialog
+            if (!it.extras.isEmpty()) info.count = 1 + it.extras.size();
             int n = it.marks.size();
             info.pagesLine = "Marked pages: " + n
                     + (it.total >= 0 ? "  \u2022  Unmarked: " + Math.max(0, it.total - n) + "  \u2022  Total: " + it.total : "");
+            if (!it.extras.isEmpty()) info.pagesLine = (1 + it.extras.size()) + " files in this document  \u2022  " + info.pagesLine;
             StringBuilder rs = new StringBuilder();
             List<String> ord = new ArrayList<>(cats);
             final Map<String, Integer> first = new java.util.HashMap<>();
@@ -568,13 +590,29 @@ public class MarkedFilesActivity extends BaseActivity {
 
             DocFileCard.Actions act = new DocFileCard.Actions();
             act.open = () -> {
-                openMarker(it.path, null, null);
+                if (it.extras.isEmpty()) { openMarker(it.path, null, null); return; }
+                final List<Item> grp = new ArrayList<>();
+                grp.add(it);
+                grp.addAll(it.extras);
+                List<String> names = new ArrayList<>();
+                for (Item g : grp) names.add(new File(g.path).getName());
+                PickerDialogs.optionSheet(c, "Files in this document", null, names, -1,
+                        which -> openMarker(grp.get(which).path, null, null));
             };
             act.details = () -> showDetails(it);
             act.edit = () -> editItem(it);
             act.path = () -> showPath(it);
             act.share = () -> {
                 try {
+                    if (!it.extras.isEmpty()) {
+                        List<android.net.Uri> us = new ArrayList<>();
+                        us.add(androidx.core.content.FileProvider.getUriForFile(
+                                c, getPackageName() + ".fileprovider", f));
+                        for (Item g : it.extras) us.add(androidx.core.content.FileProvider.getUriForFile(
+                                c, getPackageName() + ".fileprovider", new File(g.path)));
+                        DocFileCard.shareAll(c, us);
+                        return;
+                    }
                     android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(
                             c, getPackageName() + ".fileprovider", f);
                     DocFileCard.share(c, u, f.getName());
