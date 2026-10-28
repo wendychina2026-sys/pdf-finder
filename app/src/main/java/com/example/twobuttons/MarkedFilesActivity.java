@@ -482,7 +482,6 @@ public class MarkedFilesActivity extends BaseActivity {
             String d = imageSize(new File(g.path));
             if (!d.isEmpty()) b.append("  \u2022  ").append(d);
         }
-        if (!g.size.isEmpty()) b.append("  \u2022  ").append(g.size);
         if (!g.date.isEmpty()) b.append("  \u2022  ").append(g.date);
         return b.toString();
     }
@@ -712,6 +711,7 @@ public class MarkedFilesActivity extends BaseActivity {
             };
             act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
             act.edit = () -> editItem(it);
+            act.add = () -> addFiles(it);
             act.path = !it.extras.isEmpty() ? null : () -> showPath(it);
             // a multi-file card has Open / info / edit / share on every file row
             act.share = !it.extras.isEmpty() ? null : () -> {
@@ -749,6 +749,93 @@ public class MarkedFilesActivity extends BaseActivity {
      */
     private void editItem(final Item it) {
         DocEdit.show(this, it.path, this::reload);
+    }
+
+    private static final int REQ_ADD = 72;
+    private Item addTarget;
+
+    /** Add button on a card: pick more images / PDFs / Word files; they join THIS card's document. */
+    private void addFiles(Item it) {
+        addTarget = it;
+        Intent in = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        in.addCategory(Intent.CATEGORY_OPENABLE);
+        in.setType("*/*");
+        in.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/*"});
+        in.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            startActivityForResult(in, REQ_ADD);
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "No file picker available on this device", android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_ADD || res != RESULT_OK || data == null || addTarget == null) return;
+        final Item it = addTarget;
+        addTarget = null;
+        final List<android.net.Uri> got = new ArrayList<>();
+        android.content.ClipData clip = data.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) got.add(clip.getItemAt(i).getUri());
+        } else if (data.getData() != null) {
+            got.add(data.getData());
+        }
+        if (got.isEmpty()) return;
+        java.util.Set<String> cats = new TreeSet<>(it.marks.values());
+        CategoryPicker.pick(this, cats.size() == 1 ? cats.iterator().next() : "",
+                cat -> attachFiles(it, got, cat));
+    }
+
+    /** New files are stored in the app folder, marked with the category, and listed on this card. */
+    private void attachFiles(Item it, List<android.net.Uri> uris, String cat) {
+        if (cat == null || cat.trim().isEmpty()) return;
+        List<android.net.Uri> added = new ArrayList<>();
+        for (android.net.Uri u : uris) {
+            File f = DataFolder.takeIn(this, u);
+            if (f == null) continue;
+            try {
+                android.net.Uri fu = PhotoFlow.uri(this, f);
+                int k = DocFileCard.kind(f.getName());
+                if (k == 3) continue;
+                int pages = k == 0 ? Math.max(1, totalPages(f.getAbsolutePath())) : 1;
+                for (int pg = 0; pg < pages; pg++) store.set(f.getAbsolutePath(), pg, cat.trim());
+                added.add(fu);
+            } catch (Exception ignored) { }
+        }
+        if (added.isEmpty()) {
+            android.widget.Toast.makeText(this, "Could not add file", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        LegalStore ls = new LegalStore(this);
+        LegalStore.Doc d = it.doc != null ? it.doc : DocEdit.docFor(this, it.path);
+        File lead = new File(it.path);
+        if (d == null) {
+            d = new LegalStore.Doc();
+            d.name = it.refName.isEmpty() ? lead.getName() : it.refName;
+            d.date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(new java.util.Date());
+            d.caseName = DocEdit.matterOf(this, it.path);
+            d.stage = it.stage;
+            java.util.Set<String> cs = new TreeSet<>(it.marks.values());
+            d.category = cs.size() == 1 ? cs.iterator().next() : cat.trim();
+            try { d.uri = PhotoFlow.uri(this, lead).toString(); } catch (Exception ignored) { }
+        }
+        for (android.net.Uri u : added) {
+            String us = u.toString();
+            if (!us.equals(d.uri) && !d.more.contains(us)) d.more.add(us);
+        }
+        List<android.net.Uri> grp = new ArrayList<>();
+        if (!d.uri.isEmpty()) grp.add(android.net.Uri.parse(d.uri));
+        for (String m : d.more) grp.add(android.net.Uri.parse(m));
+        d.fileName = FileSetDialog.label(this, grp);
+        d.size = FileSetDialog.totalSize(this, grp);
+        ls.saveDoc(d);
+        android.widget.Toast.makeText(this, added.size() + (added.size() == 1 ? " file added" : " files added"),
+                android.widget.Toast.LENGTH_SHORT).show();
+        reload();
     }
 
     /** Long-press anywhere on a card (its tappable parts too) offers Delete file / Reset marking. */
