@@ -19,8 +19,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * Launch screen: blank white, logo grows slowly (3 s), stays 2 s, then line + app name come in,
- * stays 2 s, then fades into MainActivity. Tap skips. Always white.
+ * Launch screen: blank white, logo grows (1.5 s), stays 1 s, then line + app name come in,
+ * stays 1 s, then fades into MainActivity. Tap skips. Always white.
  */
 public class SplashActivity extends Activity {
 
@@ -43,7 +43,7 @@ public class SplashActivity extends Activity {
         logo.setImageResource(R.drawable.justice_logo);
         logo.setAdjustViewBounds(true);
         col.addView(logo, new LinearLayout.LayoutParams(
-                CaseViews.dp(this, 225), CaseViews.dp(this, 262)));
+                CaseViews.dp(this, 300), CaseViews.dp(this, 350)));
 
         View line = new View(this);
         line.setBackgroundColor(0xFF0B0B8E);
@@ -78,26 +78,26 @@ public class SplashActivity extends Activity {
         name.setTranslationY(CaseViews.dp(this, 10));
 
         // 1. logo grows slowly (3 s), fades in during the first second, no overshoot
-        ObjectAnimator g1 = ObjectAnimator.ofFloat(logo, View.SCALE_X, 0.45f, 1f).setDuration(3000);
-        ObjectAnimator g2 = ObjectAnimator.ofFloat(logo, View.SCALE_Y, 0.45f, 1f).setDuration(3000);
-        ObjectAnimator g3 = ObjectAnimator.ofFloat(logo, View.ALPHA, 0f, 1f).setDuration(1000);
+        ObjectAnimator g1 = ObjectAnimator.ofFloat(logo, View.SCALE_X, 0.45f, 1f).setDuration(1500);
+        ObjectAnimator g2 = ObjectAnimator.ofFloat(logo, View.SCALE_Y, 0.45f, 1f).setDuration(1500);
+        ObjectAnimator g3 = ObjectAnimator.ofFloat(logo, View.ALPHA, 0f, 1f).setDuration(500);
         g1.setInterpolator(new LinearInterpolator());
         g2.setInterpolator(new LinearInterpolator());
         AnimatorSet grow = new AnimatorSet();
         grow.playTogether(g1, g2, g3);
 
         // 2. logo stays 2 s, then 3. name + line come in
-        ObjectAnimator l1 = ObjectAnimator.ofFloat(line, View.SCALE_X, 0f, 1f).setDuration(700);
+        ObjectAnimator l1 = ObjectAnimator.ofFloat(line, View.SCALE_X, 0f, 1f).setDuration(400);
         l1.setInterpolator(new DecelerateInterpolator());
-        ObjectAnimator n1 = ObjectAnimator.ofFloat(name, View.ALPHA, 0f, 1f).setDuration(700);
-        ObjectAnimator n2 = ObjectAnimator.ofFloat(name, View.TRANSLATION_Y, CaseViews.dp(this, 10), 0f).setDuration(700);
+        ObjectAnimator n1 = ObjectAnimator.ofFloat(name, View.ALPHA, 0f, 1f).setDuration(400);
+        ObjectAnimator n2 = ObjectAnimator.ofFloat(name, View.TRANSLATION_Y, CaseViews.dp(this, 10), 0f).setDuration(400);
         AnimatorSet nameIn = new AnimatorSet();
         nameIn.playTogether(l1, n1, n2);
-        nameIn.setStartDelay(2000);
+        nameIn.setStartDelay(1000);
 
         // 4. everything stays 2 s, then fade out into the app
         ObjectAnimator out = ObjectAnimator.ofFloat(root, View.ALPHA, 1f, 0f).setDuration(300);
-        out.setStartDelay(2000);
+        out.setStartDelay(1000);
         out.setInterpolator(new AccelerateInterpolator());
 
         anim = new AnimatorSet();
