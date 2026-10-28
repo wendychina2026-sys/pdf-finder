@@ -586,6 +586,10 @@ public class MarkedFilesActivity extends BaseActivity {
                 rs.append(cat).append(": ").append(ranges(pg));
             }
             info.rangeLine = rs.toString();
+            if (it.extras.isEmpty() && DocFileCard.kind(f.getName()) != 0) {
+                info.pagesLine = "";            // an image / Word file is one page: no marked / unmarked / total
+                info.rangeLine = "";
+            }
             if (!it.extras.isEmpty()) {
                 // one card, several files: totals over ALL files, and every file named with its own marking
                 final List<Item> grp = new ArrayList<>();
@@ -593,24 +597,29 @@ public class MarkedFilesActivity extends BaseActivity {
                 grp.addAll(it.extras);
                 int marked = 0, totalPg = 0;
                 boolean totalKnown = true;
-                StringBuilder fl = new StringBuilder();
                 StringBuilder names = new StringBuilder();
+                boolean anyPdf = false;
                 for (int gi = 0; gi < grp.size(); gi++) {
-                    Item g = grp.get(gi);
+                    final Item g = grp.get(gi);
                     marked += g.marks.size();
                     if (g.total >= 0) totalPg += g.total; else totalKnown = false;
                     String gname = new File(g.path).getName();
-                    java.util.Set<String> gc = new TreeSet<>(g.marks.values());
-                    if (fl.length() > 0) fl.append("\n");
-                    fl.append(gi + 1).append(". ").append(gname);
-                    if (!gc.isEmpty()) fl.append("  \u2014  ").append(TextUtils.join(", ", gc));
+                    int gk = DocFileCard.kind(gname);
+                    if (gk == 0) anyPdf = true;
                     if (names.length() > 0) names.append("\n");
                     names.append(gi + 1).append(". ").append(gname);
+                    DocFileCard.Sub sb = new DocFileCard.Sub();
+                    sb.name = gname;
+                    sb.kind = gk;
+                    sb.open = () -> openMarker(g.path, null, null);
+                    sb.details = () -> showPath(g);
+                    info.subs.add(sb);
                 }
-                info.pagesLine = grp.size() + " files in this document  \u2022  Marked pages: " + marked
+                // images / Word files are one page each: only PDFs get the marked / unmarked / total line
+                info.pagesLine = grp.size() + " files in this document"
+                        + (anyPdf ? "  \u2022  Marked pages: " + marked
                         + (totalKnown ? "  \u2022  Unmarked: " + Math.max(0, totalPg - marked)
-                        + "  \u2022  Total: " + totalPg : "");
-                info.filesLine = fl.toString();
+                        + "  \u2022  Total: " + totalPg : "") : "");
                 info.fileName = names.toString();
                 info.rangeLine = "";
             }

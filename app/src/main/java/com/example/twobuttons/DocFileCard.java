@@ -21,13 +21,20 @@ import java.util.Locale;
  */
 final class DocFileCard {
 
+    /** One file inside a multi-file card: shown as a small row with its own Open and Details. */
+    static final class Sub {
+        String name = "";
+        int kind;
+        Runnable open, details;
+    }
+
     static final class Info {
         String name = "", fileName = "", category = "", matter = "", stage = "", size = "", date = "";
         Uri uri;
         int count = 1;          // files in this group
         String pagesLine = "";  // Document Vault: marked / unmarked / total pages
         String rangeLine = "";  // Document Vault: category -> page range summary
-        String filesLine = "";  // Document Vault: one line per file when a card holds several files
+        final java.util.List<Sub> subs = new java.util.ArrayList<>();   // Document Vault: one small row per file when a card holds several files
         boolean hideMeta;       // Document Vault: type / size / date live in the info dialog instead
         String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
         Runnable tagClick;
@@ -154,12 +161,27 @@ final class DocFileCard {
             pl.setPadding(0, dp(a, 4), 0, 0);
             top.addView(pl);
         }
-        if (!in.filesLine.isEmpty()) {
-            TextView fl = CaseViews.text(a, in.filesLine, 12, AppTheme.text(a), false);
-            fl.setMaxLines(6);
-            fl.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            fl.setPadding(0, dp(a, 3), 0, 0);
-            top.addView(fl);
+        for (final Sub sb : in.subs) {
+            LinearLayout r = new LinearLayout(a);
+            r.setOrientation(LinearLayout.HORIZONTAL);
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            r.setPadding(dp(a, 8), dp(a, 2), dp(a, 2), dp(a, 2));
+            r.setBackground(CaseViews.box(a, AppTheme.field(a), 10, AppTheme.fieldStroke(a), 1));
+            r.addView(CaseViews.icon(a, kindIcon(sb.kind), kindColor(a, sb.kind), 16));
+            TextView t = CaseViews.text(a, sb.name, 12, AppTheme.text(a), false);
+            t.setSingleLine(true);
+            t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            t.setPadding(dp(a, 8), 0, dp(a, 4), 0);
+            r.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            if (sb.open != null) {
+                r.addView(tinyBtn(a, R.drawable.ic_eye, AppTheme.info(a), "Open", sb.open));
+                r.setOnClickListener(v -> sb.open.run());
+            }
+            if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            slp.topMargin = dp(a, 4);
+            top.addView(r, slp);
         }
         if (!in.rangeLine.isEmpty()) {
             TextView rl = CaseViews.text(a, in.rangeLine, 11, AppTheme.sub(a), false);
@@ -252,6 +274,16 @@ final class DocFileCard {
         LinearLayout b = new LinearLayout(a);
         b.setGravity(Gravity.CENTER);
         b.setBackground(CaseViews.box(a, (color & 0x00FFFFFF) | 0x1A000000, 16, (color & 0x00FFFFFF) | 0x66000000, 1));
+        b.addView(CaseViews.icon(a, icon, color, 16));
+        b.setContentDescription(desc);
+        b.setOnClickListener(v -> click.run());
+        return b;
+    }
+
+    private static View tinyBtn(Activity a, int icon, int color, String desc, Runnable click) {
+        LinearLayout b = new LinearLayout(a);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(a, 8), dp(a, 6), dp(a, 8), dp(a, 6));
         b.addView(CaseViews.icon(a, icon, color, 16));
         b.setContentDescription(desc);
         b.setOnClickListener(v -> click.run());
