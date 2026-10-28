@@ -20,7 +20,8 @@ final class ChangeLog {
     static final Entry[] ENTRIES = {
         new Entry("28 Oct 2026", "Check for update from GitHub; new splash screen",
             "Settings > App > Check for update: looks on GitHub for a newer build, downloads it and opens the installer. Shows \"Up to date\" when nothing is newer.",
-            "Splash screen: new Lady Justice court scene, faster animation."),
+            "Splash screen: new Lady Justice court scene, faster animation.",
+            "Every morning at 8:00 AM a notification says: Hello Shaifali , Good Morning , Have a Great Day Ahead !!!!"),
         new Entry("27 Oct 2026", "One Attach to matter (with Create new case); change \"Multiple\" category",
             "Category marker: the Attach to Matter box at the bottom is removed. Attaching is now only in \"Change details\" (details card is always shown on top).",
             "Change details / Document Vault Edit: Attach to Matter now has \"+ Create new case\" (PDF files). OK opens New Case > Upload Legal Document with this file.",

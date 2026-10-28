@@ -14,6 +14,7 @@ public class App extends Application {
         super.onCreate();
         DataFolder.install(this);
         DriveBackup.schedule(this);
+        MorningGreeting.schedule(this);
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
             SharedPreferences sp = getSharedPreferences("app_runtime", MODE_PRIVATE);
