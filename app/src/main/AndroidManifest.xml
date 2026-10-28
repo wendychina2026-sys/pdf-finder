@@ -35,15 +35,22 @@
         </provider>
 
         <activity
-            android:name=".SplashActivity"
+            android:name=".IntroActivity"
             android:exported="true"
-            android:theme="@style/SplashTheme"
+            android:theme="@style/IntroTheme"
+            android:screenOrientation="portrait"
             android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".SplashActivity"
+            android:exported="false"
+            android:theme="@style/SplashTheme"
+            android:noHistory="true" />
 
         <activity
             android:name=".MainActivity"
