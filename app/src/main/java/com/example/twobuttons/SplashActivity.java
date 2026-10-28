@@ -41,9 +41,9 @@ public class SplashActivity extends Activity {
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.justice_logo);
-        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.FIT_XY);   // stretch to box: taller statue
         col.addView(logo, new LinearLayout.LayoutParams(
-                CaseViews.dp(this, 300), CaseViews.dp(this, 350)));
+                CaseViews.dp(this, 300), CaseViews.dp(this, 440)));
 
         View line = new View(this);
         line.setBackgroundColor(0xFF0B0B8E);
