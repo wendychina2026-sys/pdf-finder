@@ -123,9 +123,12 @@ public class ShareReceiverActivity extends Activity {
     }
 
     /** Upload Legal Document popup: the shared file becomes a NEW document. */
-    private void openNew(File f) {
+    private void openNew(File f) { openNew(f, null); }
+
+    private void openNew(File f, String matter) {
         Intent i = new Intent(this, NewCaseActivity.class);
         i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, f.getAbsolutePath());
+        if (matter != null) i.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, matter);
         startActivity(i);
     }
 
@@ -143,14 +146,42 @@ public class ShareReceiverActivity extends Activity {
     private void askNewOrAttach(final ArrayList<File> files, final boolean pdf) {
         java.util.List<String> items = new ArrayList<>();
         items.add("New document");
-        items.add("Add to an existing document");
+        items.add("New document, same case as an existing one");
+        items.add("Add to an existing document (same card)");
         PickerDialogs.optionSheet(this, "Shared file",
                 files.size() + (files.size() == 1 ? " file" : " files"), items, -1, which -> {
                     if (which == 0) {
                         if (pdf) openMarker(files.get(0)); else openNew(files.get(0));
                         finish();
-                    } else pickDocument(files, pdf);
+                    } else if (which == 1) pickCase(files, pdf);
+                    else pickDocument(files, pdf);
                 }, this::finish);
+    }
+
+    /** Own card with its OWN category and stage, but under the same matter as a document already saved. */
+    private void pickCase(final ArrayList<File> files, final boolean pdf) {
+        final java.util.List<String> matters = new ArrayList<>();
+        for (LegalStore.Doc d : attachableDocs(true)) {
+            String m = d.caseName == null ? "" : d.caseName.trim();
+            if (m.isEmpty() || m.equals("[]") || m.equals("General Document Vault")) m = MatterPicker.VAULT;
+            if (!matters.contains(m)) matters.add(m);
+        }
+        java.util.List<String> shown = new ArrayList<>();
+        for (String m : matters) shown.add(m.equals(MatterPicker.VAULT) ? "General Document Vault" : m);
+        PickerDialogs.optionSheet(this, "Same case as which?", "The new file keeps its own category and stage",
+                shown, -1, which -> {
+                    String matter = matters.get(which);
+                    File f = files.get(0);
+                    if (pdf) {
+                        // the marker's details card starts with this matter; category (marked pages) and stage are set there
+                        getSharedPreferences("pdf_matters", MODE_PRIVATE).edit()
+                                .putString(f.getAbsolutePath(), matter).apply();
+                        openMarker(f);
+                    } else {
+                        openNew(f, matter);
+                    }
+                    finish();
+                }, () -> askNewOrAttach(files, pdf));
     }
 
     private void pickDocument(final ArrayList<File> files, final boolean pdf) {
