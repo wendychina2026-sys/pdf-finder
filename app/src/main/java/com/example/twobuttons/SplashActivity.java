@@ -43,7 +43,7 @@ public class SplashActivity extends Activity {
         logo.setImageResource(R.drawable.justice_logo);
         logo.setAdjustViewBounds(true);
         col.addView(logo, new LinearLayout.LayoutParams(
-                CaseViews.dp(this, 150), CaseViews.dp(this, 226)));
+                CaseViews.dp(this, 190), CaseViews.dp(this, 260)));
 
         View line = new View(this);
         line.setBackgroundColor(0xFF0B0B8E);
