@@ -57,6 +57,11 @@ final class DocEdit {
         String shown = cur == null || cur.name.isEmpty() ? f.getName() : cur.name;
         final EditText name = LegalUi.text(a, form, "Document name / caption", DocFileCard.stem(shown));
 
+        final boolean pdf = f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
+        // an unmarked image / Word file is one page: its first mark goes on page 0
+        final java.util.List<Integer> pages = new ArrayList<>(marks.keySet());
+        if (pages.isEmpty() && !pdf) pages.add(0);
+
         final Set<String> cats = new TreeSet<>(marks.values());
         final CategoryPicker cp;
         final String[] multiNew = {null};      // several categories: one category picked here is set on ALL marked pages
@@ -80,18 +85,21 @@ final class DocEdit {
             note.setPadding(0, CaseViews.dp(a, 4), 0, CaseViews.dp(a, 2));
             form.addView(note);
         }
-        final boolean pdf = f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
         final MatterPicker mpk = new MatterPicker(a, form, savedMatter, cur == null ? "" : cur.stage, pdf);
 
         LegalUi.formDialog(a, "Edit document", form, () -> {
             if (!LegalUi.need(a, name, "Document name")) return false;
+            if (marks.isEmpty() && !pdf && cp != null && cp.get().trim().isEmpty()) {
+                android.widget.Toast.makeText(a, "Select a category", android.widget.Toast.LENGTH_SHORT).show();
+                return false;
+            }
             if (mpk.isCreateNew()) {
                 // attach this file to a NEW case: same route as the marker's old "Create new case"
                 if (cp != null) {
                     String neu = cp.get();
-                    for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
+                    for (Integer pg : pages) store.set(path, pg, neu);
                 } else if (multiNew[0] != null) {
-                    for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
+                    for (Integer pg : pages) store.set(path, pg, multiNew[0]);
                 }
                 android.content.Intent nc = new android.content.Intent(a, NewCaseActivity.class);
                 nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
@@ -118,11 +126,11 @@ final class DocEdit {
             if (cp != null) {
                 String neu = cp.get();
                 d.category = neu;
-                for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, neu);
+                for (Integer pg : pages) store.set(path, pg, neu);
             }
             if (cp == null && multiNew[0] != null) {
                 d.category = multiNew[0];
-                for (Integer pg : new ArrayList<>(marks.keySet())) store.set(path, pg, multiNew[0]);
+                for (Integer pg : pages) store.set(path, pg, multiNew[0]);
             }
             ls.saveDoc(d);
             String m = mpk.matter();

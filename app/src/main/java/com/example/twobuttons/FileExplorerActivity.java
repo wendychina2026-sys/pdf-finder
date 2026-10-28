@@ -434,14 +434,10 @@ public class FileExplorerActivity extends BaseActivity {
         }
     }
 
-    /** PDF: opens the page marker. Image / Word file: one category marks the whole file (page 1). */
+    /** PDF: opens the page marker. Image / Word file: the same Edit box as the Vault (name, category, stage, matter). */
     private void markFile(final File f) {
         if (isPdf(f)) { open(f); return; }
-        CategoryPicker.pick(this, "", cat -> {
-            if (cat == null || cat.isEmpty()) return;
-            new MarkStore(this).set(f.getAbsolutePath(), 0, cat);
-            reload(false);
-        });
+        DocEdit.show(this, f.getAbsolutePath(), () -> reload(false));
     }
 
     /** Removes every mark of the file; the one-time auto repair must not mark it again. */
