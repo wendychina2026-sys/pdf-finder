@@ -171,15 +171,15 @@ final class DocFileCard {
             LinearLayout txt = new LinearLayout(a);
             txt.setOrientation(LinearLayout.VERTICAL);
             txt.setPadding(dp(a, 8), 0, dp(a, 4), 0);
-            TextView t = CaseViews.text(a, sb.name, 12, AppTheme.text(a), true);
-            t.setSingleLine(true);
-            t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-            txt.addView(t);
+            TextView subName = CaseViews.text(a, sb.name, 12, AppTheme.text(a), true);
+            subName.setSingleLine(true);
+            subName.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            txt.addView(subName);
             if (!sb.meta.isEmpty()) {
-                TextView mt = CaseViews.text(a, sb.meta, 10, AppTheme.sub(a), false);
-                mt.setSingleLine(true);
-                mt.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                txt.addView(mt);
+                TextView subMeta = CaseViews.text(a, sb.meta, 10, AppTheme.sub(a), false);
+                subMeta.setSingleLine(true);
+                subMeta.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                txt.addView(subMeta);
             }
             r.addView(txt, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             if (sb.open != null) {
