@@ -612,20 +612,21 @@ public class MarkedFilesActivity extends BaseActivity {
         return null;
     }
 
+    /** Notes text of a card: the attached case's Notes, or the document's own note when it has no case. */
+    private String notesOf(Item it) {
+        DiaryStore.HCase hc = caseFor(it);
+        if (hc != null) return hc.notes == null ? "" : hc.notes.trim();
+        return getSharedPreferences("doc_notes", MODE_PRIVATE).getString(it.path, "").trim();
+    }
+
     /**
-     * Notes icon on a Vault card / file row: shows and edits the attached case's "Notes" (New Case >
-     * Notes & other details). One field, so a change here is what the case holds everywhere.
+     * Notes icon on a Vault card / file row. Attached to a case: edits that case's Notes (same field as
+     * New Case > Notes & other details). General Document Vault: the note is kept on the document itself.
      */
     private void editCaseNotes(Item it) {
         final DiaryStore.HCase hc = caseFor(it);
-        if (hc == null) {
-            android.widget.Toast.makeText(this,
-                    "Attach this document to a case first (Edit > Attach to Matter). Notes belong to the case.",
-                    android.widget.Toast.LENGTH_LONG).show();
-            return;
-        }
         final EditText et = new EditText(this);
-        et.setText(hc.notes);
+        et.setText(notesOf(it));
         et.setHint("Notes");
         et.setMinLines(4);
         et.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
@@ -638,16 +639,22 @@ public class MarkedFilesActivity extends BaseActivity {
         box.setPadding(pad, CaseViews.dp(this, 8), pad, 0);
         box.addView(et, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        String who = hc != null ? hc.title() : new File(it.path).getName();
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Notes: " + hc.title())
+                .setTitle("Notes: " + who)
                 .setView(box)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save", (d, w) -> {
-                    DiaryStore ds = new DiaryStore(this);
-                    DiaryStore.HCase fresh = ds.caseById(hc.id);     // re-read: the case may have changed meanwhile
-                    if (fresh == null) fresh = hc;
-                    fresh.notes = et.getText().toString().trim();
-                    ds.saveCase(fresh);
+                    String txt = et.getText().toString().trim();
+                    if (hc != null) {
+                        DiaryStore ds = new DiaryStore(this);
+                        DiaryStore.HCase fresh = ds.caseById(hc.id);     // re-read: the case may have changed meanwhile
+                        if (fresh == null) fresh = hc;
+                        fresh.notes = txt;
+                        ds.saveCase(fresh);
+                    } else {
+                        getSharedPreferences("doc_notes", MODE_PRIVATE).edit().putString(it.path, txt).apply();
+                    }
                     adapter.notifyDataSetChanged();
                 })
                 .show();
@@ -678,8 +685,7 @@ public class MarkedFilesActivity extends BaseActivity {
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
             info.hideMeta = true;       // type, size and date are in the (i) dialog
-            DiaryStore.HCase theCase = caseFor(it);
-            info.notesFilled = theCase != null && !theCase.notes.trim().isEmpty();
+            info.notesFilled = !notesOf(it).isEmpty();
             final Runnable notesAct = () -> editCaseNotes(it);
             if (!it.extras.isEmpty()) info.count = 1 + it.extras.size();
             int n = it.marks.size();

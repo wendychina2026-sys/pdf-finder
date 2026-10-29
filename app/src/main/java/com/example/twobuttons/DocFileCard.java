@@ -184,7 +184,11 @@ final class DocFileCard {
                 r.setOnClickListener(v -> sb.open.run());
             }
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
-            if (sb.notes != null) r.addView(tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Case notes", sb.notes));
+            if (sb.notes != null) {
+                View nb = tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Notes", sb.notes);
+                if (in.notesFilled) blink(nb);
+                r.addView(nb);
+            }
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
@@ -230,7 +234,11 @@ final class DocFileCard {
         if (act.details != null) row.addView(labelBtn(a, R.drawable.ic_notes, gold, "Details", act.details), wlp(a, 8));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
         if (act.path != null) row.addView(circleBtn(a, R.drawable.ic_info, info, "Show file path", act.path), ilp(a));
-        if (act.notes != null) row.addView(iconBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Case notes", act.notes), ilp(a));
+        if (act.notes != null) {
+            View nb = iconBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Notes", act.notes);
+            if (in.notesFilled) blink(nb);
+            row.addView(nb, ilp(a));
+        }
         if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
         if (act.add != null) row.addView(iconBtn(a, R.drawable.ic_add_circle, gold, "Add another image / PDF to this card", act.add), ilp(a));
         if (act.files != null) row.addView(iconBtn(a, R.drawable.ic_image, gold, "Manage files (add / replace / delete / reorder)", act.files), ilp(a));
@@ -244,7 +252,19 @@ final class DocFileCard {
         return card;
     }
 
-    /** Orange when the case has notes, grey when empty. */
+    /** Pulses a view (fade out / in, forever) while it is on screen; stops when it is removed. */
+    private static void blink(final View v) {
+        final android.animation.ObjectAnimator an = android.animation.ObjectAnimator.ofFloat(v, View.ALPHA, 1f, 0.2f);
+        an.setDuration(650);
+        an.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        an.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        v.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View x) { if (!an.isStarted()) an.start(); }
+            @Override public void onViewDetachedFromWindow(View x) { an.cancel(); x.setAlpha(1f); }
+        });
+    }
+
+    /** Orange when there are notes, grey when empty. */
     private static int notesColor(Activity a, boolean filled) {
         return filled ? IconPalette.pick(a, 0xFFE65100, 0xFFFFB74D) : AppTheme.sub(a);
     }
