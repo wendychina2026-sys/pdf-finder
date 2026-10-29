@@ -266,6 +266,7 @@ final class DataFolder {
                     && src.getParentFile().getCanonicalPath().equals(dir.getCanonicalPath())) return src;
             File same = findSameFile(dir, src);
             if (same != null) {                              // already in the folder: keep that one only
+                recordOrigin(c, same, src.getAbsolutePath(), false);
                 src.delete();
                 android.media.MediaScannerConnection.scanFile(c, new String[]{src.getAbsolutePath()}, null, null);
                 return same;
@@ -285,6 +286,7 @@ final class DataFolder {
                 if (dest.length() != src.length()) { dest.delete(); return null; }
                 if (!src.delete()) { /* copy is complete; the original could not be removed */ }
             }
+            recordOrigin(c, dest, src.getAbsolutePath(), true);
             android.media.MediaScannerConnection.scanFile(c, new String[]{src.getAbsolutePath(), dest.getAbsolutePath()}, null, null);
             return dest;
         } catch (Exception e) {
@@ -331,6 +333,27 @@ final class DataFolder {
     }
 
     private static final String PENDING = "pending_originals";
+    private static final String ORIGINS = "origin_locations";
+
+    /** Remembers where a stored file came from (its original folder / path), for the file information dialog. */
+    static void recordOrigin(Context c, File stored, String origin, boolean overwrite) {
+        try {
+            if (stored == null || origin == null || origin.isEmpty()) return;
+            SharedPreferences sp = c.getSharedPreferences(ORIGINS, Context.MODE_PRIVATE);
+            String k = stored.getAbsolutePath();
+            if (!overwrite && sp.contains(k)) return;
+            sp.edit().putString(k, origin).apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Where the file was before it was moved into the app, or "" when that was not recorded. */
+    static String originOf(Context c, File stored) {
+        try {
+            return c.getSharedPreferences(ORIGINS, Context.MODE_PRIVATE).getString(stored.getAbsolutePath(), "");
+        } catch (Exception e) {
+            return "";
+        }
+    }
 
     /**
      * A file was copied into the app folder from somewhere else. Its original is NOT touched yet: it is
@@ -348,6 +371,8 @@ final class DataFolder {
             c.getSharedPreferences(PENDING, Context.MODE_PRIVATE).edit()
                     .putString(stored.getAbsolutePath(), (path == null ? "" : path.getAbsolutePath()) + "\n" + uri)
                     .apply();
+            recordOrigin(c, stored, path != null ? path.getAbsolutePath()
+                    : "Shared from " + (auth == null ? "another app" : auth), true);
         } catch (Exception ignored) { }
     }
 

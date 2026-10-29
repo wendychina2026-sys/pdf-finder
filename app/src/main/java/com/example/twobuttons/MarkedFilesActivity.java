@@ -522,6 +522,8 @@ public class MarkedFilesActivity extends BaseActivity {
         int n = it.marks.size();
         if (k == 0) infoRow(card, "Marked pages", n + (it.total >= 0 ? " of " + it.total : ""));
         infoRow(card, "Location", f.getParent() == null ? "" : f.getParent());
+        String from = DataFolder.originOf(this, f);
+        infoRow(card, "Moved from", from.isEmpty() ? "Not recorded (added before this was tracked, or created in the app)" : from);
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         clp.topMargin = CaseViews.dp(this, 10);
