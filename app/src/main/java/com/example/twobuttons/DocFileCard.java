@@ -25,7 +25,7 @@ final class DocFileCard {
     static final class Sub {
         String name = "", meta = "";     // meta: what tells this file apart (type, size, dimensions, date)
         int kind;
-        Runnable open, details, edit, share;
+        Runnable open, details, edit, share, notes;
     }
 
     static final class Info {
@@ -38,10 +38,11 @@ final class DocFileCard {
         boolean hideMeta;       // Document Vault: type / size / date live in the info dialog instead
         String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
         Runnable tagClick;
+        boolean notesFilled;    // Document Vault: the attached case has notes (icon is lit)
     }
 
     static final class Actions {
-        Runnable open, save, edit, replace, share, delete, files, details, path, add;
+        Runnable open, save, edit, replace, share, delete, files, details, path, add, notes;
     }
 
     static final int PDF_RED = 0xFFE5484D, WORD_BLUE = 0xFF3B82F6, IMG_GREEN = 0xFF22C55E;
@@ -183,6 +184,7 @@ final class DocFileCard {
                 r.setOnClickListener(v -> sb.open.run());
             }
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
+            if (sb.notes != null) r.addView(tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Case notes", sb.notes));
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
@@ -228,6 +230,7 @@ final class DocFileCard {
         if (act.details != null) row.addView(labelBtn(a, R.drawable.ic_notes, gold, "Details", act.details), wlp(a, 8));
         if (act.save != null) row.addView(labelBtn(a, R.drawable.ic_download, green, "Save", act.save), wlp(a, 8));
         if (act.path != null) row.addView(circleBtn(a, R.drawable.ic_info, info, "Show file path", act.path), ilp(a));
+        if (act.notes != null) row.addView(iconBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Case notes", act.notes), ilp(a));
         if (act.edit != null) row.addView(iconBtn(a, R.drawable.ic_edit, info, "Edit document", act.edit), ilp(a));
         if (act.add != null) row.addView(iconBtn(a, R.drawable.ic_add_circle, gold, "Add another image / PDF to this card", act.add), ilp(a));
         if (act.files != null) row.addView(iconBtn(a, R.drawable.ic_image, gold, "Manage files (add / replace / delete / reorder)", act.files), ilp(a));
@@ -239,6 +242,11 @@ final class DocFileCard {
         rlp.topMargin = dp(a, 8);
         card.addView(row, rlp);
         return card;
+    }
+
+    /** Orange when the case has notes, grey when empty. */
+    private static int notesColor(Activity a, boolean filled) {
+        return filled ? IconPalette.pick(a, 0xFFE65100, 0xFFFFB74D) : AppTheme.sub(a);
     }
 
     private static void detail(Activity a, LinearLayout box, String label, String value) {

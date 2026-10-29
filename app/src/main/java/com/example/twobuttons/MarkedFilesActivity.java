@@ -604,6 +604,55 @@ public class MarkedFilesActivity extends BaseActivity {
                 android.widget.Toast.LENGTH_LONG).show();
     }
 
+    /** The case this document is attached to (null for the General Document Vault or a case that is gone). */
+    private DiaryStore.HCase caseFor(Item it) {
+        String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
+        if (m.isEmpty() || m.equals(MatterPicker.VAULT) || m.equals("General Document Vault")) return null;
+        for (DiaryStore.HCase hc : new DiaryStore(this).cases()) if (hc.title().equals(m)) return hc;
+        return null;
+    }
+
+    /**
+     * Notes icon on a Vault card / file row: shows and edits the attached case's "Notes" (New Case >
+     * Notes & other details). One field, so a change here is what the case holds everywhere.
+     */
+    private void editCaseNotes(Item it) {
+        final DiaryStore.HCase hc = caseFor(it);
+        if (hc == null) {
+            android.widget.Toast.makeText(this,
+                    "Attach this document to a case first (Edit > Attach to Matter). Notes belong to the case.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        final EditText et = new EditText(this);
+        et.setText(hc.notes);
+        et.setHint("Notes");
+        et.setMinLines(4);
+        et.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        et.setTextColor(AppTheme.text(this));
+        et.setHintTextColor(AppTheme.sub(this));
+        LinearLayout box = new LinearLayout(this);
+        int pad = CaseViews.dp(this, 20);
+        box.setPadding(pad, CaseViews.dp(this, 8), pad, 0);
+        box.addView(et, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Notes: " + hc.title())
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (d, w) -> {
+                    DiaryStore ds = new DiaryStore(this);
+                    DiaryStore.HCase fresh = ds.caseById(hc.id);     // re-read: the case may have changed meanwhile
+                    if (fresh == null) fresh = hc;
+                    fresh.notes = et.getText().toString().trim();
+                    ds.saveCase(fresh);
+                    adapter.notifyDataSetChanged();
+                })
+                .show();
+    }
+
     private class ItemAdapter extends BaseAdapter {
         @Override public int getCount() { return items.size(); }
         @Override public Object getItem(int i) { return items.get(i); }
@@ -629,6 +678,9 @@ public class MarkedFilesActivity extends BaseActivity {
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
             info.hideMeta = true;       // type, size and date are in the (i) dialog
+            DiaryStore.HCase theCase = caseFor(it);
+            info.notesFilled = theCase != null && !theCase.notes.trim().isEmpty();
+            final Runnable notesAct = () -> editCaseNotes(it);
             if (!it.extras.isEmpty()) info.count = 1 + it.extras.size();
             int n = it.marks.size();
             info.pagesLine = "Marked pages: " + n
@@ -685,6 +737,7 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.details = () -> showPath(g);
                     sb.edit = () -> editFileName(g, shownLabel);
                     sb.share = () -> shareFile(g.path);
+                    sb.notes = notesAct;
                     sb.meta = fileMeta(g, gk);
                     info.subs.add(sb);
                 }
@@ -711,6 +764,7 @@ public class MarkedFilesActivity extends BaseActivity {
             };
             act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
             act.edit = () -> editItem(it);
+            act.notes = notesAct;
             act.add = () -> addFiles(it);
             act.path = !it.extras.isEmpty() ? null : () -> showPath(it);
             // a multi-file card has Open / info / edit / share on every file row
