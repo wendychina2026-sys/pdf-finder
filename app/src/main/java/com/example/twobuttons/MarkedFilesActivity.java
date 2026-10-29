@@ -612,49 +612,89 @@ public class MarkedFilesActivity extends BaseActivity {
         return null;
     }
 
-    /** Notes text of a card: the attached case's Notes, or the document's own note when it has no case. */
-    private String notesOf(Item it) {
+    // Three separate notes: the attached case's Notes (shared with New Case), the card's own note,
+    // and one note per file row of a multi-file card.
+
+    private String caseNote(Item it) {
         DiaryStore.HCase hc = caseFor(it);
-        if (hc != null) return hc.notes == null ? "" : hc.notes.trim();
-        return getSharedPreferences("doc_notes", MODE_PRIVATE).getString(it.path, "").trim();
+        return hc == null || hc.notes == null ? "" : hc.notes.trim();
     }
 
-    /**
-     * Notes icon on a Vault card / file row. Attached to a case: edits that case's Notes (same field as
-     * New Case > Notes & other details). General Document Vault: the note is kept on the document itself.
-     */
-    private void editCaseNotes(Item it) {
-        final DiaryStore.HCase hc = caseFor(it);
-        final EditText et = new EditText(this);
-        et.setText(notesOf(it));
+    private String cardNote(Item it) {
+        android.content.SharedPreferences sp = getSharedPreferences("doc_notes", MODE_PRIVATE);
+        String v = sp.getString("card:" + it.path, null);
+        if (v == null) v = sp.getString(it.path, "");      // note saved by the first version
+        return v.trim();
+    }
+
+    private String fileNote(String path) {
+        return getSharedPreferences("doc_notes", MODE_PRIVATE).getString("file:" + path, "").trim();
+    }
+
+    private EditText noteField(String label, String value, LinearLayout box) {
+        TextView l = CaseViews.text(this, label, 12, AppTheme.sub(this), true);
+        l.setPadding(0, CaseViews.dp(this, 8), 0, CaseViews.dp(this, 2));
+        box.addView(l);
+        EditText et = new EditText(this);
+        et.setText(value);
         et.setHint("Notes");
-        et.setMinLines(4);
+        et.setMinLines(3);
         et.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         et.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         et.setTextColor(AppTheme.text(this));
         et.setHintTextColor(AppTheme.sub(this));
-        LinearLayout box = new LinearLayout(this);
-        int pad = CaseViews.dp(this, 20);
-        box.setPadding(pad, CaseViews.dp(this, 8), pad, 0);
         box.addView(et, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        String who = hc != null ? hc.title() : new File(it.path).getName();
+        return et;
+    }
+
+    private LinearLayout noteBox() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = CaseViews.dp(this, 20);
+        box.setPadding(pad, CaseViews.dp(this, 4), pad, 0);
+        return box;
+    }
+
+    /** Card notes icon: the card's own note, plus (when attached to a case) that case's Notes as a separate field. */
+    private void editCardNotes(Item it) {
+        final DiaryStore.HCase hc = caseFor(it);
+        LinearLayout box = noteBox();
+        final EditText caseEt = hc == null ? null
+                : noteField("Case notes (same as New Case > Notes)", hc.notes, box);
+        final EditText cardEt = noteField(hc == null ? "Document notes" : "Document notes (this card only)",
+                cardNote(it), box);
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Notes: " + who)
+                .setTitle("Notes: " + (hc != null ? hc.title() : new File(it.path).getName()))
                 .setView(box)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save", (d, w) -> {
-                    String txt = et.getText().toString().trim();
+                    getSharedPreferences("doc_notes", MODE_PRIVATE).edit()
+                            .putString("card:" + it.path, cardEt.getText().toString().trim()).apply();
                     if (hc != null) {
                         DiaryStore ds = new DiaryStore(this);
                         DiaryStore.HCase fresh = ds.caseById(hc.id);     // re-read: the case may have changed meanwhile
                         if (fresh == null) fresh = hc;
-                        fresh.notes = txt;
+                        fresh.notes = caseEt.getText().toString().trim();
                         ds.saveCase(fresh);
-                    } else {
-                        getSharedPreferences("doc_notes", MODE_PRIVATE).edit().putString(it.path, txt).apply();
                     }
+                    adapter.notifyDataSetChanged();
+                })
+                .show();
+    }
+
+    /** File-row notes icon: a note for that one file only. */
+    private void editFileNotes(Item g, String label) {
+        LinearLayout box = noteBox();
+        final EditText et = noteField("Notes for this file", fileNote(g.path), box);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Notes: " + label)
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (d, w) -> {
+                    getSharedPreferences("doc_notes", MODE_PRIVATE).edit()
+                            .putString("file:" + g.path, et.getText().toString().trim()).apply();
                     adapter.notifyDataSetChanged();
                 })
                 .show();
@@ -685,8 +725,7 @@ public class MarkedFilesActivity extends BaseActivity {
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
             info.hideMeta = true;       // type, size and date are in the (i) dialog
-            info.notesFilled = !notesOf(it).isEmpty();
-            final Runnable notesAct = () -> editCaseNotes(it);
+            info.notesFilled = !cardNote(it).isEmpty() || !caseNote(it).isEmpty();
             if (!it.extras.isEmpty()) info.count = 1 + it.extras.size();
             int n = it.marks.size();
             info.pagesLine = "Marked pages: " + n
@@ -743,7 +782,8 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.details = () -> showPath(g);
                     sb.edit = () -> editFileName(g, shownLabel);
                     sb.share = () -> shareFile(g.path);
-                    sb.notes = notesAct;
+                    sb.notes = () -> editFileNotes(g, shownLabel);
+                    sb.notesFilled = !fileNote(g.path).isEmpty();
                     sb.meta = fileMeta(g, gk);
                     info.subs.add(sb);
                 }
@@ -770,7 +810,7 @@ public class MarkedFilesActivity extends BaseActivity {
             };
             act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
             act.edit = () -> editItem(it);
-            act.notes = notesAct;
+            act.notes = () -> editCardNotes(it);
             act.add = () -> addFiles(it);
             act.path = !it.extras.isEmpty() ? null : () -> showPath(it);
             // a multi-file card has Open / info / edit / share on every file row

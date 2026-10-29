@@ -23,7 +23,7 @@ final class ChangeLog {
             "Splash screen: new Lady Justice court scene, faster animation.",
             "Every morning at 8:00 AM a notification says: Hello Shaifali , Good Morning , Have a Great Day Ahead !!!!",
             "Intro video (4 s, Bonsai) plays full screen before the splash screen. Tap skips.",
-            "Document Vault cards and file rows: notes icon. Shows and edits the attached case's Notes (same field as New Case > Notes & other details). Orange and blinking = has notes. Works for any document; no case needed."),
+            "Document Vault: notes icon on cards and on each file row. Card: its own note, plus the attached case's Notes as a separate field (same as New Case > Notes & other details). File row: note for that file only. Orange and blinking = has notes."),
         new Entry("27 Oct 2026", "One Attach to matter (with Create new case); change \"Multiple\" category",
             "Category marker: the Attach to Matter box at the bottom is removed. Attaching is now only in \"Change details\" (details card is always shown on top).",
             "Change details / Document Vault Edit: Attach to Matter now has \"+ Create new case\" (PDF files). OK opens New Case > Upload Legal Document with this file.",

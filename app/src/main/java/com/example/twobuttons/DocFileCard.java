@@ -25,6 +25,7 @@ final class DocFileCard {
     static final class Sub {
         String name = "", meta = "";     // meta: what tells this file apart (type, size, dimensions, date)
         int kind;
+        boolean notesFilled;
         Runnable open, details, edit, share, notes;
     }
 
@@ -185,8 +186,8 @@ final class DocFileCard {
             }
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
             if (sb.notes != null) {
-                View nb = tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, in.notesFilled), "Notes", sb.notes);
-                if (in.notesFilled) blink(nb);
+                View nb = tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, sb.notesFilled), "Notes", sb.notes);
+                if (sb.notesFilled) blink(nb);
                 r.addView(nb);
             }
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
