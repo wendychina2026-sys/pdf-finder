@@ -63,6 +63,18 @@ public class SettingsActivity extends BaseActivity {
         app.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
         root.addView(app);
 
+        LinearLayout news = new LinearLayout(this);
+        news.setOrientation(LinearLayout.VERTICAL);
+        news.setGravity(Gravity.CENTER_VERTICAL);
+        news.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        news.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        news.addView(CaseViews.text(this, "Legal News", 16, AppTheme.text(this), true));
+        news.addView(CaseViews.text(this, "Latest Supreme Court, High Court and tribunal news from Supreme Today, as cards. Needs internet.",
+                14, AppTheme.sub(this), false));
+        news.setOnClickListener(v -> startActivity(new Intent(this, NewsActivity.class)));
+        root.addView(news, CaseViews.lp(this, 0, 0));
+
         LinearLayout gh = new LinearLayout(this);
         gh.setOrientation(LinearLayout.VERTICAL);
         gh.setGravity(Gravity.CENTER_VERTICAL);
@@ -73,7 +85,7 @@ public class SettingsActivity extends BaseActivity {
         gh.addView(CaseViews.text(this, "Looks on GitHub for a newer version, downloads it and opens the installer. Needs internet.",
                 14, AppTheme.sub(this), false));
         gh.setOnClickListener(v -> UpdateChecker.check(this));
-        root.addView(gh, CaseViews.lp(this, 0, 0));
+        root.addView(gh, CaseViews.lp(this, 8, 0));
 
         LinearLayout upd = new LinearLayout(this);
         upd.setOrientation(LinearLayout.VERTICAL);
