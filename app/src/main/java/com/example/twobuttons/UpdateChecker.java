@@ -2,7 +2,6 @@ package com.example.twobuttons;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.pm.PackageInfo;
 import android.widget.Toast;
 
@@ -45,7 +44,8 @@ final class UpdateChecker {
                 } else {
                     JSONObject j = new JSONObject(read(c.getInputStream()));
                     tag = j.optString("tag_name", "");
-                    notes = j.optString("name", tag);
+                    notes = j.optString("body", "");
+                    if (notes.trim().isEmpty()) notes = j.optString("name", tag);
                     Matcher m = Pattern.compile("(\\d+)$").matcher(tag);
                     if (m.find()) build = Long.parseLong(m.group(1));
                     JSONArray as = j.optJSONArray("assets");
@@ -61,13 +61,13 @@ final class UpdateChecker {
             } catch (Exception e) {
                 err = "Cannot reach GitHub. Check internet.\n" + e.getMessage();
             }
-            final String fErr = err, fTag = tag, fUrl = url;
+            final String fErr = err, fTag = tag, fUrl = url, fNotes = notes;
             final long fBuild = build;
-            a.runOnUiThread(() -> result(a, fErr, fTag, fBuild, fUrl));
+            a.runOnUiThread(() -> result(a, fErr, fTag, fBuild, fUrl, fNotes));
         }).start();
     }
 
-    private static void result(Activity a, String err, String tag, long build, String url) {
+    private static void result(Activity a, String err, String tag, long build, String url, String notes) {
         if (a.isFinishing()) return;
         if (err != null) {
             info(a, "Update check failed", err);
@@ -79,19 +79,14 @@ final class UpdateChecker {
             info(a, "Up to date", "Installed: build " + have + "\nLatest on GitHub: build " + build);
             return;
         }
-        new AlertDialog.Builder(a).setTitle("Update available")
-                .setMessage("Installed: build " + have + "\nNew: " + tag + " (build " + build
-                        + ")\n\nDownload and install?")
-                .setNegativeButton("Later", null)
-                .setPositiveButton("Install", (d, w) -> download(a, url))
-                .show();
+        final UpdateDialog.Ctl[] ctl = new UpdateDialog.Ctl[1];
+        ctl[0] = UpdateDialog.show(a, tag, notes, () -> {
+            ctl[0].busy("Downloading...");
+            download(a, url, ctl[0]);
+        });
     }
 
-    private static void download(Activity a, String url) {
-        ProgressDialog pd = new ProgressDialog(a);
-        pd.setMessage("Downloading update...");
-        pd.setCancelable(false);
-        pd.show();
+    private static void download(Activity a, String url, UpdateDialog.Ctl ctl) {
         new Thread(() -> {
             File out = null;
             String err = null;
@@ -113,7 +108,7 @@ final class UpdateChecker {
             final File f = out;
             final String fErr = err;
             a.runOnUiThread(() -> {
-                pd.dismiss();
+                ctl.close();
                 if (a.isFinishing()) return;
                 if (f == null) { info(a, "Update failed", fErr); return; }
                 PackageInfo apk = a.getPackageManager().getPackageArchiveInfo(f.getAbsolutePath(), 0);
