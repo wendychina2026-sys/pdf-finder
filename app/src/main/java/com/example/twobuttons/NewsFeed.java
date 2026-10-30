@@ -53,6 +53,18 @@ final class NewsFeed {
             {"Columns", "https://www.verdictum.in/columns"},
     };
 
+    // LiveLaw Hindi (hindi.livelaw.in): tab label, listing page. Same CMS as Verdictum; read when its tab is opened.
+    static final String HOME_H = "https://hindi.livelaw.in/";
+    static final String[][] H_SECTIONS = {
+            {"\u092e\u0941\u0916\u094d\u092f \u0938\u0941\u0930\u094d\u0916\u093f\u092f\u093e\u0902", "https://hindi.livelaw.in/category/top-stories"},
+            {"\u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902", "https://hindi.livelaw.in/category/news-updates"},
+            {"\u0938\u0941\u092a\u094d\u0930\u0940\u092e \u0915\u094b\u0930\u094d\u091f", "https://hindi.livelaw.in/supreme-court"},
+            {"\u0939\u093e\u0908\u0915\u094b\u0930\u094d\u091f", "https://hindi.livelaw.in/high-court"},
+            {"\u0909\u092a\u092d\u094b\u0915\u094d\u0924\u093e \u092e\u093e\u092e\u0932\u0947", "https://hindi.livelaw.in/consumer-cases"},
+            {"\u091c\u093e\u0928\u093f\u090f \u0939\u092e\u093e\u0930\u093e \u0915\u093e\u0928\u0942\u0928", "https://hindi.livelaw.in/know-the-law"},
+            {"\u0938\u094d\u0924\u0902\u092d", "https://hindi.livelaw.in/category/columns"},
+    };
+
     static final class Item {
         String url, slug, domain = "supremetoday.ai", title = "", desc = "", img = "", date = "";
         boolean loaded;
@@ -62,6 +74,9 @@ final class NewsFeed {
             "href=\"(?:https?://(?:www\\.)?supremetoday\\.ai)?/([a-z0-9%\\-]+-(20\\d{9,12}))/?\"");
     private static final Pattern VLINK = Pattern.compile(
             "href=\"(?:https?://(?:www\\.)?verdictum\\.in)?/([a-z0-9\\-]+)/([a-z0-9%\\-]+-(\\d{6,8}))/?\"");
+    // hindi.livelaw.in/category/news-updates/<english-slug>-162196 or /supreme-court/<slug>-123456
+    private static final Pattern HLINK = Pattern.compile(
+            "href=\"(?:https?://hindi\\.livelaw\\.in)?/((?:[a-z0-9\\-]+/){1,2}([a-z0-9%\\-]+-(\\d{5,8})))/?\"");
     private static final Pattern META = Pattern.compile("<meta\\s+[^>]*?>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern ATTR = Pattern.compile("(property|name|content)\\s*=\\s*(\"([^\"]*)\"|'([^']*)')",
             Pattern.CASE_INSENSITIVE);
@@ -137,6 +152,36 @@ final class NewsFeed {
             out.add(fromVUrl(HOME_V + sec + "/" + m.group(2)));
         }
         return out;
+    }
+
+    /** Article links of one LiveLaw Hindi listing page, newest first. */
+    static List<Item> fetchLiveLawHindi(String listUrl) throws Exception {
+        String html = get(listUrl, 900_000);
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<Item> out = new ArrayList<>();
+        Matcher m = HLINK.matcher(html);
+        while (m.find()) {
+            String path = m.group(1);
+            if (path.startsWith("tags/") || path.startsWith("author/") || path.startsWith("videos/")
+                    || path.startsWith("webinar/") || path.startsWith("images/") || path.startsWith("h-upload/")
+                    || path.startsWith("theme_leo/")) continue;
+            if (!seen.add(m.group(3))) continue;
+            out.add(fromHUrl(HOME_H + path));
+        }
+        return out;
+    }
+
+    /** A LiveLaw Hindi item known only by its link (title is the English slug until the page is read). */
+    static Item fromHUrl(String url) {
+        Item it = new Item();
+        it.url = url;
+        it.domain = "hindi.livelaw.in";
+        Matcher d = Pattern.compile("/([a-z0-9%\\-]+-(\\d{5,8}))/?$").matcher(url);
+        String slug = url, id = url;
+        if (d.find()) { slug = d.group(1); id = d.group(2); }
+        it.slug = "h" + id;
+        it.title = titleFromSlug(slug);
+        return it;
     }
 
     /** A Verdictum item known only by its link. */

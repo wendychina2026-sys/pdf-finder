@@ -25,7 +25,7 @@ final class ChangeLog {
             "Intro video (4 s, Bonsai) plays full screen before the splash screen. Tap skips.",
             "Document Vault: notes icon on cards and on each file row. Card: its own note, plus the attached case's Notes as a separate field (same as New Case > Notes & other details). File row: note for that file only. Orange and blinking = has notes.",
             "File information (i): new row \"Moved from\" shows where the file was before it went into the app. Only for files added from now on.",
-            "Legal News (Settings > Legal News): Supreme Today News as cards, with picture, headline, summary and link. Tabs per section. Tap opens the article, share icon sends the link. New source switch: Supreme Today | Verdictum (Latest, Supreme Court, High Courts, Top Stories, News, Columns)."),
+            "Legal News (Settings > Legal News): Supreme Today News as cards, with picture, headline, summary and link. Tabs per section. Tap opens the article, share icon sends the link. New source switch: Supreme Today | Verdictum (Latest, Supreme Court, High Courts, Top Stories, News, Columns). Third source: LiveLaw Hindi (Hindi headlines; Top Stories, Latest, Supreme Court, High Court, Consumer, Know the Law, Columns)."),
         new Entry("27 Oct 2026", "One Attach to matter (with Create new case); change \"Multiple\" category",
             "Category marker: the Attach to Matter box at the bottom is removed. Attaching is now only in \"Change details\" (details card is always shown on top).",
             "Change details / Document Vault Edit: Attach to Matter now has \"+ Create new case\" (PDF files). OK opens New Case > Upload Legal Document with this file.",

@@ -35,7 +35,9 @@ public class NewsActivity extends BaseActivity {
     private final List<List<NewsFeed.Item>> data = new ArrayList<>();      // Supreme Today, all sections at once
     private final List<List<NewsFeed.Item>> vData = new ArrayList<>();     // Verdictum, one listing per tab
     private final boolean[] vLoaded = new boolean[NewsFeed.V_SECTIONS.length];
-    private int src;                                                        // 0 Supreme Today, 1 Verdictum
+    private final List<List<NewsFeed.Item>> hData = new ArrayList<>();     // LiveLaw Hindi, one listing per tab
+    private final boolean[] hLoaded = new boolean[NewsFeed.H_SECTIONS.length];
+    private int src;                                                        // 0 Supreme Today, 1 Verdictum, 2 LiveLaw Hindi
     private LinearLayout srcRow;
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private boolean dead;
@@ -76,15 +78,19 @@ public class NewsActivity extends BaseActivity {
         ImageView refresh = CaseViews.icon(this, R.drawable.ic_refresh, AppTheme.accent(this), 44);
         refresh.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 10), CaseViews.dp(this, 10), CaseViews.dp(this, 10));
         refresh.setContentDescription("Refresh");
-        refresh.setOnClickListener(v -> { if (src == 0) reload(true); else fetchV(sel, true); });
+        refresh.setOnClickListener(v -> { if (src == 0) reload(true); else if (src == 1) fetchV(sel, true); else fetchH(sel, true); });
         top.addView(refresh);
         page.addView(top);
 
         srcRow = new LinearLayout(this);
         srcRow.setPadding(CaseViews.dp(this, 12), 0, CaseViews.dp(this, 12), CaseViews.dp(this, 6));
-        page.addView(srcRow);
+        HorizontalScrollView srcScroll = new HorizontalScrollView(this);
+        srcScroll.setHorizontalScrollBarEnabled(false);
+        srcScroll.addView(srcRow);
+        page.addView(srcScroll);
 
         for (int i = 0; i < NewsFeed.V_SECTIONS.length; i++) vData.add(new ArrayList<NewsFeed.Item>());
+        for (int i = 0; i < NewsFeed.H_SECTIONS.length; i++) hData.add(new ArrayList<NewsFeed.Item>());
 
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
@@ -110,6 +116,7 @@ public class NewsActivity extends BaseActivity {
 
         loadCachedHome();
         loadCachedV();
+        loadCachedH();
         renderSources();
         reload(false);
     }
@@ -191,9 +198,61 @@ public class NewsActivity extends BaseActivity {
         } catch (Exception ignored) { }
     }
 
-    private List<List<NewsFeed.Item>> cur() { return src == 0 ? data : vData; }
+    private List<List<NewsFeed.Item>> cur() { return src == 0 ? data : src == 1 ? vData : hData; }
 
-    private String label(int i) { return src == 0 ? NewsFeed.SECTIONS[i][0] : NewsFeed.V_SECTIONS[i][0]; }
+    private String label(int i) {
+        return src == 0 ? NewsFeed.SECTIONS[i][0] : src == 1 ? NewsFeed.V_SECTIONS[i][0] : NewsFeed.H_SECTIONS[i][0];
+    }
+
+    private void loadCachedH() {
+        try {
+            android.content.SharedPreferences sp = getSharedPreferences("news_cache", MODE_PRIVATE);
+            for (int i = 0; i < hData.size(); i++) {
+                String s = sp.getString("htab" + i, null);
+                if (s == null) continue;
+                JSONArray a = new JSONArray(s);
+                List<NewsFeed.Item> l = new ArrayList<>();
+                for (int k = 0; k < a.length(); k++) l.add(NewsFeed.fromHUrl(a.getString(k)));
+                hData.set(i, l);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** Reads one LiveLaw Hindi listing (the tab being opened). force = refresh icon. */
+    private void fetchH(final int idx, boolean force) {
+        if (!force && hLoaded[idx]) return;
+        status.setText("Loading LiveLaw Hindi...");
+        status.setVisibility(View.VISIBLE);
+        new Thread(() -> {
+            List<NewsFeed.Item> l = null;
+            String err = null;
+            try {
+                l = NewsFeed.fetchLiveLawHindi(NewsFeed.H_SECTIONS[idx][1]);
+                if (l.isEmpty()) err = "No articles found on LiveLaw Hindi. The site layout may have changed.";
+            } catch (Exception e) {
+                err = "Cannot reach hindi.livelaw.in. Check internet.";
+            }
+            final List<NewsFeed.Item> fl = l;
+            final String fErr = err;
+            runOnUiThread(() -> {
+                if (dead) return;
+                if (fErr != null) {
+                    status.setText(hData.get(idx).isEmpty() ? fErr : fErr + " Showing saved list.");
+                    status.setVisibility(View.VISIBLE);
+                    return;
+                }
+                status.setVisibility(View.GONE);
+                hData.set(idx, fl);
+                hLoaded[idx] = true;
+                try {
+                    JSONArray a = new JSONArray();
+                    for (NewsFeed.Item it : fl) a.put(it.url);
+                    getSharedPreferences("news_cache", MODE_PRIVATE).edit().putString("htab" + idx, a.toString()).apply();
+                } catch (Exception ignored) { }
+                if (src == 2 && sel == idx) { shown = PAGE; render(); }
+            });
+        }).start();
+    }
 
     private void loadCachedV() {
         try {
@@ -247,7 +306,7 @@ public class NewsActivity extends BaseActivity {
 
     private void renderSources() {
         srcRow.removeAllViews();
-        String[] names = {"Supreme Today", "Verdictum"};
+        String[] names = {"Supreme Today", "Verdictum", "LiveLaw Hindi"};
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
             boolean on = i == src;
@@ -264,6 +323,7 @@ public class NewsActivity extends BaseActivity {
                 render();
                 scroll.scrollTo(0, 0);
                 if (src == 1) fetchV(sel, false);
+                else if (src == 2) fetchH(sel, false);
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -282,7 +342,7 @@ public class NewsActivity extends BaseActivity {
             for (int i = 0; i < d.size(); i++) if (!d.get(i).isEmpty()) { sel = i; break; }
         }
         for (int i = 0; i < d.size(); i++) {
-            if (src == 0 && d.get(i).isEmpty()) continue;       // Verdictum tabs are read when opened, so all show
+            if (src == 0 && d.get(i).isEmpty()) continue;       // Verdictum / LiveLaw Hindi tabs are read when opened, so all show
             final int idx = i;
             boolean on = i == sel;
             TextView t = CaseViews.text(this, label(i), 14, on ? 0xFFFFFFFF : AppTheme.text(this), on);
@@ -295,6 +355,7 @@ public class NewsActivity extends BaseActivity {
                 render();
                 scroll.scrollTo(0, 0);
                 if (src == 1) fetchV(idx, false);
+                else if (src == 2) fetchH(idx, false);
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
