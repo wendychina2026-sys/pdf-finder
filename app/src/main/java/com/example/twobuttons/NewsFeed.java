@@ -65,6 +65,28 @@ final class NewsFeed {
             {"\u0938\u094d\u0924\u0902\u092d", "https://hindi.livelaw.in/category/columns"},
     };
 
+
+    // Bar & Bench Hindi, Law Trend Hindi, Lawyer Guruji: source index 0, 1, 2. Tab label, listing/feed url.
+    static final String[] X_NAMES = {"Bar & Bench Hindi", "Law Trend Hindi", "Lawyer Guruji"};
+    static final String[] X_DOMAIN = {"hindi.barandbench.com", "lawtrend.in", "lawyerguruji.com"};
+    static final String[][][] X_SECTIONS = {
+            {
+                    {"\u0924\u093e\u091c\u093c\u093e", "https://hindi.barandbench.com/news_sitemap.xml"},
+                    {"\u0938\u092e\u093e\u091a\u093e\u0930", "https://hindi.barandbench.com/news"},
+                    {"\u0935\u093e\u0926\u0915\u0930\u0923", "https://hindi.barandbench.com/news/litigation"},
+            },
+            {
+                    {"\u0932\u0949 \u091f\u094d\u0930\u0947\u0902\u0921 \u0939\u093f\u0902\u0926\u0940", "https://lawtrend.in/category/law-trend-hindi/feed/"},
+            },
+            {
+                    {"\u0924\u093e\u091c\u093c\u093e \u0932\u0947\u0916", "https://www.lawyerguruji.com/feeds/posts/default?alt=rss&max-results=30"},
+            },
+    };
+
+    private static final Pattern BBLINK = Pattern.compile(
+            "href=\"(?:https?://hindi\\.barandbench\\.com)?(/news/(?:[a-z0-9\\-]+/)?[a-z0-9\\-%]{25,})/?\"");
+    private static final Pattern RSS_DATE = Pattern.compile("(\\d{1,2})\\s+([A-Za-z]{3})\\s+(\\d{4})");
+
     static final class Item {
         String url, slug, domain = "supremetoday.ai", title = "", desc = "", img = "", date = "";
         boolean loaded;
@@ -206,6 +228,91 @@ final class NewsFeed {
         Matcher d = Pattern.compile("-(20\\d{9,12})$").matcher(slug);
         if (d.find()) it.date = dateFromSlug(d.group(1));
         return it;
+    }
+
+    // ---------- Bar & Bench Hindi / Law Trend Hindi / Lawyer Guruji ----------
+
+    /** Article list of one tab of source s (0 Bar & Bench Hindi, 1 Law Trend Hindi, 2 Lawyer Guruji). */
+    static List<Item> fetchX(int s, String url) throws Exception {
+        if (s == 0) return url.contains("news_sitemap") ? bbSitemap(url) : bbListing(url);
+        return rss(url, s);
+    }
+
+    /** An item known only by its link. */
+    static Item fromXUrl(String url, int s) {
+        Item it = new Item();
+        it.url = url;
+        it.domain = X_DOMAIN[s];
+        it.slug = "x" + s + Integer.toHexString(url.hashCode());
+        String path = url.replaceAll("[?#].*$", "").replaceAll("/+$", "");
+        String last = path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.html$", "");
+        it.title = titleFromSlug(last);
+        return it;
+    }
+
+    private static String between(String s, String a, String b) {
+        int i = s.indexOf(a);
+        if (i < 0) return "";
+        i += a.length();
+        int j = s.indexOf(b, i);
+        return j < 0 ? "" : s.substring(i, j);
+    }
+
+    private static String tag(String s, String name) {
+        String v = between(s, "<" + name + ">", "</" + name + ">").trim();
+        if (v.startsWith("<![CDATA[")) v = between(v, "<![CDATA[", "]]>");
+        return v.trim();
+    }
+
+    /** Bar & Bench Hindi news sitemap: link, Hindi headline and date of the latest articles. */
+    private static List<Item> bbSitemap(String url) throws Exception {
+        String xml = get(url, 700_000);
+        List<Item> out = new ArrayList<>();
+        for (String part : xml.split("<url>")) {
+            String loc = between(part, "<loc>", "</loc>").trim();
+            if (!loc.startsWith("https://hindi.barandbench.com/")) continue;
+            Item it = fromXUrl(loc, 0);
+            String t = plain(between(part, "<news:title>", "</news:title>"));
+            if (!t.isEmpty()) it.title = t;
+            String pd = between(part, "<news:publication_date>", "</news:publication_date>").trim();
+            if (pd.length() >= 10) it.date = dateFromSlug(pd.substring(0, 4) + pd.substring(5, 7) + pd.substring(8, 10));
+            out.add(it);
+        }
+        return out;
+    }
+
+    /** Bar & Bench Hindi section page (news, litigation). */
+    private static List<Item> bbListing(String url) throws Exception {
+        String html = get(url, 900_000);
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<Item> out = new ArrayList<>();
+        Matcher m = BBLINK.matcher(html);
+        while (m.find()) {
+            String path = m.group(1);
+            if (!seen.add(path)) continue;
+            out.add(fromXUrl("https://hindi.barandbench.com" + path, 0));
+        }
+        return out;
+    }
+
+    /** RSS (Law Trend Hindi = WordPress feed, Lawyer Guruji = Blogger feed): link, title, date. */
+    private static List<Item> rss(String url, int s) throws Exception {
+        String xml = get(url, 900_000);
+        List<Item> out = new ArrayList<>();
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        String[] parts = xml.split("<item[ >]");
+        for (int i = 1; i < parts.length; i++) {
+            String part = parts[i];
+            String link = tag(part, "link");
+            if (!link.startsWith("http") || !seen.add(link)) continue;
+            Item it = fromXUrl(link, s);
+            String t = plain(tag(part, "title"));
+            if (!t.isEmpty()) it.title = t;
+            Matcher d = RSS_DATE.matcher(tag(part, "pubDate"));
+            if (d.find()) it.date = Integer.parseInt(d.group(1)) + " " + d.group(2) + " " + d.group(3);
+            out.add(it);
+        }
+        return out;
     }
 
     private static String titleFromSlug(String slug) {
