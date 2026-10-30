@@ -32,7 +32,11 @@ public class NewsActivity extends BaseActivity {
 
     private static final int PAGE = 20;
 
-    private final List<List<NewsFeed.Item>> data = new ArrayList<>();
+    private final List<List<NewsFeed.Item>> data = new ArrayList<>();      // Supreme Today, all sections at once
+    private final List<List<NewsFeed.Item>> vData = new ArrayList<>();     // Verdictum, one listing per tab
+    private final boolean[] vLoaded = new boolean[NewsFeed.V_SECTIONS.length];
+    private int src;                                                        // 0 Supreme Today, 1 Verdictum
+    private LinearLayout srcRow;
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private boolean dead;
     private int sel;
@@ -72,9 +76,15 @@ public class NewsActivity extends BaseActivity {
         ImageView refresh = CaseViews.icon(this, R.drawable.ic_refresh, AppTheme.accent(this), 44);
         refresh.setPadding(CaseViews.dp(this, 10), CaseViews.dp(this, 10), CaseViews.dp(this, 10), CaseViews.dp(this, 10));
         refresh.setContentDescription("Refresh");
-        refresh.setOnClickListener(v -> reload(true));
+        refresh.setOnClickListener(v -> { if (src == 0) reload(true); else fetchV(sel, true); });
         top.addView(refresh);
         page.addView(top);
+
+        srcRow = new LinearLayout(this);
+        srcRow.setPadding(CaseViews.dp(this, 12), 0, CaseViews.dp(this, 12), CaseViews.dp(this, 6));
+        page.addView(srcRow);
+
+        for (int i = 0; i < NewsFeed.V_SECTIONS.length; i++) vData.add(new ArrayList<NewsFeed.Item>());
 
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
@@ -99,6 +109,8 @@ public class NewsActivity extends BaseActivity {
         setContentView(page);
 
         loadCachedHome();
+        loadCachedV();
+        renderSources();
         reload(false);
     }
 
@@ -126,7 +138,7 @@ public class NewsActivity extends BaseActivity {
             if (d.size() == NewsFeed.SECTIONS.length) {
                 data.clear();
                 data.addAll(d);
-                render();
+                if (src == 0) render();
             }
         } catch (Exception ignored) { }
     }
@@ -158,9 +170,11 @@ public class NewsActivity extends BaseActivity {
                 data.clear();
                 data.addAll(fd);
                 saveHome();
-                shown = PAGE;
-                render();
-                if (userTap) scroll.scrollTo(0, 0);
+                if (src == 0) {
+                    shown = PAGE;
+                    render();
+                    if (userTap) scroll.scrollTo(0, 0);
+                }
             });
         }).start();
     }
@@ -177,33 +191,119 @@ public class NewsActivity extends BaseActivity {
         } catch (Exception ignored) { }
     }
 
+    private List<List<NewsFeed.Item>> cur() { return src == 0 ? data : vData; }
+
+    private String label(int i) { return src == 0 ? NewsFeed.SECTIONS[i][0] : NewsFeed.V_SECTIONS[i][0]; }
+
+    private void loadCachedV() {
+        try {
+            android.content.SharedPreferences sp = getSharedPreferences("news_cache", MODE_PRIVATE);
+            for (int i = 0; i < vData.size(); i++) {
+                String s = sp.getString("vtab" + i, null);
+                if (s == null) continue;
+                JSONArray a = new JSONArray(s);
+                List<NewsFeed.Item> l = new ArrayList<>();
+                for (int k = 0; k < a.length(); k++) l.add(NewsFeed.fromVUrl(a.getString(k)));
+                vData.set(i, l);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** Reads one Verdictum listing (the tab being opened). force = refresh icon. */
+    private void fetchV(final int idx, boolean force) {
+        if (!force && vLoaded[idx]) return;
+        status.setText("Loading Verdictum...");
+        status.setVisibility(View.VISIBLE);
+        new Thread(() -> {
+            List<NewsFeed.Item> l = null;
+            String err = null;
+            try {
+                l = NewsFeed.fetchVerdictum(NewsFeed.V_SECTIONS[idx][1]);
+                if (l.isEmpty()) err = "No articles found on Verdictum. The site layout may have changed.";
+            } catch (Exception e) {
+                err = "Cannot reach verdictum.in. Check internet.";
+            }
+            final List<NewsFeed.Item> fl = l;
+            final String fErr = err;
+            runOnUiThread(() -> {
+                if (dead) return;
+                if (fErr != null) {
+                    status.setText(vData.get(idx).isEmpty() ? fErr : fErr + " Showing saved list.");
+                    status.setVisibility(View.VISIBLE);
+                    return;
+                }
+                status.setVisibility(View.GONE);
+                vData.set(idx, fl);
+                vLoaded[idx] = true;
+                try {
+                    JSONArray a = new JSONArray();
+                    for (NewsFeed.Item it : fl) a.put(it.url);
+                    getSharedPreferences("news_cache", MODE_PRIVATE).edit().putString("vtab" + idx, a.toString()).apply();
+                } catch (Exception ignored) { }
+                if (src == 1 && sel == idx) { shown = PAGE; render(); }
+            });
+        }).start();
+    }
+
+    private void renderSources() {
+        srcRow.removeAllViews();
+        String[] names = {"Supreme Today", "Verdictum"};
+        for (int i = 0; i < names.length; i++) {
+            final int idx = i;
+            boolean on = i == src;
+            TextView t = CaseViews.text(this, names[i], 14, on ? 0xFFFFFFFF : AppTheme.text(this), true);
+            t.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 7), CaseViews.dp(this, 14), CaseViews.dp(this, 7));
+            t.setBackground(CaseViews.box(this, on ? 0xFF731818 : AppTheme.card(this), 18, AppTheme.cardStroke(this), 1));
+            t.setOnClickListener(v -> {
+                if (src == idx) return;
+                src = idx;
+                sel = 0;
+                shown = PAGE;
+                status.setVisibility(View.GONE);
+                renderSources();
+                render();
+                scroll.scrollTo(0, 0);
+                if (src == 1) fetchV(sel, false);
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = CaseViews.dp(this, 8);
+            srcRow.addView(t, lp);
+        }
+    }
+
     // ---------- screen ----------
 
     private void render() {
-        // tabs: only sections that have articles
+        final List<List<NewsFeed.Item>> d = cur();
         tabs.removeAllViews();
-        if (sel >= data.size() || data.get(sel).isEmpty()) {
+        if (src == 0 && (sel >= d.size() || d.get(sel).isEmpty())) {
             sel = 0;
-            for (int i = 0; i < data.size(); i++) if (!data.get(i).isEmpty()) { sel = i; break; }
+            for (int i = 0; i < d.size(); i++) if (!d.get(i).isEmpty()) { sel = i; break; }
         }
-        for (int i = 0; i < data.size(); i++) {
-            if (data.get(i).isEmpty()) continue;
+        for (int i = 0; i < d.size(); i++) {
+            if (src == 0 && d.get(i).isEmpty()) continue;       // Verdictum tabs are read when opened, so all show
             final int idx = i;
             boolean on = i == sel;
-            TextView t = CaseViews.text(this, NewsFeed.SECTIONS[i][0], 14,
-                    on ? 0xFFFFFFFF : AppTheme.text(this), on);
+            TextView t = CaseViews.text(this, label(i), 14, on ? 0xFFFFFFFF : AppTheme.text(this), on);
             t.setPadding(CaseViews.dp(this, 14), CaseViews.dp(this, 8), CaseViews.dp(this, 14), CaseViews.dp(this, 8));
-            t.setBackground(CaseViews.box(this, on ? AppTheme.accent(this) == 0xFFA9B1FF ? 0xFF4A55C8 : 0xFF0B0B8E
+            t.setBackground(CaseViews.box(this, on ? (AppTheme.isDark(this) ? 0xFF4A55C8 : 0xFF0B0B8E)
                     : AppTheme.card(this), 18, AppTheme.cardStroke(this), 1));
-            t.setOnClickListener(v -> { sel = idx; shown = PAGE; render(); scroll.scrollTo(0, 0); });
+            t.setOnClickListener(v -> {
+                sel = idx;
+                shown = PAGE;
+                render();
+                scroll.scrollTo(0, 0);
+                if (src == 1) fetchV(idx, false);
+            });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             lp.rightMargin = CaseViews.dp(this, 8);
             tabs.addView(t, lp);
         }
         list.removeAllViews();
-        if (sel >= data.size()) return;
-        final List<NewsFeed.Item> items = data.get(sel);
+        if (sel >= d.size()) return;
+        final List<NewsFeed.Item> items = d.get(sel);
         int n = Math.min(shown, items.size());
         for (int i = 0; i < n; i++) list.addView(card(items.get(i)));
         if (n < items.size()) {
@@ -246,7 +346,7 @@ public class NewsActivity extends BaseActivity {
         LinearLayout foot = new LinearLayout(this);
         foot.setGravity(Gravity.CENTER_VERTICAL);
         foot.setPadding(pad, CaseViews.dp(this, 8), CaseViews.dp(this, 4), CaseViews.dp(this, 6));
-        TextView dom = CaseViews.text(this, "supremetoday.ai" + (it.date.isEmpty() ? "" : "  \u2022  " + it.date),
+        TextView dom = CaseViews.text(this, it.domain + (it.date.isEmpty() ? "" : "  \u2022  " + it.date),
                 12, AppTheme.accent(this), false);
         foot.addView(dom, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         ImageView share = CaseViews.icon(this, R.drawable.ic_share, AppTheme.sub(this), 36);

@@ -42,13 +42,26 @@ final class NewsFeed {
             {"News Updates", "News Updates"},
     };
 
+    // Verdictum (verdictum.in): tab label, listing page. Each listing is read when its tab is opened.
+    static final String HOME_V = "https://www.verdictum.in/";
+    static final String[][] V_SECTIONS = {
+            {"Latest", "https://www.verdictum.in/latest-news"},
+            {"Supreme Court", "https://www.verdictum.in/court-updates/supreme-court"},
+            {"High Courts", "https://www.verdictum.in/court-updates/high-courts"},
+            {"Top Stories", "https://www.verdictum.in/top-stories"},
+            {"News", "https://www.verdictum.in/news"},
+            {"Columns", "https://www.verdictum.in/columns"},
+    };
+
     static final class Item {
-        String url, slug, title = "", desc = "", img = "", date = "";
+        String url, slug, domain = "supremetoday.ai", title = "", desc = "", img = "", date = "";
         boolean loaded;
     }
 
     private static final Pattern LINK = Pattern.compile(
             "href=\"(?:https?://(?:www\\.)?supremetoday\\.ai)?/([a-z0-9%\\-]+-(20\\d{9,12}))/?\"");
+    private static final Pattern VLINK = Pattern.compile(
+            "href=\"(?:https?://(?:www\\.)?verdictum\\.in)?/([a-z0-9\\-]+)/([a-z0-9%\\-]+-(\\d{6,8}))/?\"");
     private static final Pattern META = Pattern.compile("<meta\\s+[^>]*?>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern ATTR = Pattern.compile("(property|name|content)\\s*=\\s*(\"([^\"]*)\"|'([^']*)')",
             Pattern.CASE_INSENSITIVE);
@@ -110,6 +123,35 @@ final class NewsFeed {
         return out;
     }
 
+    /** Article links of one Verdictum listing page, newest first. */
+    static List<Item> fetchVerdictum(String listUrl) throws Exception {
+        String html = get(listUrl, 800_000);
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<Item> out = new ArrayList<>();
+        Matcher m = VLINK.matcher(html);
+        while (m.find()) {
+            String sec = m.group(1);
+            if (sec.equals("court-updates") || sec.equals("tags") || sec.equals("videos")
+                    || sec.equals("videoes") || sec.equals("latest-news")) continue;
+            if (!seen.add(m.group(3))) continue;
+            out.add(fromVUrl(HOME_V + sec + "/" + m.group(2)));
+        }
+        return out;
+    }
+
+    /** A Verdictum item known only by its link. */
+    static Item fromVUrl(String url) {
+        Item it = new Item();
+        it.url = url;
+        it.domain = "verdictum.in";
+        Matcher d = Pattern.compile("/([a-z0-9%\\-]+-(\\d{6,8}))/?$").matcher(url);
+        String slug = url, id = url;
+        if (d.find()) { slug = d.group(1); id = d.group(2); }
+        it.slug = "v" + id;
+        it.title = titleFromSlug(slug);
+        return it;
+    }
+
     /** An item known only by its link: title and date come from the slug until the page itself is read. */
     static Item fromSlug(String slug) {
         Item it = new Item();
@@ -122,7 +164,7 @@ final class NewsFeed {
     }
 
     private static String titleFromSlug(String slug) {
-        String s = slug.replaceAll("-20\\d{9,12}$", "").replace('-', ' ');
+        String s = slug.replaceAll("-\\d{6,14}$", "").replace('-', ' ');
         StringBuilder sb = new StringBuilder();
         for (String w : s.split(" ")) {
             if (w.isEmpty()) continue;
@@ -158,6 +200,7 @@ final class NewsFeed {
                 it.title = j.optString("t", it.title);
                 it.desc = j.optString("d");
                 it.img = j.optString("i");
+                it.date = j.optString("dt", it.date);
                 it.loaded = true;
                 return;
             }
@@ -166,7 +209,7 @@ final class NewsFeed {
             String head = get(it.url, 120_000);
             int cut = head.toLowerCase(Locale.ROOT).indexOf("</head>");
             if (cut > 0) head = head.substring(0, cut);
-            String t = "", d = "", i = "";
+            String t = "", d = "", i = "", pub = "";
             Matcher m = META.matcher(head);
             while (m.find()) {
                 String key = null, val = null;
@@ -181,17 +224,23 @@ final class NewsFeed {
                     case "og:title": t = val; break;
                     case "og:description": d = val; break;
                     case "og:image": i = val; break;
+                    case "article:published_time": pub = val; break;
                     default: break;
                 }
             }
             if (!t.isEmpty()) it.title = plain(t);
             it.desc = plain(d);
             it.img = plain(i);
+            if (pub.length() >= 10) {
+                String dt = dateFromSlug(pub.substring(0, 4) + pub.substring(5, 7) + pub.substring(8, 10));
+                if (!dt.isEmpty()) it.date = dt;
+            }
             it.loaded = true;
             JSONObject j = new JSONObject();
             j.put("t", it.title);
             j.put("d", it.desc);
             j.put("i", it.img);
+            j.put("dt", it.date);
             sp.edit().putString(it.slug, j.toString()).apply();
             trimCache(sp);
         } catch (Exception ignored) {
