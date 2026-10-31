@@ -85,6 +85,11 @@ public class SettingsActivity extends BaseActivity {
         gh.addView(CaseViews.text(this, "Looks on GitHub for a newer version, downloads it and opens the installer. Needs internet.",
                 14, AppTheme.sub(this), false));
         gh.setOnClickListener(v -> UpdateChecker.check(this));
+        // long-press = preview of the new update card (no download)
+        gh.setOnLongClickListener(v -> {
+            UpdateDialog.show(this, "v1.0.99", "Fix some terrible bugs\nNew update card with flying rocket\nHindi legal news sources\nFaster loading", () -> { });
+            return true;
+        });
         root.addView(gh, CaseViews.lp(this, 8, 0));
 
         LinearLayout upd = new LinearLayout(this);
