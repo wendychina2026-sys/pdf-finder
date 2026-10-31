@@ -166,6 +166,7 @@ final class DocEdit {
                 d.category = multiNew[0];
                 for (Integer pg : targets) store.set(curPath, pg, multiNew[0]);
             }
+            if (cp == null && multiNew[0] == null) d.category = "Multiple";   // pages keep their different categories
             ls.saveDoc(d);
             String m = mpk.matter();
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
