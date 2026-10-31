@@ -316,11 +316,16 @@ final class DocEdit {
             } else {
                 d.category = "Multiple";      // pages keep their different categories
             }
+            final String origin = DataFolder.originalOf(a, ff);
             ls.saveDoc(d);
             String m = mpk.matter();
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
             if (!curPath.equals(path) && movedTo != null) movedTo.accept(curPath);
-            android.widget.Toast.makeText(a, "Saved to Document Vault", android.widget.Toast.LENGTH_SHORT).show();
+            String where = ff.getParent() == null ? "" : ff.getParent();
+            boolean left = !origin.isEmpty() && new File(origin).isFile() && !new File(origin).equals(ff);
+            android.widget.Toast.makeText(a, left
+                    ? "Saved to Vault (" + where + "). Android did not let me delete the original: " + origin
+                    : "Saved to Vault: " + where, android.widget.Toast.LENGTH_LONG).show();
             if (after != null) after.run();
             return true;
         }, null);

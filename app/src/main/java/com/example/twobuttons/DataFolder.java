@@ -397,6 +397,18 @@ final class DataFolder {
         } catch (Exception ignored) { }
     }
 
+    /** Path of the original this stored copy was taken from (""= unknown / none pending). */
+    static String originalOf(Context c, File stored) {
+        try {
+            String v = c.getSharedPreferences(PENDING, Context.MODE_PRIVATE).getString(stored.getAbsolutePath(), null);
+            if (v == null) return "";
+            int nl = v.indexOf('\n');
+            return nl < 0 ? "" : v.substring(0, nl);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /** Deletes the original (never the stored copy, never anything inside the app's own folders). */
     private static boolean removeOriginal(Context c, File path, android.net.Uri uri, File stored) {
         try {
