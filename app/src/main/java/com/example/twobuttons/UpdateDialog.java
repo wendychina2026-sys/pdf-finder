@@ -36,10 +36,45 @@ final class UpdateDialog {
     /** onUpdate runs when the pill is tapped; call finish() on the returned controller when done. */
     static final class Ctl {
         final Dialog dialog;
-        final TextView button;
-        Ctl(Dialog d, TextView b) { dialog = d; button = b; }
-        void busy(String text) { button.setText(text); button.setEnabled(false); button.setAlpha(0.7f); }
+        final Pill button;
+        final Header header;
+        Ctl(Dialog d, Pill b, Header h) { dialog = d; button = b; header = h; }
+        void busy(String text) { button.setText(text); button.setEnabled(false); button.setProgress(0f); }
+        /** frac 0..1, or -1 when the size is unknown. */
+        void progress(float frac) {
+            if (frac < 0) { button.setText("Downloading..."); return; }
+            button.setProgress(frac);
+            button.setText("Downloading " + Math.round(frac * 100) + "%");
+        }
+        /** Download done: pill full, rocket blasts off, then after is run. */
+        void launch(Runnable after) {
+            button.setProgress(1f);
+            button.setText("Launching...");
+            header.launch(after);
+        }
         void close() { try { dialog.dismiss(); } catch (Exception ignored) { } }
+    }
+
+    /** The red pill. Doubles as the download progress bar. */
+    static final class Pill extends TextView {
+        private final Paint fp = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path clip = new Path();
+        private float prog = 1f;
+        Pill(Context c) { super(c); }
+        void setProgress(float f) { prog = Math.max(0f, Math.min(1f, f)); invalidate(); }
+        @Override protected void onDraw(Canvas cv) {
+            if (prog < 1f) {
+                float w = getWidth(), h = getHeight();
+                clip.reset();
+                clip.addRoundRect(new RectF(0, 0, w, h), h / 2f, h / 2f, Path.Direction.CW);
+                cv.save();
+                cv.clipPath(clip);
+                fp.setColor(0xFFF95A5A);
+                cv.drawRect(0, 0, w * prog, h, fp);
+                cv.restore();
+            }
+            super.onDraw(cv);
+        }
     }
 
     static Ctl show(Activity a, String version, String notes, final Runnable onUpdate) {
@@ -55,7 +90,8 @@ final class UpdateDialog {
         card.setClipToOutline(true);
         int pad = CaseViews.dp(a, 24);
 
-        card.addView(new Header(a), new LinearLayout.LayoutParams(
+        final Header header = new Header(a);
+        card.addView(header, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, CaseViews.dp(a, 150)));
 
         LinearLayout head = new LinearLayout(a);
@@ -87,9 +123,13 @@ final class UpdateDialog {
         foot.setOrientation(LinearLayout.VERTICAL);
         foot.setGravity(Gravity.CENTER_HORIZONTAL);
         foot.setPadding(pad, CaseViews.dp(a, 6), pad, CaseViews.dp(a, 18));
-        final TextView btn = CaseViews.text(a, buttonText, 18, Color.WHITE, false);
+        final Pill btn = new Pill(a);
+        btn.setText(buttonText);
+        btn.setTextSize(18);
+        btn.setTextColor(Color.WHITE);
         btn.setGravity(Gravity.CENTER);
         btn.setBackground(CaseViews.box(a, 0xFFF95A5A, 30, Color.TRANSPARENT, 0));
+        btn.setTag(null);
         btn.setElevation(CaseViews.dp(a, 8));
         if (android.os.Build.VERSION.SDK_INT >= 28) btn.setOutlineAmbientShadowColor(0xFFF95A5A);
         if (android.os.Build.VERSION.SDK_INT >= 28) btn.setOutlineSpotShadowColor(0xFFF95A5A);
@@ -112,7 +152,7 @@ final class UpdateDialog {
             w.setLayout(Math.min(sw - CaseViews.dp(a, 48), CaseViews.dp(a, 340)), WindowManager.LayoutParams.WRAP_CONTENT);
         }
         d.show();
-        return new Ctl(d, btn);
+        return new Ctl(d, btn, header);
     }
 
     private static List<String> noteLines(String notes) {
@@ -131,11 +171,19 @@ final class UpdateDialog {
     }
 
     /** Yellow header: drifting clouds, shooting stars, flying rocket. */
-    private static final class Header extends View {
+    static final class Header extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final long t0 = System.nanoTime();
         private boolean running;
+        private long launchAt = -1;
+        private Runnable afterLaunch;
+
+        void launch(Runnable after) {
+            afterLaunch = after;
+            launchAt = System.nanoTime();
+            postInvalidateOnAnimation();
+        }
 
         Header(Context c) { super(c); }
 
@@ -178,11 +226,20 @@ final class UpdateDialog {
             float ease = 1f - (1f - enter) * (1f - enter) * (1f - enter);
             float hover = (float) Math.sin(t * 2.6f) * 4 * dp * enter;
             float cx = W / 2f + (float) Math.sin(t * 1.3f) * 2 * dp;
-            float cy = H * 0.42f + (1f - ease) * 70 * dp + hover;
+            float L = 0f;
+            if (launchAt >= 0) {
+                L = Math.min(1f, (System.nanoTime() - launchAt) / 1e9f / 0.9f);
+                if (L >= 1f && afterLaunch != null) {
+                    final Runnable r = afterLaunch;
+                    afterLaunch = null;
+                    post(r);
+                }
+            }
+            float cy = H * 0.42f + (1f - ease) * 70 * dp + hover * (1f - L) - L * L * H * 1.5f;
             float rw = 13 * dp, rh = 30 * dp;
 
             // flame
-            float fl = 0.75f + 0.25f * (float) Math.sin(t * 28f);
+            float fl = (0.75f + 0.25f * (float) Math.sin(t * 28f)) * (1f + 2.2f * L);
             path.reset();
             path.moveTo(cx - rw * 0.45f, cy + rh * 0.55f);
             path.quadTo(cx, cy + rh * (0.55f + 0.95f * fl), cx + rw * 0.45f, cy + rh * 0.55f);

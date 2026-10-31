@@ -82,7 +82,7 @@ final class UpdateChecker {
         }
         final UpdateDialog.Ctl[] ctl = new UpdateDialog.Ctl[1];
         ctl[0] = UpdateDialog.show(a, tag, notes, () -> {
-            ctl[0].busy("Downloading...");
+            ctl[0].busy("Downloading 0%");
             download(a, url, ctl[0]);
         });
     }
@@ -97,10 +97,21 @@ final class UpdateChecker {
                 File dir = new File(a.getCacheDir(), "apk");
                 dir.mkdirs();
                 out = new File(dir, "update.apk");
+                final long total = c.getContentLengthLong();
+                long got = 0, lastUi = 0;
                 try (InputStream in = c.getInputStream(); FileOutputStream os = new FileOutputStream(out)) {
                     byte[] buf = new byte[64 * 1024];
                     int n;
-                    while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+                    while ((n = in.read(buf)) > 0) {
+                        os.write(buf, 0, n);
+                        got += n;
+                        long now = System.currentTimeMillis();
+                        if (now - lastUi > 80) {
+                            lastUi = now;
+                            final float fr = total > 0 ? (float) got / total : -1f;
+                            a.runOnUiThread(() -> ctl.progress(fr));
+                        }
+                    }
                 }
             } catch (Exception e) {
                 err = "Download failed: " + e.getMessage();
@@ -109,15 +120,18 @@ final class UpdateChecker {
             final File f = out;
             final String fErr = err;
             a.runOnUiThread(() -> {
-                ctl.close();
-                if (a.isFinishing()) return;
-                if (f == null) { info(a, "Update failed", fErr); return; }
+                if (a.isFinishing()) { ctl.close(); return; }
+                if (f == null) { ctl.close(); info(a, "Update failed", fErr); return; }
                 PackageInfo apk = a.getPackageManager().getPackageArchiveInfo(f.getAbsolutePath(), 0);
                 if (apk == null || !a.getPackageName().equals(apk.packageName)) {
+                    ctl.close();
                     info(a, "Update failed", "Downloaded file is not this app's APK.");
                     return;
                 }
-                ApkInstaller.install(a, f);
+                ctl.launch(() -> {
+                    ctl.close();
+                    if (!a.isFinishing()) ApkInstaller.install(a, f);
+                });
             });
         }).start();
     }
