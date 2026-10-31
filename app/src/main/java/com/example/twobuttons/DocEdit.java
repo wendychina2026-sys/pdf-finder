@@ -331,17 +331,19 @@ final class DocEdit {
             String m = mpk.matter();
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
             if (!curPath.equals(path) && movedTo != null) movedTo.accept(curPath);
-            String where = ff.getParent() == null ? "" : ff.getParent();
             if (moveFailed) {
-                android.widget.Toast.makeText(a, "Saved, but the file could not be moved into the app folder. It stays at: "
-                        + f.getParent(), android.widget.Toast.LENGTH_LONG).show();
-                if (after != null) after.run();
-                return true;
+                android.widget.Toast.makeText(a, "Saved, but the file could not be moved into the app folder.\nStays at: "
+                        + f.getAbsolutePath(), android.widget.Toast.LENGTH_LONG).show();
+            } else {
+                boolean moved2 = !curPath.equals(path);
+                String from = moved2 ? path : DataFolder.originOf(a, ff);
+                boolean left = !origin.isEmpty() && new File(origin).isFile() && !new File(origin).equals(ff);
+                StringBuilder tb = new StringBuilder("Saved to Vault.");
+                if (!from.isEmpty() && !from.equals(ff.getAbsolutePath())) tb.append("\nFrom: ").append(from);
+                tb.append("\nTo: ").append(ff.getAbsolutePath());
+                if (left) tb.append("\nOriginal could not be deleted: ").append(origin);
+                android.widget.Toast.makeText(a, tb.toString(), android.widget.Toast.LENGTH_LONG).show();
             }
-            boolean left = !origin.isEmpty() && new File(origin).isFile() && !new File(origin).equals(ff);
-            android.widget.Toast.makeText(a, left
-                    ? "Saved to Vault (" + where + "). Android did not let me delete the original: " + origin
-                    : "Saved to Vault: " + where, android.widget.Toast.LENGTH_LONG).show();
             if (after != null) after.run();
             return true;
         }, null);

@@ -521,7 +521,7 @@ public class MarkedFilesActivity extends BaseActivity {
         infoRow(card, "Last edited", df.format(new java.util.Date(f.lastModified())));
         int n = it.marks.size();
         if (k == 0) infoRow(card, "Marked pages", n + (it.total >= 0 ? " of " + it.total : ""));
-        infoRow(card, "Location", f.getParent() == null ? "" : f.getParent());
+        infoRow(card, "Now at", f.getAbsolutePath());
         String from = DataFolder.originOf(this, f);
         infoRow(card, "Moved from", from.isEmpty() ? "Not recorded (added before this was tracked, or created in the app)" : from);
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
