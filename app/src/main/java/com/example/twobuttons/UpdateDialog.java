@@ -84,7 +84,7 @@ final class UpdateDialog {
     }
 
     static Ctl show(Activity a, String version, String notes, String heading, String buttonText, final Runnable onUpdate) {
-        final Dialog d = new Dialog(a);
+        final Dialog d = new Dialog(a, android.R.style.Theme_Translucent_NoTitleBar);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout card = new LinearLayout(a);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -158,6 +158,8 @@ final class UpdateDialog {
         Window w = d.getWindow();
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
             w.setDimAmount(0.55f);
             w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
         }
@@ -253,8 +255,8 @@ final class UpdateDialog {
     static final class Fx extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
-        private final float[] ang = new float[44], spd = new float[44], sz = new float[44];
-        private final int[] col = new int[44];
+        private final float[] ang = new float[90], spd = new float[90], sz = new float[90];
+        private final int[] col = new int[90];
         private boolean active, doneCalled;
         private long t0, tBlast = -1;
         private float sx, sy, tx, ty, prevAng;
@@ -266,8 +268,8 @@ final class UpdateDialog {
             int[] pal = {0xFFFFD54A, 0xFFFF9A3C, 0xFFF95A5A, 0xFFFFFFFF, 0xFFFFF2A8, 0xFF8FA6FF};
             for (int i = 0; i < ang.length; i++) {
                 ang[i] = (float) (r.nextFloat() * Math.PI * 2);
-                spd[i] = 40 + r.nextFloat() * 120;
-                sz[i] = 2.5f + r.nextFloat() * 3.5f;
+                spd[i] = 0.15f + r.nextFloat() * 0.85f;
+                sz[i] = 3f + r.nextFloat() * 5f;
                 col[i] = pal[r.nextInt(pal.length)];
             }
         }
@@ -278,8 +280,8 @@ final class UpdateDialog {
             float dp = getResources().getDisplayMetrics().density;
             sx = from[0] - loc[0];
             sy = from[1] - loc[1];
-            tx = getWidth() * 0.84f;
-            ty = 34 * dp;
+            tx = sx;
+            ty = getHeight() * 0.22f;
             after = done;
             t0 = System.nanoTime();
             active = true;
@@ -313,27 +315,52 @@ final class UpdateDialog {
                 prevAng = deg;
             } else {
                 if (tBlast < 0) tBlast = System.nanoTime();
-                float b = Math.min(1f, (System.nanoTime() - tBlast) / 1e9f / 0.85f);
+                float b = Math.min(1f, (System.nanoTime() - tBlast) / 1e9f / 1.3f);
                 float eo = 1f - (1f - b) * (1f - b);
-                // flash + shock ring
+                float W = getWidth(), H = getHeight();
+                float maxR = (float) Math.hypot(W, H);
+                // screen flash
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb((int) (230 * (1f - b)), 255, 240, 170));
-                cv.drawCircle(tx, ty, (10 + 80 * eo) * dp, p);
+                p.setColor(Color.argb((int) (150 * Math.max(0f, 1f - b * 1.6f)), 255, 244, 190));
+                cv.drawRect(0, 0, W, H, p);
+                p.setColor(Color.argb((int) (240 * (1f - b)), 255, 236, 150));
+                cv.drawCircle(tx, ty, (20 * dp + maxR * 0.35f * eo), p);
+                // shock rings
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth((5f - 3.5f * b) * dp);
-                p.setColor(Color.argb((int) (220 * (1f - b)), 255, 255, 255));
-                cv.drawCircle(tx, ty, (14 + 130 * eo) * dp, p);
-                // debris
+                for (int k = 0; k < 3; k++) {
+                    float bk = Math.max(0f, Math.min(1f, b * 1.25f - k * 0.12f));
+                    if (bk <= 0f) continue;
+                    p.setStrokeWidth((7f - 5.5f * bk) * dp);
+                    p.setColor(Color.argb((int) (230 * (1f - bk)), 255, k == 1 ? 200 : 255, k == 2 ? 150 : 255));
+                    cv.drawCircle(tx, ty, maxR * 0.75f * (1f - (1f - bk) * (1f - bk)), p);
+                }
+                // main debris across the whole screen
                 p.setStyle(Paint.Style.FILL);
                 for (int i = 0; i < ang.length; i++) {
-                    float d = spd[i] * dp * eo * 1.6f;
+                    float d = spd[i] * maxR * 0.75f * eo;
                     float px = tx + (float) Math.cos(ang[i]) * d;
-                    float py = ty + (float) Math.sin(ang[i]) * d + 70 * dp * b * b;
+                    float py = ty + (float) Math.sin(ang[i]) * d + 140 * dp * b * b;
                     int c = col[i];
                     p.setColor(Color.argb((int) (255 * (1f - b)), Color.red(c), Color.green(c), Color.blue(c)));
-                    cv.drawCircle(px, py, sz[i] * dp * (1f - 0.6f * b), p);
+                    cv.drawCircle(px, py, sz[i] * dp * (1f - 0.7f * b), p);
                 }
-                if (b >= 0.8f && !doneCalled) {
+                // three small secondary bursts
+                float[][] sec = {{-0.28f, 0.10f}, {0.30f, 0.16f}, {0.02f, 0.30f}};
+                for (int k = 0; k < sec.length; k++) {
+                    float bk = Math.max(0f, Math.min(1f, (b - 0.15f - k * 0.08f) * 1.6f));
+                    if (bk <= 0f) continue;
+                    float ek = 1f - (1f - bk) * (1f - bk);
+                    float cx2 = tx + W * sec[k][0], cy2 = ty + H * sec[k][1];
+                    for (int i = 0; i < 18; i++) {
+                        int j = (i * 5 + k * 31) % ang.length;
+                        float d = spd[j] * W * 0.28f * ek;
+                        int c = col[(j + 7) % col.length];
+                        p.setColor(Color.argb((int) (255 * (1f - bk)), Color.red(c), Color.green(c), Color.blue(c)));
+                        cv.drawCircle(cx2 + (float) Math.cos(ang[j]) * d, cy2 + (float) Math.sin(ang[j]) * d + 30 * dp * bk * bk,
+                                (2.5f + sz[j] * 0.4f) * dp * (1f - 0.6f * bk), p);
+                    }
+                }
+                if (b >= 0.7f && !doneCalled) {
                     doneCalled = true;
                     final Runnable r = after;
                     if (r != null) post(r);
