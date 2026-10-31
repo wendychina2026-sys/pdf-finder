@@ -142,7 +142,7 @@ public class MarkActivity extends BaseActivity {
             marks = store.all(path);        // a category change re-marks every page
             pageAdapter.notifyDataSetChanged();
             refreshInfo();
-        }));
+        }, np -> path = np));       // saving moved the file into the Vault folder: follow it
         head.addView(chg);
         card.addView(head);
 

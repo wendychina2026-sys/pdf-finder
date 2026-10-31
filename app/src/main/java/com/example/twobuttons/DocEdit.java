@@ -43,7 +43,22 @@ final class DocEdit {
         return m;
     }
 
+    /** Page count of a PDF (0 when it cannot be read). */
+    static int pageCount(File f) {
+        try (android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(f, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+             android.graphics.pdf.PdfRenderer r = new android.graphics.pdf.PdfRenderer(pfd)) {
+            return r.getPageCount();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     static void show(final Activity a, final String path, final Runnable after) {
+        show(a, path, after, null);
+    }
+
+    /** movedTo gets the file's new path when saving moved it into the app's Documents folder. */
+    static void show(final Activity a, final String path, final Runnable after, final java.util.function.Consumer<String> movedTo) {
         final File f = new File(path);
         final MarkStore store = new MarkStore(a);
         final Map<Integer, String> marks = store.all(path);
@@ -112,29 +127,50 @@ final class DocEdit {
             LegalStore.Doc d = cur;
             String newName = LegalUi.str(name);
             String stored = DocFileCard.ext(newName).isEmpty() ? newName + ext : newName;
+            // a file that is not in the app's Documents folder yet is moved in now; its page marks follow
+            String curPath = path;
+            File ff = f;
+            if (d == null) {
+                File moved = DataFolder.moveIntoDocuments(a, f);
+                if (moved != null && !moved.getAbsolutePath().equals(path)) {
+                    store.move(a, path, moved.getAbsolutePath());
+                    curPath = moved.getAbsolutePath();
+                    ff = moved;
+                }
+            }
             if (d == null) {
                 // a plain marked PDF has no document record yet: create one so name and stage can be kept
                 d = new LegalStore.Doc();
                 d.date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(new java.util.Date());
-                d.size = android.text.format.Formatter.formatShortFileSize(a, f.length());
-                d.fileName = f.getName();
-                try { d.uri = PhotoFlow.uri(a, f).toString(); } catch (Exception ignored) { }
+                d.size = android.text.format.Formatter.formatShortFileSize(a, ff.length());
+                d.fileName = ff.getName();
+                try { d.uri = PhotoFlow.uri(a, ff).toString(); } catch (Exception ignored) { }
             }
             d.name = stored;
             d.caseName = mpk.matter();
             d.stage = mpk.stage();
+            // a PDF with no page marked yet: the chosen category is put on EVERY page, no range asked
+            java.util.List<Integer> targets = pages;
+            if (pdf && targets.isEmpty()) {
+                targets = new ArrayList<>();
+                int pc = pageCount(ff);
+                for (int pg = 0; pg < pc; pg++) targets.add(pg);
+            }
             if (cp != null) {
-                String neu = cp.get();
+                String neu = cp.get().trim();
+                if (neu.isEmpty()) neu = "Other";
                 d.category = neu;
-                for (Integer pg : pages) store.set(path, pg, neu);
+                for (Integer pg : targets) store.set(curPath, pg, neu);
             }
             if (cp == null && multiNew[0] != null) {
                 d.category = multiNew[0];
-                for (Integer pg : pages) store.set(path, pg, multiNew[0]);
+                for (Integer pg : targets) store.set(curPath, pg, multiNew[0]);
             }
             ls.saveDoc(d);
             String m = mpk.matter();
-            mp.edit().putString(path, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
+            mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
+            if (!curPath.equals(path) && movedTo != null) movedTo.accept(curPath);
+            android.widget.Toast.makeText(a, "Saved to Document Vault", android.widget.Toast.LENGTH_SHORT).show();
             if (after != null) after.run();
             return true;
         }, null);
