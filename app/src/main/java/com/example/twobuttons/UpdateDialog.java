@@ -43,6 +43,10 @@ final class UpdateDialog {
     }
 
     static Ctl show(Activity a, String version, String notes, final Runnable onUpdate) {
+        return show(a, version, notes, "ABOUT UPDATE", "Update", onUpdate);
+    }
+
+    static Ctl show(Activity a, String version, String notes, String heading, String buttonText, final Runnable onUpdate) {
         final Dialog d = new Dialog(a);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout card = new LinearLayout(a);
@@ -57,7 +61,7 @@ final class UpdateDialog {
         LinearLayout head = new LinearLayout(a);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(pad, CaseViews.dp(a, 18), pad, CaseViews.dp(a, 6));
-        TextView about = CaseViews.text(a, "ABOUT UPDATE", 15, 0xFF1B1B1F, true);
+        TextView about = CaseViews.text(a, heading, 15, 0xFF1B1B1F, true);
         head.addView(about, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         head.addView(CaseViews.text(a, version, 15, 0xFFF0454A, true));
         card.addView(head);
@@ -83,7 +87,7 @@ final class UpdateDialog {
         foot.setOrientation(LinearLayout.VERTICAL);
         foot.setGravity(Gravity.CENTER_HORIZONTAL);
         foot.setPadding(pad, CaseViews.dp(a, 6), pad, CaseViews.dp(a, 18));
-        final TextView btn = CaseViews.text(a, "Update", 18, Color.WHITE, false);
+        final TextView btn = CaseViews.text(a, buttonText, 18, Color.WHITE, false);
         btn.setGravity(Gravity.CENTER);
         btn.setBackground(CaseViews.box(a, 0xFFF95A5A, 30, Color.TRANSPARENT, 0));
         btn.setElevation(CaseViews.dp(a, 8));

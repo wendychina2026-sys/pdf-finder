@@ -76,7 +76,8 @@ final class UpdateChecker {
         PackageInfo cur = ApkInstaller.installed(a);
         long have = cur == null ? 0 : ApkInstaller.code(cur);
         if (build <= have) {
-            info(a, "Up to date", "Installed: build " + have + "\nLatest on GitHub: build " + build);
+            final UpdateDialog.Ctl[] uc = new UpdateDialog.Ctl[1];
+            uc[0] = UpdateDialog.show(a, tag, notes, "YOU'RE UP TO DATE", "OK", () -> uc[0].close());
             return;
         }
         final UpdateDialog.Ctl[] ctl = new UpdateDialog.Ctl[1];
