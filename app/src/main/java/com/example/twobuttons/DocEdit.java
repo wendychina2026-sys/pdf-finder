@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.widget.EditText;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -43,6 +44,136 @@ final class DocEdit {
         return m;
     }
 
+
+    /** Marker only: one row per page range, each with its own category. Reopening shows the current ranges. */
+    static final class Ranges {
+        private static final class Row { android.widget.EditText pg; String cat = ""; View card; }
+        private final Activity a;
+        private final LinearLayout box;
+        private final java.util.List<Row> rows = new ArrayList<>();
+        private final int pc;
+
+        Ranges(Activity a, LinearLayout form, Map<Integer, String> marks, int pc) {
+            this.a = a;
+            this.pc = pc;
+            LegalUi.label(a, form, "Pages and categories");
+            box = new LinearLayout(a);
+            box.setOrientation(LinearLayout.VERTICAL);
+            form.addView(box);
+            if (marks.isEmpty()) {
+                addRow(pc > 1 ? "1-" + pc : "1", "");          // default: the whole PDF, just pick a category
+            } else {
+                java.util.Map<String, java.util.List<Integer>> by = new java.util.LinkedHashMap<>();
+                for (Integer p : new java.util.TreeSet<>(marks.keySet())) {
+                    String c = marks.get(p);
+                    if (!by.containsKey(c)) by.put(c, new ArrayList<Integer>());
+                    by.get(c).add(p);
+                }
+                for (Map.Entry<String, java.util.List<Integer>> e : by.entrySet()) addRow(format(e.getValue()), e.getKey());
+            }
+            TextView add = CaseViews.text(a, "+ Add another range", 13, IconPalette.pick(a, 0xFF1A237E, 0xFFFFD54F), true);
+            add.setPadding(0, CaseViews.dp(a, 8), 0, CaseViews.dp(a, 2));
+            add.setOnClickListener(v -> addRow("", ""));
+            form.addView(add);
+            TextView note = CaseViews.text(a, "Each range gets its own category. Pages left out stay unmarked. "
+                    + "Example: 1-3 Petition, 4-6 Evidence.", 11, AppTheme.sub(a), false);
+            note.setPadding(0, CaseViews.dp(a, 2), 0, CaseViews.dp(a, 2));
+            form.addView(note);
+        }
+
+        private void addRow(String pages, String cat) {
+            final Row r = new Row();
+            r.cat = cat;
+            LinearLayout card = new LinearLayout(a);
+            card.setOrientation(LinearLayout.VERTICAL);
+            int pad = CaseViews.dp(a, 8);
+            card.setPadding(pad, pad, pad, pad);
+            card.setBackground(CaseViews.box(a, 0x00000000, 10, AppTheme.sub(a) & 0x55FFFFFF, 1));
+            LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            cl.bottomMargin = CaseViews.dp(a, 6);
+            r.pg = LegalUi.text(a, card, "Pages (1 to " + pc + ", e.g. 1-3, 5)", pages);
+            LegalUi.label(a, card, "Category");
+            final TextView[] tv = new TextView[1];
+            tv[0] = FieldStyle.dropdown(a, card, "Select category", v ->
+                    CategoryPicker.pick(a, r.cat, s -> {
+                        r.cat = s;
+                        FieldStyle.setDropdownValue(tv[0], s, "Select category");
+                    }), new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            FieldStyle.setDropdownValue(tv[0], cat, "Select category");
+            TextView rm = CaseViews.text(a, "Remove range", 12, 0xFFD32F2F, true);
+            rm.setPadding(0, CaseViews.dp(a, 6), 0, 0);
+            rm.setOnClickListener(v -> {
+                if (rows.size() <= 1) {
+                    android.widget.Toast.makeText(a, "At least one range is needed", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                rows.remove(r);
+                box.removeView(r.card);
+            });
+            card.addView(rm);
+            r.card = card;
+            rows.add(r);
+            box.addView(card, cl);
+        }
+
+        /** "1-3, 6" for 0-based pages. */
+        static String format(java.util.List<Integer> pages) {
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            while (i < pages.size()) {
+                int j = i;
+                while (j + 1 < pages.size() && pages.get(j + 1) == pages.get(j) + 1) j++;
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(pages.get(i) + 1);
+                if (j > i) sb.append('-').append(pages.get(j) + 1);
+                i = j + 1;
+            }
+            return sb.toString();
+        }
+
+        private java.util.List<Integer> parse(String txt) {
+            java.util.TreeSet<Integer> out = new java.util.TreeSet<>();
+            for (String part : txt.split("[,;\\s]+")) {
+                if (part.isEmpty()) continue;
+                try {
+                    int x, y, dash = part.indexOf('-');
+                    if (dash > 0) {
+                        x = Integer.parseInt(part.substring(0, dash).trim());
+                        y = Integer.parseInt(part.substring(dash + 1).trim());
+                    } else {
+                        x = y = Integer.parseInt(part.trim());
+                    }
+                    if (x > y) { int t = x; x = y; y = t; }
+                    for (int p = Math.max(1, x); p <= Math.min(pc, y); p++) out.add(p - 1);
+                } catch (NumberFormatException ignored) { }
+            }
+            return new ArrayList<>(out);
+        }
+
+        /** null when fine, else the message to show. */
+        String validate() {
+            for (int i = 0; i < rows.size(); i++) {
+                Row r = rows.get(i);
+                if (parse(r.pg.getText().toString()).isEmpty()) return "Range " + (i + 1) + ": enter pages like 1-3, 5";
+                if (r.cat.trim().isEmpty()) return "Range " + (i + 1) + ": select a category";
+            }
+            return null;
+        }
+
+        /** Replaces every page mark of the file by these ranges (a later range wins an overlap). Returns the document category. */
+        String apply(String path, MarkStore store) {
+            store.clear(path);
+            Set<String> used = new TreeSet<>();
+            for (Row r : rows) {
+                String c = r.cat.trim();
+                for (int p : parse(r.pg.getText().toString())) store.set(path, p, c);
+            }
+            for (String c : store.all(path).values()) used.add(c);
+            return used.size() == 1 ? used.iterator().next() : "Multiple";
+        }
+    }
     /** Page count of a PDF (0 when it cannot be read). */
     static int pageCount(File f) {
         try (android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(f, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
@@ -79,11 +210,18 @@ final class DocEdit {
 
         final Set<String> cats = new TreeSet<>(marks.values());
         final CategoryPicker cp;
+        final Ranges rr;
         final String[] multiNew = {null};      // several categories: one category picked here is set on ALL marked pages
-        if (cats.size() <= 1) {
+        if (a instanceof MarkActivity && pdf) {
+            // opened from the marker (direct share or reopened PDF): page ranges, each with its own category
+            cp = null;
+            rr = new Ranges(a, form, marks, pageCount(f));
+        } else if (cats.size() <= 1) {
+            rr = null;
             cp = new CategoryPicker(a, form, cats.isEmpty() ? "" : cats.iterator().next());
         } else {
             cp = null;
+            rr = null;
             final String multiLabel = "Multiple (" + cats.size() + " categories)";
             LegalUi.label(a, form, "Category");
             final TextView[] mtv = new TextView[1];
@@ -104,13 +242,22 @@ final class DocEdit {
 
         LegalUi.formDialog(a, "Edit document", form, () -> {
             if (!LegalUi.need(a, name, "Document name")) return false;
+            if (rr != null) {
+                String err = rr.validate();
+                if (err != null) {
+                    android.widget.Toast.makeText(a, err, android.widget.Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+            }
             if (marks.isEmpty() && !pdf && cp != null && cp.get().trim().isEmpty()) {
                 android.widget.Toast.makeText(a, "Select a category", android.widget.Toast.LENGTH_SHORT).show();
                 return false;
             }
             if (mpk.isCreateNew()) {
                 // attach this file to a NEW case: same route as the marker's old "Create new case"
-                if (cp != null) {
+                if (rr != null) {
+                    rr.apply(path, store);
+                } else if (cp != null) {
                     String neu = cp.get();
                     for (Integer pg : pages) store.set(path, pg, neu);
                 } else if (multiNew[0] != null) {
@@ -156,17 +303,19 @@ final class DocEdit {
                 int pc = pageCount(ff);
                 for (int pg = 0; pg < pc; pg++) targets.add(pg);
             }
-            if (cp != null) {
+            if (rr != null) {
+                d.category = rr.apply(curPath, store);
+            } else if (cp != null) {
                 String neu = cp.get().trim();
                 if (neu.isEmpty()) neu = "Other";
                 d.category = neu;
                 for (Integer pg : targets) store.set(curPath, pg, neu);
-            }
-            if (cp == null && multiNew[0] != null) {
+            } else if (multiNew[0] != null) {
                 d.category = multiNew[0];
                 for (Integer pg : targets) store.set(curPath, pg, multiNew[0]);
+            } else {
+                d.category = "Multiple";      // pages keep their different categories
             }
-            if (cp == null && multiNew[0] == null) d.category = "Multiple";   // pages keep their different categories
             ls.saveDoc(d);
             String m = mpk.matter();
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();

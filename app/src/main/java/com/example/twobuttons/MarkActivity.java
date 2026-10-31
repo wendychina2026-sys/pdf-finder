@@ -109,18 +109,6 @@ public class MarkActivity extends BaseActivity {
             root.addView(infoBox, ip);
             refreshInfo();
         }
-        // one PDF, several categories: mark page ranges, one category at a time
-        TextView rng = CaseViews.text(this, "Mark pages by range", 13, IconPalette.pick(this, 0xFF1A237E, 0xFFFFD54F), true);
-        rng.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 8), CaseViews.dp(this, 12), CaseViews.dp(this, 8));
-        rng.setBackground(CaseViews.box(this, 0x00000000, 8, IconPalette.pick(this, 0xFF1A237E, 0xFFFFD54F), 1));
-        rng.setOnClickListener(v -> showRangeDialog());
-        if (onlySub.isEmpty()) {
-            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            rp.topMargin = CaseViews.dp(this, 4);
-            rp.bottomMargin = CaseViews.dp(this, 2);
-            root.addView(rng, rp);
-        }
         root.addView(hint, wide);
         root.addView(pages, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -204,65 +192,6 @@ public class MarkActivity extends BaseActivity {
 
     private int realPage(int pos) {
         return visible == null ? pos : visible[pos];
-    }
-
-    /** Pages like "1-3, 5" (1-based) -> real page indexes. Empty when nothing valid. */
-    private java.util.List<Integer> parseRange(String txt) {
-        java.util.TreeSet<Integer> out = new java.util.TreeSet<>();
-        int n = renderer.getPageCount();
-        for (String part : txt.split("[,;\\s]+")) {
-            if (part.isEmpty()) continue;
-            try {
-                int a, b;
-                int dash = part.indexOf('-');
-                if (dash > 0) {
-                    a = Integer.parseInt(part.substring(0, dash).trim());
-                    b = Integer.parseInt(part.substring(dash + 1).trim());
-                } else {
-                    a = b = Integer.parseInt(part.trim());
-                }
-                if (a > b) { int t = a; a = b; b = t; }
-                for (int p = Math.max(1, a); p <= Math.min(n, b); p++) out.add(p - 1);
-            } catch (NumberFormatException ignored) { }
-        }
-        return new java.util.ArrayList<>(out);
-    }
-
-    /** Give several pages ONE category in one go. Repeat with other pages / categories for a mixed PDF. */
-    private void showRangeDialog() {
-        final String[] chosen = {addCat};
-        LinearLayout form = LegalUi.form(this);
-        final android.widget.EditText pg = LegalUi.text(this, form,
-                "Pages (1 to " + renderer.getPageCount() + ", e.g. 1-3, 5)", "");
-        LegalUi.label(this, form, "Category");
-        final TextView[] tv = new TextView[1];
-        tv[0] = FieldStyle.dropdown(this, form, "Select category", v ->
-                CategoryPicker.pick(this, chosen[0], s -> {
-                    chosen[0] = s;
-                    FieldStyle.setDropdownValue(tv[0], s, "Select category");
-                }, new java.util.HashMap<>(marks)), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        FieldStyle.setDropdownValue(tv[0], chosen[0], "Select category");
-        LegalUi.formDialog(this, "Mark pages", form, () -> {
-            java.util.List<Integer> list = parseRange(pg.getText().toString());
-            if (list.isEmpty()) {
-                Toast.makeText(this, "Enter pages like 1-3, 5", Toast.LENGTH_SHORT).show();
-                return false;
-            }
-            if (chosen[0].isEmpty()) {
-                Toast.makeText(this, "Select a category", Toast.LENGTH_SHORT).show();
-                return false;
-            }
-            for (int p : list) {
-                store.set(path, p, chosen[0]);
-                marks.put(p, chosen[0]);
-            }
-            pageAdapter.notifyDataSetChanged();
-            if (infoBox != null && infoBox.getChildCount() > 0) refreshInfo();
-            Toast.makeText(this, list.size() + " page(s) marked as " + chosen[0]
-                    + ". Mark more, then Change details > OK to save.", Toast.LENGTH_LONG).show();
-            return true;
-        }, null);
     }
 
     // New mark, or view/edit existing mark. Uses the same Document Category picker
