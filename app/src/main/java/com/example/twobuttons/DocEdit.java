@@ -277,12 +277,22 @@ final class DocEdit {
             // a file that is not in the app's Documents folder yet is moved in now; its page marks follow
             String curPath = path;
             File ff = f;
-            if (d == null) {
-                File moved = DataFolder.moveIntoDocuments(a, f);
-                if (moved != null && !moved.getAbsolutePath().equals(path)) {
-                    store.move(a, path, moved.getAbsolutePath());
-                    curPath = moved.getAbsolutePath();
-                    ff = moved;
+            // always: a file still sitting at its original place (also when the Vault record already exists) goes into the app folder
+            File moved = DataFolder.moveIntoDocuments(a, f);
+            boolean moveFailed = moved == null;
+            if (moved != null && !moved.getAbsolutePath().equals(path)) {
+                store.move(a, path, moved.getAbsolutePath());
+                curPath = moved.getAbsolutePath();
+                ff = moved;
+                if (d != null) {              // the Vault record pointed at the old place: point it at the new file
+                    try {
+                        String oldUri = PhotoFlow.uri(a, f).toString();
+                        String newUri = PhotoFlow.uri(a, moved).toString();
+                        if (oldUri.equals(d.uri)) d.uri = newUri;
+                        int ix = d.more.indexOf(oldUri);
+                        if (ix >= 0) d.more.set(ix, newUri);
+                        if (d.more.isEmpty()) d.fileName = moved.getName();
+                    } catch (Exception ignored) { }
                 }
             }
             if (d == null) {
@@ -322,6 +332,12 @@ final class DocEdit {
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
             if (!curPath.equals(path) && movedTo != null) movedTo.accept(curPath);
             String where = ff.getParent() == null ? "" : ff.getParent();
+            if (moveFailed) {
+                android.widget.Toast.makeText(a, "Saved, but the file could not be moved into the app folder. It stays at: "
+                        + f.getParent(), android.widget.Toast.LENGTH_LONG).show();
+                if (after != null) after.run();
+                return true;
+            }
             boolean left = !origin.isEmpty() && new File(origin).isFile() && !new File(origin).equals(ff);
             android.widget.Toast.makeText(a, left
                     ? "Saved to Vault (" + where + "). Android did not let me delete the original: " + origin
