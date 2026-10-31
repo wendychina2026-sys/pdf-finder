@@ -19,6 +19,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -38,7 +39,8 @@ final class UpdateDialog {
         final Dialog dialog;
         final Pill button;
         final Header header;
-        Ctl(Dialog d, Pill b, Header h) { dialog = d; button = b; header = h; }
+        final Fx fx;
+        Ctl(Dialog d, Pill b, Header h, Fx f) { dialog = d; button = b; header = h; fx = f; }
         void busy(String text) { button.setText(text); button.setEnabled(false); button.setProgress(0f); }
         /** frac 0..1, or -1 when the size is unknown. */
         void progress(float frac) {
@@ -50,7 +52,7 @@ final class UpdateDialog {
         void launch(Runnable after) {
             button.setProgress(1f);
             button.setText("Launching...");
-            header.launch(after);
+            fx.start(header.takeOff(), after);
         }
         void close() { try { dialog.dismiss(); } catch (Exception ignored) { } }
     }
@@ -88,6 +90,7 @@ final class UpdateDialog {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(CaseViews.box(a, Color.WHITE, 24, Color.TRANSPARENT, 0));
         card.setClipToOutline(true);
+        card.setClickable(true);
         int pad = CaseViews.dp(a, 24);
 
         final Header header = new Header(a);
@@ -143,16 +146,23 @@ final class UpdateDialog {
         foot.addView(later);
         card.addView(foot);
 
-        d.setContentView(card);
+        final FrameLayout root = new FrameLayout(a);
+        int sw0 = a.getResources().getDisplayMetrics().widthPixels;
+        FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(
+                Math.min(sw0 - CaseViews.dp(a, 48), CaseViews.dp(a, 340)), FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        root.addView(card, cp);
+        final Fx fx = new Fx(a);
+        root.addView(fx, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        root.setOnClickListener(v -> { if (btn.isEnabled()) d.dismiss(); });
+        d.setContentView(root);
         Window w = d.getWindow();
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             w.setDimAmount(0.55f);
-            int sw = a.getResources().getDisplayMetrics().widthPixels;
-            w.setLayout(Math.min(sw - CaseViews.dp(a, 48), CaseViews.dp(a, 340)), WindowManager.LayoutParams.WRAP_CONTENT);
+            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
         }
         d.show();
-        return new Ctl(d, btn, header);
+        return new Ctl(d, btn, header, fx);
     }
 
     private static List<String> noteLines(String notes) {
@@ -170,19 +180,185 @@ final class UpdateDialog {
         return out;
     }
 
+
+    /** Draws the rocket (flame, sparks, fins, body, window) centred on cx,cy. Shared by header and blast overlay. */
+    static void drawRocket(Canvas cv, Paint p, Path path, float cx, float cy, float dp, float t, float flameMul) {
+        float rw = 13 * dp, rh = 30 * dp;
+        p.setStyle(Paint.Style.FILL);
+        // flame
+        float fl = (0.75f + 0.25f * (float) Math.sin(t * 28f)) * flameMul;
+        path.reset();
+        path.moveTo(cx - rw * 0.45f, cy + rh * 0.55f);
+        path.quadTo(cx, cy + rh * (0.55f + 0.95f * fl), cx + rw * 0.45f, cy + rh * 0.55f);
+        path.close();
+        p.setColor(0xFFFF9A3C);
+        cv.drawPath(path, p);
+        path.reset();
+        path.moveTo(cx - rw * 0.22f, cy + rh * 0.55f);
+        path.quadTo(cx, cy + rh * (0.55f + 0.55f * fl), cx + rw * 0.22f, cy + rh * 0.55f);
+        path.close();
+        p.setColor(0xFFFFF2A8);
+        cv.drawPath(path, p);
+
+        // exhaust sparks falling away
+        for (int i = 0; i < 5; i++) {
+            float ph = ((t * 1.4f) + i * 0.2f) % 1f;
+            p.setColor(Color.argb((int) (190 * (1 - ph)), 255, 255, 255));
+            cv.drawCircle(cx + (i - 2) * 4 * dp, cy + rh * 0.9f + ph * 40 * dp * flameMul, (2.6f - ph * 1.6f) * dp, p);
+        }
+
+        // fins
+        p.setColor(0xFFE4E7F2);
+        path.reset();
+        path.moveTo(cx - rw * 0.8f, cy + rh * 0.05f);
+        path.lineTo(cx - rw * 1.45f, cy + rh * 0.58f);
+        path.lineTo(cx - rw * 0.6f, cy + rh * 0.45f);
+        path.close();
+        cv.drawPath(path, p);
+        path.reset();
+        path.moveTo(cx + rw * 0.8f, cy + rh * 0.05f);
+        path.lineTo(cx + rw * 1.45f, cy + rh * 0.58f);
+        path.lineTo(cx + rw * 0.6f, cy + rh * 0.45f);
+        path.close();
+        cv.drawPath(path, p);
+
+        // body
+        p.setColor(Color.WHITE);
+        path.reset();
+        path.moveTo(cx, cy - rh * 0.62f);
+        path.cubicTo(cx + rw * 1.1f, cy - rh * 0.25f, cx + rw * 0.95f, cy + rh * 0.3f, cx + rw * 0.6f, cy + rh * 0.58f);
+        path.lineTo(cx - rw * 0.6f, cy + rh * 0.58f);
+        path.cubicTo(cx - rw * 0.95f, cy + rh * 0.3f, cx - rw * 1.1f, cy - rh * 0.25f, cx, cy - rh * 0.62f);
+        path.close();
+        cv.drawPath(path, p);
+        p.setColor(0xFFF0F2FA);
+        cv.drawRect(new RectF(cx + rw * 0.25f, cy - rh * 0.2f, cx + rw * 0.7f, cy + rh * 0.55f), p);
+        p.setColor(0xFFFFFFFF);
+        path.reset();
+        path.moveTo(cx, cy - rh * 0.62f);
+        path.cubicTo(cx + rw * 1.1f, cy - rh * 0.25f, cx + rw * 0.95f, cy + rh * 0.3f, cx + rw * 0.6f, cy + rh * 0.58f);
+        path.lineTo(cx + rw * 0.25f, cy + rh * 0.58f);
+        path.close();
+        // window
+        p.setColor(0xFFDDE3FF);
+        cv.drawCircle(cx, cy - rh * 0.08f, rw * 0.48f, p);
+        p.setColor(0xFF5B7BFF);
+        cv.drawCircle(cx, cy - rh * 0.08f, rw * 0.34f, p);
+        p.setColor(0xFF9DB1FF);
+        cv.drawCircle(cx - rw * 0.08f, cy - rh * 0.13f, rw * 0.12f, p);
+
+    }
+
+    /** Full-screen overlay: rocket flies to the top of the screen, then blows up. */
+    static final class Fx extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private final float[] ang = new float[44], spd = new float[44], sz = new float[44];
+        private final int[] col = new int[44];
+        private boolean active, doneCalled;
+        private long t0, tBlast = -1;
+        private float sx, sy, tx, ty, prevAng;
+        private Runnable after;
+
+        Fx(Context c) {
+            super(c);
+            java.util.Random r = new java.util.Random(7);
+            int[] pal = {0xFFFFD54A, 0xFFFF9A3C, 0xFFF95A5A, 0xFFFFFFFF, 0xFFFFF2A8, 0xFF8FA6FF};
+            for (int i = 0; i < ang.length; i++) {
+                ang[i] = (float) (r.nextFloat() * Math.PI * 2);
+                spd[i] = 40 + r.nextFloat() * 120;
+                sz[i] = 2.5f + r.nextFloat() * 3.5f;
+                col[i] = pal[r.nextInt(pal.length)];
+            }
+        }
+
+        void start(float[] from, Runnable done) {
+            int[] loc = new int[2];
+            getLocationInWindow(loc);
+            float dp = getResources().getDisplayMetrics().density;
+            sx = from[0] - loc[0];
+            sy = from[1] - loc[1];
+            tx = getWidth() * 0.84f;
+            ty = 34 * dp;
+            after = done;
+            t0 = System.nanoTime();
+            active = true;
+            postInvalidateOnAnimation();
+        }
+
+        @Override protected void onDraw(Canvas cv) {
+            if (!active) return;
+            float dp = getResources().getDisplayMetrics().density;
+            float now = (System.nanoTime() - t0) / 1e9f;
+            float T = 1.15f;
+            float u = Math.min(1f, now / T);
+            if (u < 1f) {
+                // trail
+                p.setStyle(Paint.Style.FILL);
+                for (int k = 14; k >= 1; k--) {
+                    float uk = Math.max(0f, u - k * 0.018f);
+                    float e = uk * uk;
+                    float px = sx + (tx - sx) * e, py = sy + (ty - sy) * e;
+                    p.setColor(Color.argb((int) (170 * (1f - k / 15f)), 255, k % 2 == 0 ? 190 : 255, 120));
+                    cv.drawCircle(px, py + 18 * dp, (7f - k * 0.4f) * dp, p);
+                }
+                float e = u * u;
+                float x = sx + (tx - sx) * e, y = sy + (ty - sy) * e;
+                float dx = tx - sx, dy = ty - sy;
+                float deg = (float) Math.toDegrees(Math.atan2(dx, -dy));
+                cv.save();
+                cv.rotate(deg, x, y);
+                drawRocket(cv, p, path, x, y, dp, now, 1.4f + 1.6f * u);
+                cv.restore();
+                prevAng = deg;
+            } else {
+                if (tBlast < 0) tBlast = System.nanoTime();
+                float b = Math.min(1f, (System.nanoTime() - tBlast) / 1e9f / 0.85f);
+                float eo = 1f - (1f - b) * (1f - b);
+                // flash + shock ring
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb((int) (230 * (1f - b)), 255, 240, 170));
+                cv.drawCircle(tx, ty, (10 + 80 * eo) * dp, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth((5f - 3.5f * b) * dp);
+                p.setColor(Color.argb((int) (220 * (1f - b)), 255, 255, 255));
+                cv.drawCircle(tx, ty, (14 + 130 * eo) * dp, p);
+                // debris
+                p.setStyle(Paint.Style.FILL);
+                for (int i = 0; i < ang.length; i++) {
+                    float d = spd[i] * dp * eo * 1.6f;
+                    float px = tx + (float) Math.cos(ang[i]) * d;
+                    float py = ty + (float) Math.sin(ang[i]) * d + 70 * dp * b * b;
+                    int c = col[i];
+                    p.setColor(Color.argb((int) (255 * (1f - b)), Color.red(c), Color.green(c), Color.blue(c)));
+                    cv.drawCircle(px, py, sz[i] * dp * (1f - 0.6f * b), p);
+                }
+                if (b >= 0.8f && !doneCalled) {
+                    doneCalled = true;
+                    final Runnable r = after;
+                    if (r != null) post(r);
+                }
+                if (b >= 1f) { active = false; return; }
+            }
+            postInvalidateOnAnimation();
+        }
+    }
+
     /** Yellow header: drifting clouds, shooting stars, flying rocket. */
     static final class Header extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final long t0 = System.nanoTime();
         private boolean running;
-        private long launchAt = -1;
-        private Runnable afterLaunch;
+        private boolean gone;
+        float lastCx, lastCy;
 
-        void launch(Runnable after) {
-            afterLaunch = after;
-            launchAt = System.nanoTime();
-            postInvalidateOnAnimation();
+        /** Rocket leaves the card: header stops drawing it, overlay takes over. Returns start point in window coords. */
+        float[] takeOff() {
+            gone = true;
+            int[] loc = new int[2];
+            getLocationInWindow(loc);
+            return new float[]{loc[0] + lastCx, loc[1] + lastCy};
         }
 
         Header(Context c) { super(c); }
@@ -226,79 +402,10 @@ final class UpdateDialog {
             float ease = 1f - (1f - enter) * (1f - enter) * (1f - enter);
             float hover = (float) Math.sin(t * 2.6f) * 4 * dp * enter;
             float cx = W / 2f + (float) Math.sin(t * 1.3f) * 2 * dp;
-            float L = 0f;
-            if (launchAt >= 0) {
-                L = Math.min(1f, (System.nanoTime() - launchAt) / 1e9f / 0.9f);
-                if (L >= 1f && afterLaunch != null) {
-                    final Runnable r = afterLaunch;
-                    afterLaunch = null;
-                    post(r);
-                }
-            }
-            float cy = H * 0.42f + (1f - ease) * 70 * dp + hover * (1f - L) - L * L * H * 1.5f;
-            float rw = 13 * dp, rh = 30 * dp;
-
-            // flame
-            float fl = (0.75f + 0.25f * (float) Math.sin(t * 28f)) * (1f + 2.2f * L);
-            path.reset();
-            path.moveTo(cx - rw * 0.45f, cy + rh * 0.55f);
-            path.quadTo(cx, cy + rh * (0.55f + 0.95f * fl), cx + rw * 0.45f, cy + rh * 0.55f);
-            path.close();
-            p.setColor(0xFFFF9A3C);
-            cv.drawPath(path, p);
-            path.reset();
-            path.moveTo(cx - rw * 0.22f, cy + rh * 0.55f);
-            path.quadTo(cx, cy + rh * (0.55f + 0.55f * fl), cx + rw * 0.22f, cy + rh * 0.55f);
-            path.close();
-            p.setColor(0xFFFFF2A8);
-            cv.drawPath(path, p);
-
-            // exhaust sparks falling away
-            for (int i = 0; i < 5; i++) {
-                float ph = ((t * 1.4f) + i * 0.2f) % 1f;
-                p.setColor(Color.argb((int) (190 * (1 - ph)), 255, 255, 255));
-                cv.drawCircle(cx + (i - 2) * 4 * dp, cy + rh * 0.9f + ph * 40 * dp, (2.6f - ph * 1.6f) * dp, p);
-            }
-
-            // fins
-            p.setColor(0xFFE4E7F2);
-            path.reset();
-            path.moveTo(cx - rw * 0.8f, cy + rh * 0.05f);
-            path.lineTo(cx - rw * 1.45f, cy + rh * 0.58f);
-            path.lineTo(cx - rw * 0.6f, cy + rh * 0.45f);
-            path.close();
-            cv.drawPath(path, p);
-            path.reset();
-            path.moveTo(cx + rw * 0.8f, cy + rh * 0.05f);
-            path.lineTo(cx + rw * 1.45f, cy + rh * 0.58f);
-            path.lineTo(cx + rw * 0.6f, cy + rh * 0.45f);
-            path.close();
-            cv.drawPath(path, p);
-
-            // body
-            p.setColor(Color.WHITE);
-            path.reset();
-            path.moveTo(cx, cy - rh * 0.62f);
-            path.cubicTo(cx + rw * 1.1f, cy - rh * 0.25f, cx + rw * 0.95f, cy + rh * 0.3f, cx + rw * 0.6f, cy + rh * 0.58f);
-            path.lineTo(cx - rw * 0.6f, cy + rh * 0.58f);
-            path.cubicTo(cx - rw * 0.95f, cy + rh * 0.3f, cx - rw * 1.1f, cy - rh * 0.25f, cx, cy - rh * 0.62f);
-            path.close();
-            cv.drawPath(path, p);
-            p.setColor(0xFFF0F2FA);
-            cv.drawRect(new RectF(cx + rw * 0.25f, cy - rh * 0.2f, cx + rw * 0.7f, cy + rh * 0.55f), p);
-            p.setColor(0xFFFFFFFF);
-            path.reset();
-            path.moveTo(cx, cy - rh * 0.62f);
-            path.cubicTo(cx + rw * 1.1f, cy - rh * 0.25f, cx + rw * 0.95f, cy + rh * 0.3f, cx + rw * 0.6f, cy + rh * 0.58f);
-            path.lineTo(cx + rw * 0.25f, cy + rh * 0.58f);
-            path.close();
-            // window
-            p.setColor(0xFFDDE3FF);
-            cv.drawCircle(cx, cy - rh * 0.08f, rw * 0.48f, p);
-            p.setColor(0xFF5B7BFF);
-            cv.drawCircle(cx, cy - rh * 0.08f, rw * 0.34f, p);
-            p.setColor(0xFF9DB1FF);
-            cv.drawCircle(cx - rw * 0.08f, cy - rh * 0.13f, rw * 0.12f, p);
+            float cy = H * 0.42f + (1f - ease) * 70 * dp + hover;
+            if (!gone) drawRocket(cv, p, path, cx, cy, dp, t, 1f);
+            lastCx = cx;
+            lastCy = cy;
 
             // wavy yellow edge at the bottom of the header
             p.setColor(0xFFFFCB3B);
