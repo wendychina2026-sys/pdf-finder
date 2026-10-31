@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Update card: yellow cloud header with a flying rocket, "ABOUT UPDATE" + version, numbered notes,
+ * Update card (download bar test build): yellow cloud header with a flying rocket, "ABOUT UPDATE" + version, numbered notes,
  * red "Update" pill. The rocket lifts off on open, then keeps hovering with a flickering flame.
  */
 final class UpdateDialog {
