@@ -35,4 +35,5 @@ android {
 dependencies {
     implementation("androidx.core:core:1.13.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

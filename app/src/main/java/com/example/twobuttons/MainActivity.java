@@ -160,6 +160,8 @@ public class MainActivity extends BaseActivity {
                 "Search cases by court, contact, date", SarthCaseListActivity.class), CaseViews.lp(this, 0, 10));
         col.addView(drawerRow(R.drawable.ic_court, "Manage Court",
                 "Add, rename, delete courts", ManageCourtActivity.class), CaseViews.lp(this, 0, 10));
+        col.addView(drawerRow(R.drawable.ic_share, "Transfer Files",
+                "Send or receive files with a QR code", TransferActivity.class), CaseViews.lp(this, 0, 10));
         col.addView(drawerRow(R.drawable.ic_lock, "Sign In",
                 "Sarth login screen (layout only)", SignInActivity.class), CaseViews.lp(this, 0, 10));
         return panel;
