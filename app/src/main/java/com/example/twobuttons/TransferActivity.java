@@ -39,6 +39,7 @@ import java.util.List;
 public class TransferActivity extends BaseActivity {
 
     private static final int REQ_PICK = 4101;
+    private static final int REQ_EXPLORER = 4102;
     private static final String PREFIX = "PDFFINDER";
 
     private LinearLayout root;
@@ -141,15 +142,9 @@ public class TransferActivity extends BaseActivity {
     // ------------------------------------------------------------------ giver
 
     private void pickFiles() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        try {
-            startActivityForResult(i, REQ_PICK);
-        } catch (Exception e) {
-            Toast.makeText(this, "No file picker found on this phone", Toast.LENGTH_LONG).show();
-        }
+        Intent i = new Intent(this, PhoneFilesActivity.class);
+        i.putExtra(PhoneFilesActivity.EXTRA_PICK, true);
+        startActivityForResult(i, REQ_EXPLORER);
     }
 
     private void showQr(List<TransferServer.Item> items) {
@@ -318,6 +313,18 @@ public class TransferActivity extends BaseActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_EXPLORER) {
+            if (resultCode != RESULT_OK || data == null) return;
+            ArrayList<String> paths = data.getStringArrayListExtra(PhoneFilesActivity.EXTRA_PATHS);
+            if (paths == null || paths.isEmpty()) return;
+            List<TransferServer.Item> chosen = new ArrayList<>();
+            for (String path : paths) {
+                File f = new File(path);
+                if (f.isFile()) chosen.add(new TransferServer.Item(Uri.fromFile(f), f.getName(), f.length()));
+            }
+            if (!chosen.isEmpty()) showQr(chosen);
+            return;
+        }
         if (requestCode == REQ_PICK) {
             if (resultCode != RESULT_OK || data == null) return;
             List<Uri> uris = new ArrayList<>();

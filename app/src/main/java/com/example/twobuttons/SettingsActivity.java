@@ -116,6 +116,18 @@ public class SettingsActivity extends BaseActivity {
         log.setOnClickListener(v -> startActivity(new Intent(this, ChangeLogActivity.class)));
         root.addView(log, CaseViews.lp(this, 8, 0));
 
+        LinearLayout phoneFiles = new LinearLayout(this);
+        phoneFiles.setOrientation(LinearLayout.VERTICAL);
+        phoneFiles.setGravity(Gravity.CENTER_VERTICAL);
+        phoneFiles.setPadding(CaseViews.dp(this, 16), CaseViews.dp(this, 14),
+                CaseViews.dp(this, 16), CaseViews.dp(this, 14));
+        phoneFiles.setBackground(CaseViews.box(this, AppTheme.card(this), 12, AppTheme.cardStroke(this), 1));
+        phoneFiles.addView(CaseViews.text(this, "File Explorer", 16, AppTheme.text(this), true));
+        phoneFiles.addView(CaseViews.text(this, "Browse the phone's music, videos, photos, apps, archives and documents.",
+                14, AppTheme.sub(this), false));
+        phoneFiles.setOnClickListener(v -> startActivity(new Intent(this, PhoneFilesActivity.class)));
+        root.addView(phoneFiles, CaseViews.lp(this, 8, 0));
+
         TextView bk = CaseViews.text(this, "Backup", 14, AppTheme.accent(this), true);
         bk.setPadding(0, CaseViews.dp(this, 24), 0, CaseViews.dp(this, 8));
         root.addView(bk);

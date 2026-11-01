@@ -138,7 +138,10 @@ public class NewCaseActivity extends BaseActivity {
     static final String EXTRA_UPLOAD_PDF = "upload_pdf";
     /** Intent extra: the Attach to Matter choice made in the marker (vault, saved case or Create new case). */
     static final String EXTRA_UPLOAD_MATTER = "upload_matter";
+    /** Intent extra: paths of the OTHER shared files (images / Word) that join the first one in the upload popup. */
+    static final String EXTRA_UPLOAD_EXTRA = "upload_extra";
     private String markerPdf = "";
+    private java.util.ArrayList<String> markerExtras = new java.util.ArrayList<>();
     private String markerMatter = "";
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
@@ -154,6 +157,8 @@ public class NewCaseActivity extends BaseActivity {
         if (getActionBar() != null) getActionBar().hide();
         String mp = getIntent().getStringExtra(EXTRA_UPLOAD_PDF);
         markerPdf = (mp == null || savedInstanceState != null) ? "" : mp;
+        java.util.ArrayList<String> mx = getIntent().getStringArrayListExtra(EXTRA_UPLOAD_EXTRA);
+        markerExtras = (mx == null || savedInstanceState != null) ? new java.util.ArrayList<>() : mx;
         String mm = getIntent().getStringExtra(EXTRA_UPLOAD_MATTER);
         markerMatter = (mm == null || savedInstanceState != null) ? "" : mm;
         store = new DiaryStore(this);
@@ -1041,6 +1046,8 @@ public class NewCaseActivity extends BaseActivity {
         markerPdf = "";
         final String markerMatterPick = markerMatter;
         markerMatter = "";
+        final java.util.ArrayList<String> extraPaths = markerExtras;
+        markerExtras = new java.util.ArrayList<>();
         final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
         final boolean fromMarker = marked != null && marked.isFile();
         // only a PDF coming from the Category marker had a matter chosen there; a shared image / Word file did not
@@ -1051,6 +1058,14 @@ public class NewCaseActivity extends BaseActivity {
             Uri mu = PhotoFlow.uri(this, marked);
             dlgUris.add(mu);
             markerFiles.put(mu.toString(), markerPath);
+            for (String xp : extraPaths) {          // every other file shared together with the first
+                java.io.File xf = new java.io.File(xp);
+                if (!xf.isFile()) continue;
+                Uri xu = PhotoFlow.uri(this, xf);
+                if (dlgUris.contains(xu)) continue;
+                dlgUris.add(xu);
+                markerFiles.put(xu.toString(), xp);
+            }
         }
         replaceIdx = -1;
         dlgReplaceIdx = -1;

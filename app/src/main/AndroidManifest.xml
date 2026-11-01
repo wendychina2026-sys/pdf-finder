@@ -155,5 +155,6 @@
         <activity android:name=".ManageCourtActivity" android:exported="false" />
         <activity android:name=".SignInActivity" android:exported="false" />
         <activity android:name=".TransferActivity" android:exported="false" />
+        <activity android:name=".PhoneFilesActivity" android:exported="false" />
     </application>
 </manifest>

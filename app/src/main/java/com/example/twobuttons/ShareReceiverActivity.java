@@ -102,7 +102,7 @@ public class ShareReceiverActivity extends Activity {
             openMarker(first);
         } else {
             if (wordCount > 1) {
-                Toast.makeText(this, wordCount + " files saved. Opening the first; the rest are in the Documents folder.",
+                Toast.makeText(this, wordCount + " files saved. All of them open in one upload box.",
                         Toast.LENGTH_LONG).show();
             }
             // a Word file or image has no pages to mark: new document, or attach to a document already in the Vault
@@ -110,7 +110,7 @@ public class ShareReceiverActivity extends Activity {
                 askNewOrAttach(words, false);
                 return;                 // finishes after the choice
             }
-            openNew(firstWord);
+            openNew(words);
         }
         finish();
     }
@@ -122,12 +122,17 @@ public class ShareReceiverActivity extends Activity {
         startActivity(i);
     }
 
-    /** Upload Legal Document popup: the shared file becomes a NEW document. */
-    private void openNew(File f) { openNew(f, null); }
+    /** Upload Legal Document popup: the shared files become ONE new document (all of them, in the order shared). */
+    private void openNew(ArrayList<File> files) { openNew(files, null); }
 
-    private void openNew(File f, String matter) {
+    private void openNew(ArrayList<File> files, String matter) {
         Intent i = new Intent(this, NewCaseActivity.class);
-        i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, f.getAbsolutePath());
+        i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, files.get(0).getAbsolutePath());
+        if (files.size() > 1) {
+            ArrayList<String> rest = new ArrayList<>();
+            for (int k = 1; k < files.size(); k++) rest.add(files.get(k).getAbsolutePath());
+            i.putStringArrayListExtra(NewCaseActivity.EXTRA_UPLOAD_EXTRA, rest);
+        }
         if (matter != null) i.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, matter);
         startActivity(i);
     }
@@ -151,7 +156,7 @@ public class ShareReceiverActivity extends Activity {
         PickerDialogs.optionSheet(this, "Shared file",
                 files.size() + (files.size() == 1 ? " file" : " files"), items, -1, which -> {
                     if (which == 0) {
-                        if (pdf) openMarker(files.get(0)); else openNew(files.get(0));
+                        if (pdf) openMarker(files.get(0)); else openNew(files);
                         finish();
                     } else if (which == 1) pickCase(files, pdf);
                     else pickDocument(files, pdf);
@@ -178,7 +183,7 @@ public class ShareReceiverActivity extends Activity {
                                 .putString(f.getAbsolutePath(), matter).apply();
                         openMarker(f);
                     } else {
-                        openNew(f, matter);
+                        openNew(files, matter);
                     }
                     finish();
                 }, () -> askNewOrAttach(files, pdf));
