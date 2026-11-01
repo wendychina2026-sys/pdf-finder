@@ -147,6 +147,18 @@ public class NewCaseActivity extends BaseActivity {
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
     /** Uris of documents saved with "Create new case": they join this case when it is created. */
     private final List<String> pendingNewCaseDocs = new ArrayList<>();
+    /** Lead file of the latest card saved to the General Document Vault from this page: Additional details > Notes is that card's note. */
+    private String vaultCardPath = "";
+
+    /** Copies the Notes box of this page into the note of the Vault card saved here (the card's own Notes icon shows it). */
+    private void mirrorNoteToVaultCard() {
+        if (vaultCardPath.isEmpty() || notesEdit == null) return;
+        String v = LegalUi.str(notesEdit);
+        android.content.SharedPreferences.Editor e = getSharedPreferences("doc_notes", MODE_PRIVATE).edit();
+        if (v.isEmpty()) e.remove("card:" + vaultCardPath);
+        else e.putString("card:" + vaultCardPath, v);
+        e.apply();
+    }
     private LinearLayout uploadCardView;
     private static final String MULTIPLE = "Multiple";
     private static final String CREATE_NEW_CASE = "Create new case";
@@ -934,6 +946,11 @@ public class NewCaseActivity extends BaseActivity {
         priority = LegalUi.spinner(this, f4, "Priority", PRIORITIES, PRIORITIES[0]);
         notesEdit = LegalUi.multiline(this, f4, "Notes", "");
         notesEdit.setMinLines(3);
+        notesEdit.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence cs, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence cs, int a, int b, int c) { }
+            @Override public void afterTextChanged(android.text.Editable ed) { mirrorNoteToVaultCard(); }
+        });
         extra.addView(section(R.drawable.ic_edit, "Notes & other details",
                 "Priority, notes and sub type", f4));
 
@@ -1547,6 +1564,11 @@ public class NewCaseActivity extends BaseActivity {
             d.date = today;
             ls.saveDoc(d);
             if (newCase) pendingNewCaseDocs.add(d.uri);
+            if (matterSel[0].equals(general)) {
+                String lead = markerFiles.get(first.toString());
+                vaultCardPath = lead == null ? "" : lead;
+                mirrorNoteToVaultCard();            // Notes already typed on this page belong to the card just saved
+            }
             if (matterSel[0].equals(general)) { vaultSaved = true; missing(); relaxRequiredLabels(findViewById(android.R.id.content)); }
             dlgUris.clear();
             renderFiles();

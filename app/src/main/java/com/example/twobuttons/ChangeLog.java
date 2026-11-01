@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("1 Nov 2026", "New Case Notes now fill the Vault card note",
+            "When a document is saved to the General Document Vault from the New Case page, whatever is written in Additional details > Notes becomes that card's own note (notes icon on the card).",
+            "It works whether the notes are typed before or after Save to Vault, and keeps following the box while the page is open. With more than one card saved in the same visit, the latest card gets the note.",
+            "Notes written for a real case still go to the case as before."),
         new Entry("1 Nov 2026", "View as one PDF on multi-file cards",
             "Document Vault, Document Library and New Case upload list: a card that holds several files (images, PDFs) now has a \"View as one PDF\" button under its action row.",
             "It joins every file of that card, in the saved order, into a single PDF (PDF pages are copied as they are, each image becomes one page) and opens it. Word files cannot be made into pages and are left out, with a message.",
