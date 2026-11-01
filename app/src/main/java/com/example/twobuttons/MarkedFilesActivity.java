@@ -811,6 +811,17 @@ public class MarkedFilesActivity extends BaseActivity {
                         which -> openMarker(grp.get(which).path, null, null));
             };
             act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
+            if (!it.extras.isEmpty()) act.viewPdf = () -> {
+                List<android.net.Uri> us = new ArrayList<>();
+                try {
+                    us.add(PhotoFlow.uri(c, new File(it.path)));
+                    for (Item g : it.extras) us.add(PhotoFlow.uri(c, new File(g.path)));
+                } catch (Exception e) {
+                    android.widget.Toast.makeText(c, "Cannot read these files", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                DocFileCard.viewAsOnePdf(c, us, DocFileCard.stem(info.name));
+            };
             act.edit = () -> editItem(it);
             act.notes = () -> editCardNotes(it);
             act.add = () -> addFiles(it);

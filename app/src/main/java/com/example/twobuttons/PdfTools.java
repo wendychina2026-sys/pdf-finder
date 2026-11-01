@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
+import com.tom_roush.pdfbox.io.MemoryUsageSetting;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.pdmodel.PDPage;
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream;
@@ -19,6 +20,8 @@ import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -108,6 +111,86 @@ final class PdfTools {
             doc.save(out);
         } finally {
             if (doc != null) doc.close();
+        }
+        return out;
+    }
+
+    /** A readable copy of a picked file in the cache folder (null if it cannot be read). */
+    private static File cacheCopy(Context c, Uri u, String ext) {
+        try (InputStream in = c.getContentResolver().openInputStream(u)) {
+            if (in == null) return null;
+            File dir = new File(c.getCacheDir(), "merge_tmp");
+            dir.mkdirs();
+            File t = File.createTempFile("part_", ext, dir);
+            try (OutputStream out = new java.io.FileOutputStream(t)) {
+                byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            }
+            return t;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Every file of a document in its saved order as ONE PDF: PDF pages are copied as they are, each image
+     * becomes one page. Word files cannot be turned into pages here and are skipped (counted in skipped[0]).
+     * Written to the cache folder; run off the main thread.
+     */
+    static File mergeToPdf(Context c, List<Uri> files, String title, int[] skipped) throws IOException {
+        PDFBoxResourceLoader.init(c.getApplicationContext());
+        File dir = new File(c.getCacheDir(), "merged");
+        dir.mkdirs();
+        String base = title == null ? "" : title.replaceAll("[^A-Za-z0-9 _-]", "_").trim();
+        if (base.isEmpty()) base = "Document";
+        File out = new File(dir, base + "_one_PDF.pdf");
+        List<File> temps = new ArrayList<>();
+        List<PDDocument> sources = new ArrayList<>();
+        PDDocument dst = new PDDocument();
+        try {
+            List<File> pendingImages = new ArrayList<>();
+            for (Uri u : files) {
+                String name = fileName(c, u);
+                int k = DocFileCard.kind(name);
+                if (k == 3) {
+                    String t = c.getContentResolver().getType(u);
+                    if (t != null && t.equals("application/pdf")) k = 0;
+                    else if (t != null && t.startsWith("image/")) k = 2;
+                }
+                if (k == 2) {
+                    File t = cacheCopy(c, u, ".img");
+                    if (t == null) { if (skipped != null) skipped[0]++; continue; }
+                    temps.add(t);
+                    pendingImages.add(t);
+                } else if (k == 0) {
+                    addImagePages(dst, pendingImages);      // keep the saved order: images before this PDF first
+                    pendingImages.clear();
+                    File t = cacheCopy(c, u, ".pdf");
+                    if (t == null) { if (skipped != null) skipped[0]++; continue; }
+                    temps.add(t);
+                    PDDocument src = PDDocument.load(t, MemoryUsageSetting.setupTempFileOnly());
+                    sources.add(src);                      // stays open until dst is saved (pages share its data)
+                    for (int p = 0; p < src.getNumberOfPages(); p++) {
+                        com.tom_roush.pdfbox.pdmodel.PDPage original = src.getPage(p);
+                        com.tom_roush.pdfbox.pdmodel.PDPage copy = dst.importPage(original);
+                        copy.setResources(original.getResources());
+                        copy.setMediaBox(original.getMediaBox());
+                        copy.setRotation(original.getRotation());
+                    }
+                } else if (skipped != null) {
+                    skipped[0]++;
+                }
+            }
+            addImagePages(dst, pendingImages);
+            if (dst.getNumberOfPages() == 0) throw new IOException("no pages");
+            dst.save(out);
+        } finally {
+            try { dst.close(); } catch (Exception ignored) { }
+            for (PDDocument d : sources) {
+                try { d.close(); } catch (Exception ignored) { }
+            }
+            for (File t : temps) t.delete();
         }
         return out;
     }

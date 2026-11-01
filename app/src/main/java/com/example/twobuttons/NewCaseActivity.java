@@ -2016,6 +2016,7 @@ public class NewCaseActivity extends BaseActivity {
             act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(idx))
                     : () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
             act.files = () -> manageFiles(idx);
+            if (grp) act.viewPdf = () -> DocFileCard.viewAsOnePdf(this, groupOf(idx), DocFileCard.stem(pickedNames.get(idx)));
             act.edit = () -> editPicked(idx);
             act.replace = () -> PickerDialogs.confirm(this, "Replace file?",
                     "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",

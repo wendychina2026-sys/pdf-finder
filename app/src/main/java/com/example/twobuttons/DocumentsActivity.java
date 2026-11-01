@@ -184,6 +184,7 @@ public class DocumentsActivity extends BaseActivity {
         act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(d))
                 : () -> DocFileCard.share(this, uri, d.name);
         act.files = () -> manageFiles(d);
+        if (grp) act.viewPdf = () -> DocFileCard.viewAsOnePdf(this, groupOf(d), DocFileCard.stem(d.name));
         act.edit = () -> editSaved(d);
         act.replace = () -> LegalUi.confirm(this, "Replace " + d.name + "?",
                 "The stored file will be swapped for the one you pick.", () -> {

@@ -18,6 +18,10 @@ final class ChangeLog {
     private ChangeLog() {}
 
     static final Entry[] ENTRIES = {
+        new Entry("1 Nov 2026", "View as one PDF on multi-file cards",
+            "Document Vault, Document Library and New Case upload list: a card that holds several files (images, PDFs) now has a \"View as one PDF\" button under its action row.",
+            "It joins every file of that card, in the saved order, into a single PDF (PDF pages are copied as they are, each image becomes one page) and opens it. Word files cannot be made into pages and are left out, with a message.",
+            "The joined PDF is only a temporary copy for viewing; your saved files are not changed."),
         new Entry("28 Oct 2026", "Check for update from GitHub; new splash screen",
             "Settings > App > Check for update: looks on GitHub for a newer build, downloads it and opens the installer. Shows \"Up to date\" when nothing is newer.",
             "Splash screen: new Lady Justice court scene, faster animation.",

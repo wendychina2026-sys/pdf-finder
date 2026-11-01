@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Locale;
@@ -44,6 +45,7 @@ final class DocFileCard {
 
     static final class Actions {
         Runnable open, save, edit, replace, share, delete, files, details, path, add, notes;
+        Runnable viewPdf;       // several files on this card: "View as one PDF" button under the action row
     }
 
     static final int PDF_RED = 0xFFE5484D, WORD_BLUE = 0xFF3B82F6, IMG_GREEN = 0xFF22C55E;
@@ -250,6 +252,13 @@ final class DocFileCard {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         rlp.topMargin = dp(a, 8);
         card.addView(row, rlp);
+        if (act.viewPdf != null) {
+            LinearLayout vb = (LinearLayout) labelBtn(a, R.drawable.ic_pdf, PDF_RED, "View as one PDF", act.viewPdf);
+            LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(a, 36));
+            vlp.topMargin = dp(a, 8);
+            card.addView(vb, vlp);
+        }
         return card;
     }
 
@@ -386,6 +395,38 @@ final class DocFileCard {
         } catch (Exception e) {
             Toast.makeText(a, "Cannot share these files", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** "View as one PDF": all files of a card (images and PDFs, in saved order) joined into one PDF and opened. */
+    static void viewAsOnePdf(final Activity a, final java.util.List<Uri> files, final String title) {
+        if (files == null || files.isEmpty()) {
+            Toast.makeText(a, "File not stored on this device", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(a, "Making one PDF\u2026", Toast.LENGTH_SHORT).show();
+        final java.util.List<Uri> copy = new java.util.ArrayList<>(files);
+        new Thread(() -> {
+            final int[] skipped = new int[1];
+            File out = null;
+            try {
+                out = PdfTools.mergeToPdf(a, copy, title, skipped);
+            } catch (Throwable e) {
+                out = null;
+            }
+            final File res = out;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing()) return;
+                if (res == null) {
+                    Toast.makeText(a, "Could not make one PDF from these files", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (skipped[0] > 0) {
+                    Toast.makeText(a, skipped[0] + (skipped[0] == 1 ? " Word / other file" : " Word / other files")
+                            + " left out (cannot be made into PDF pages)", Toast.LENGTH_LONG).show();
+                }
+                open(a, PhotoFlow.uri(a, res), res.getName());
+            });
+        }).start();
     }
 
     /** Ask where to save a copy; call finishSave from onActivityResult(req). */
