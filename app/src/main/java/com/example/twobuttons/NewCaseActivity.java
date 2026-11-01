@@ -1241,29 +1241,96 @@ public class NewCaseActivity extends BaseActivity {
                 ready.setGravity(Gravity.CENTER);
                 ready.setPadding(0, dp(6), 0, dp(4));
                 drop.addView(ready);
+                if (dlgUris.size() > 1) {
+                    TextView orderHint = CaseViews.text(this, "Touch and hold a file, then drag it up or down to change the order",
+                            11, AppTheme.sub(this), false);
+                    orderHint.setGravity(Gravity.CENTER);
+                    orderHint.setPadding(0, 0, 0, dp(6));
+                    drop.addView(orderHint);
+                }
                 for (int fi = 0; fi < dlgUris.size(); fi++) {
                     final int idx = fi;
                     final String fname = displayName(dlgUris.get(fi));
                     final int kind = DocFileCard.kind(fname);
-                    LinearLayout nameRow = new LinearLayout(this);
-                    nameRow.setOrientation(LinearLayout.HORIZONTAL);
-                    nameRow.setGravity(Gravity.CENTER);
-                    nameRow.setPadding(0, dp(fi == 0 ? 4 : 14), 0, dp(2));
-                    nameRow.addView(CaseViews.icon(this, DocFileCard.kindIcon(kind), DocFileCard.kindColor(this, kind), 22));
-                    TextView t1 = CaseViews.text(this, fname, 13.5f, AppTheme.text(this), true);
+                    final LinearLayout fileCard = new LinearLayout(this);
+                    fileCard.setOrientation(LinearLayout.VERTICAL);
+                    fileCard.setPadding(dp(10), dp(10), dp(10), dp(10));
+                    fileCard.setBackground(dlgCardBg(false));
+                    LinearLayout topRow = new LinearLayout(this);
+                    topRow.setOrientation(LinearLayout.HORIZONTAL);
+                    topRow.setGravity(Gravity.CENTER_VERTICAL);
+                    ImageView thumbView = new ImageView(this);
+                    thumbView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    android.graphics.drawable.GradientDrawable thumbBg = new android.graphics.drawable.GradientDrawable();
+                    thumbBg.setCornerRadius(dp(10));
+                    thumbBg.setColor(AppTheme.card(this));
+                    thumbView.setBackground(thumbBg);
+                    thumbView.setClipToOutline(true);
+                    dlgThumb(thumbView, dlgUris.get(fi), kind);
+                    topRow.addView(thumbView, new LinearLayout.LayoutParams(dp(72), dp(72)));
+                    LinearLayout infoCol = new LinearLayout(this);
+                    infoCol.setOrientation(LinearLayout.VERTICAL);
+                    infoCol.setPadding(dp(12), 0, 0, 0);
+                    TextView t1 = CaseViews.text(this, (fi + 1) + ".  " + fname, 13.5f, AppTheme.text(this), true);
                     t1.setSingleLine(true);
                     t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-                    t1.setPadding(dp(8), 0, 0, 0);
-                    nameRow.addView(t1, new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                    drop.addView(nameRow, new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    infoCol.addView(t1);
                     String sz = sizeText(fileSize(dlgUris.get(fi)));
                     TextView t2 = CaseViews.text(this, DocFileCard.kindLabel(kind, fname) + (sz.isEmpty() ? "" : "  \u2022  " + sz),
                             11, AppTheme.sub(this), false);
-                    t2.setGravity(Gravity.CENTER);
-                    t2.setPadding(0, 0, 0, dp(8));
-                    drop.addView(t2);
+                    t2.setPadding(0, dp(3), 0, 0);
+                    infoCol.addView(t2);
+                    topRow.addView(infoCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                    fileCard.addView(topRow, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    LinearLayout.LayoutParams fileCardLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    fileCardLp.topMargin = dp(fi == 0 ? 4 : 10);
+                    // touch and hold = pick the file up; drop it on another file to put it in that place
+                    final View.OnLongClickListener pickUp = pv -> {
+                        if (dlgUris.size() < 2) return false;
+                        dlgDragFrom = idx;
+                        pv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                        View src = fileCard;
+                        src.startDragAndDrop(ClipData.newPlainText("file", String.valueOf(idx)),
+                                new View.DragShadowBuilder(src), null, 0);
+                        return true;
+                    };
+                    fileCard.setOnLongClickListener(pickUp);
+                    topRow.setOnLongClickListener(pickUp);
+                    fileCard.setOnDragListener((dv, ev) -> {
+                        switch (ev.getAction()) {
+                            case android.view.DragEvent.ACTION_DRAG_STARTED:
+                                if (idx == dlgDragFrom) dv.setAlpha(0.35f);
+                                return true;
+                            case android.view.DragEvent.ACTION_DRAG_ENTERED:
+                                if (idx != dlgDragFrom) dv.setBackground(dlgCardBg(true));
+                                return true;
+                            case android.view.DragEvent.ACTION_DRAG_EXITED:
+                                dv.setBackground(dlgCardBg(false));
+                                return true;
+                            case android.view.DragEvent.ACTION_DRAG_LOCATION:
+                                dlgAutoScroll(dv, ev.getY());
+                                return true;
+                            case android.view.DragEvent.ACTION_DROP: {
+                                int from = dlgDragFrom;
+                                dlgDragFrom = -1;
+                                if (from >= 0 && from < dlgUris.size() && from != idx) {
+                                    Uri dragged = dlgUris.remove(from);
+                                    dlgUris.add(Math.min(idx, dlgUris.size()), dragged);
+                                    dv.post(() -> dlgRefresh.run());
+                                }
+                                return true;
+                            }
+                            case android.view.DragEvent.ACTION_DRAG_ENDED:
+                                dv.setAlpha(1f);
+                                dv.setBackground(dlgCardBg(false));
+                                return true;
+                            default:
+                                return true;
+                        }
+                    });
+                    drop.addView(fileCard, fileCardLp);
                     LinearLayout btns = new LinearLayout(this);
                     btns.setOrientation(LinearLayout.HORIZONTAL);
                     btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> openUri(dlgUris.get(idx))),
@@ -1286,7 +1353,7 @@ public class NewCaseActivity extends BaseActivity {
                                         dlgUris.remove(idx);
                                         dlgRefresh.run();
                                     })), dlgBtnLp(true));
-                    drop.addView(btns, new LinearLayout.LayoutParams(
+                    fileCard.addView(btns, new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     if (kind == 0) {       // PDF: reopen it to delete pages or add photos
                         View pages = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit pages (add / remove)", () ->
@@ -1297,7 +1364,7 @@ public class NewCaseActivity extends BaseActivity {
                         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                         plp.topMargin = dp(8);
-                        drop.addView(pages, plp);
+                        fileCard.addView(pages, plp);
                     }
                 }
                 // more files / photos into the SAME group, before saving
@@ -1550,6 +1617,101 @@ public class NewCaseActivity extends BaseActivity {
             } catch (Exception ignored) { }
         }
         return out;
+    }
+
+    private int dlgDragFrom = -1;
+    private final java.util.Map<String, android.graphics.Bitmap> dlgThumbs = new java.util.HashMap<>();
+
+    private android.graphics.drawable.GradientDrawable dlgCardBg(boolean hot) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setCornerRadius(dp(12));
+        g.setColor(hot ? (AppTheme.accent(this) & 0x00FFFFFF) | 0x22000000 : 0x00000000);
+        g.setStroke(dp(hot ? 2 : 1), hot ? AppTheme.accent(this) : AppTheme.cardStroke(this));
+        return g;
+    }
+
+    /** While a file is being dragged: scroll the dialog when the finger is near its top or bottom edge. */
+    private void dlgAutoScroll(View card, float yInCard) {
+        android.view.ViewParent p = card.getParent();
+        while (p != null && !(p instanceof ScrollView)) p = p.getParent();
+        if (p == null) return;
+        ScrollView sc = (ScrollView) p;
+        int[] a = new int[2];
+        int[] b = new int[2];
+        card.getLocationOnScreen(a);
+        sc.getLocationOnScreen(b);
+        float rel = a[1] + yInCard - b[1];
+        if (rel < dp(80)) sc.scrollBy(0, -dp(16));
+        else if (rel > sc.getHeight() - dp(80)) sc.scrollBy(0, dp(16));
+    }
+
+    /** Small preview of a chosen file: the picture itself, the first page of a PDF, or the file-type icon. */
+    private void dlgThumb(final ImageView iv, final Uri u, final int kind) {
+        final String key = u.toString();
+        android.graphics.Bitmap cached = dlgThumbs.get(key);
+        if (cached != null) {
+            iv.setImageBitmap(cached);
+            return;
+        }
+        iv.setPadding(dp(20), dp(20), dp(20), dp(20));
+        iv.setImageResource(DocFileCard.kindIcon(kind));
+        iv.setColorFilter(DocFileCard.kindColor(this, kind), android.graphics.PorterDuff.Mode.SRC_IN);
+        if (kind != 0 && kind != 2) return;
+        new Thread(() -> {
+            android.graphics.Bitmap bmp = null;
+            try {
+                if (kind == 2) {
+                    android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+                    o.inJustDecodeBounds = true;
+                    try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+                        android.graphics.BitmapFactory.decodeStream(is, null, o);
+                    }
+                    int sample = 1;
+                    while (o.outWidth / (sample * 2) >= 260 && o.outHeight / (sample * 2) >= 260) sample *= 2;
+                    android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+                    o2.inSampleSize = sample;
+                    try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+                        bmp = android.graphics.BitmapFactory.decodeStream(is, null, o2);
+                    }
+                    int rot = 0;
+                    try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+                        int ori = new android.media.ExifInterface(is).getAttributeInt(
+                                android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+                        rot = ori == android.media.ExifInterface.ORIENTATION_ROTATE_90 ? 90
+                                : ori == android.media.ExifInterface.ORIENTATION_ROTATE_180 ? 180
+                                : ori == android.media.ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+                    } catch (Exception ignored) { }
+                    if (bmp != null && rot != 0) {
+                        android.graphics.Matrix m = new android.graphics.Matrix();
+                        m.postRotate(rot);
+                        bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+                    }
+                } else {
+                    try (android.os.ParcelFileDescriptor pf = getContentResolver().openFileDescriptor(u, "r");
+                         android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+                        if (pr.getPageCount() > 0) {
+                            android.graphics.pdf.PdfRenderer.Page pg = pr.openPage(0);
+                            int w = 260;
+                            int h = Math.max(1, w * pg.getHeight() / Math.max(1, pg.getWidth()));
+                            bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+                            bmp.eraseColor(0xFFFFFFFF);
+                            pg.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                            pg.close();
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {
+                bmp = null;
+            }
+            final android.graphics.Bitmap done = bmp;
+            if (done == null) return;
+            runOnUiThread(() -> {
+                dlgThumbs.put(key, done);
+                iv.setPadding(0, 0, 0, 0);
+                iv.clearColorFilter();
+                iv.setImageBitmap(done);
+            });
+        }, "dlg-thumb").start();
     }
 
     /** Small labelled button (icon + text) used under a chosen file in the upload dialog. */
