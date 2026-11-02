@@ -18,6 +18,15 @@ import java.util.ArrayList;
  *  into app storage and opens it in the Category marker. */
 public class ShareReceiverActivity extends Activity {
 
+    private final PhotoFlow flow = new PhotoFlow(this, 64);
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (FileSetDialog.handle(this, req, res, data)) return;
+        flow.handle(req, res);
+    }
+
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -197,8 +206,69 @@ public class ShareReceiverActivity extends Activity {
             items.add(d.name + "  \u2022  " + m + "  \u2022  " + d.category
                     + (d.more.isEmpty() ? "" : "  \u2022  " + (1 + d.more.size()) + " files"));
         }
-        PickerDialogs.optionSheet(this, "Add to which document?", "These files will join that document's card", items, -1,
-                which -> attach(files, docs.get(which), pdf), () -> askNewOrAttach(files, pdf));
+        final java.util.Map<String, LegalStore.Doc> byLabel = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < docs.size(); i++) {
+            String label = items.get(i);
+            if (byLabel.containsKey(label)) label = label + "  (" + (i + 1) + ")";
+            byLabel.put(label, docs.get(i));
+        }
+        PickerDialogs.searchSheet(this, "Add to which document?", "Search by name, case or category",
+                new ArrayList<>(byLabel.keySet()), null, null, null, null,
+                label -> manageThenAttach(files, byLabel.get(label), pdf),
+                () -> askNewOrAttach(files, pdf));
+    }
+
+    /** Image / Word share: ONE box with the card's current files + the new ones, so they can be reordered / removed first. */
+    private void manageThenAttach(final ArrayList<File> files, final LegalStore.Doc d, final boolean pdf) {
+        if (pdf) { attach(files, d, true); return; }
+        final java.util.List<Uri> all = new ArrayList<>();
+        if (d.uri != null && !d.uri.isEmpty()) all.add(Uri.parse(d.uri));
+        for (String x : d.more) all.add(Uri.parse(x));
+        final java.util.Map<String, File> incoming = new java.util.HashMap<>();
+        for (File f : files) {
+            Uri u = PhotoFlow.uri(this, f);
+            incoming.put(u.toString(), f);
+            all.add(u);
+        }
+        final boolean[] saved = {false};
+        FileSetDialog.show(this, flow, "Files in \"" + d.name + "\"", all, list -> {
+            saved[0] = true;
+            attachOrdered(list, incoming, d);
+        }, () -> { if (!saved[0]) askNewOrAttach(files, pdf); });
+    }
+
+    /** Saves the card with the files in the order chosen in the box; new files move into the Documents folder. */
+    private void attachOrdered(java.util.List<Uri> list, java.util.Map<String, File> incoming, LegalStore.Doc d) {
+        LegalStore ls = new LegalStore(this);
+        MarkStore ms = new MarkStore(this);
+        String m = d.caseName == null ? "" : d.caseName.trim();
+        boolean general = m.isEmpty() || m.equals("[]") || m.equals("General Document Vault");
+        java.util.List<Uri> finalList = new ArrayList<>();
+        int added = 0;
+        for (Uri u : list) {
+            File f = incoming.get(u.toString());
+            if (f == null) { finalList.add(u); continue; }
+            File moved = DataFolder.moveIntoDocuments(this, f);
+            if (moved == null) continue;
+            finalList.add(PhotoFlow.uri(this, moved));
+            String path = moved.getAbsolutePath();
+            if (general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
+                    && !d.category.equals("Multiple")) {
+                ms.set(path, 0, d.category);
+            }
+            added++;
+        }
+        if (finalList.isEmpty()) { finish(); return; }
+        d.uri = finalList.get(0).toString();
+        d.more.clear();
+        for (int k = 1; k < finalList.size(); k++) d.more.add(finalList.get(k).toString());
+        d.size = FileSetDialog.totalSize(this, finalList);
+        d.fileName = FileSetDialog.label(this, finalList);
+        ls.saveDoc(d);
+        Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
+                Toast.LENGTH_LONG).show();
+        startActivity(new Intent(this, DocumentsActivity.class));
+        finish();
     }
 
     /** The shared files join the chosen document: same card, same name / category / stage / matter. */

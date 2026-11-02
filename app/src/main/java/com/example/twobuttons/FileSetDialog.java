@@ -74,6 +74,11 @@ final class FileSetDialog {
     }
 
     static void show(final Activity a, final PhotoFlow flow, String title, List<Uri> start, final Done done) {
+        show(a, flow, title, start, done, null);
+    }
+
+    static void show(final Activity a, final PhotoFlow flow, String title, List<Uri> start, final Done done,
+                     final Runnable onClosed) {
         final List<Uri> files = new ArrayList<>(start);
         final LinearLayout body = new LinearLayout(a);
         body.setOrientation(LinearLayout.VERTICAL);
@@ -166,7 +171,11 @@ final class FileSetDialog {
             }
             done.save(new ArrayList<>(files));
             return true;
-        }, () -> { curFiles = null; pendRedraw = null; });
+        }, () -> {
+            curFiles = null;
+            pendRedraw = null;
+            if (onClosed != null) onClosed.run();
+        });
     }
 
     private static void source(final Activity a, final PhotoFlow flow) {
