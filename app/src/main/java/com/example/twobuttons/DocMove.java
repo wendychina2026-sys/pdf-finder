@@ -38,7 +38,7 @@ final class DocMove {
         String curCat = cats.size() == 1 ? cats.iterator().next() : (cats.isEmpty() ? doc.category : "");
 
         LinearLayout form = LegalUi.form(a);
-        TextView hint = CaseViews.text(a, "Only THIS file changes. If its category, stage or matter differs from the card, "
+        TextView hint = CaseViews.text(a, "This MOVES the file. If its category, stage or matter differs from the card, "
                 + "it moves to the matching card (or a new one). Nothing is deleted.", 11, AppTheme.sub(a), false);
         hint.setPadding(0, 0, 0, CaseViews.dp(a, 6));
         form.addView(hint);
@@ -134,6 +134,74 @@ final class DocMove {
             target.size = FileSetDialog.totalSize(a, files);
             ls.saveDoc(target);
             done(a, after, "File moved to its own card");
+            return true;
+        }, null);
+    }
+
+
+    /**
+     * Edit ONE file and KEEP it in its card: change its name, category, stage and matter in place.
+     * Nothing moves. (Stage is a card-level field, so a changed stage applies to the whole card.)
+     */
+    static void showHere(final Activity a, final String path, final String currentLabel, final Runnable after) {
+        final LegalStore ls = new LegalStore(a);
+        final LegalStore.Doc doc = DocEdit.docFor(a, path);
+        if (doc == null) { DocEdit.show(a, path, after); return; }
+        final MarkStore store = new MarkStore(a);
+        final Map<Integer, String> marks = store.all(path);
+        final boolean pdf = path.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
+
+        java.util.Set<String> cats = new java.util.TreeSet<>(marks.values());
+        String curCat = cats.size() == 1 ? cats.iterator().next() : (cats.isEmpty() ? doc.category : "");
+
+        LinearLayout form = LegalUi.form(a);
+        TextView hint = CaseViews.text(a, "This file STAYS in its card. Only its name, category, stage and matter change. "
+                + "(Stage is shared by the whole card.)", 11, AppTheme.sub(a), false);
+        hint.setPadding(0, 0, 0, CaseViews.dp(a, 6));
+        form.addView(hint);
+        final android.widget.EditText nameEt = LegalUi.text(a, form, "File name / caption", currentLabel);
+        final CategoryPicker cp = new CategoryPicker(a, form, curCat);
+        final MatterPicker mpk = new MatterPicker(a, form, DocEdit.matterOf(a, path), doc.stage, false);
+        if (cats.size() > 1) {
+            TextView w = CaseViews.text(a, "This PDF has pages in different categories. Picking one sets ALL its marked pages "
+                    + "to it; leave the category empty to keep the page categories.", 11, AppTheme.sub(a), false);
+            w.setPadding(0, CaseViews.dp(a, 4), 0, 0);
+            form.addView(w);
+        }
+
+        LegalUi.formDialog(a, "Edit file (stays in this card)", form, () -> {
+            if (!LegalUi.need(a, nameEt, "File name")) return false;
+            if (!mpk.valid()) return false;
+            String cat = norm(cp.get());
+            final boolean keepPages = cat.isEmpty() && cats.size() > 1;
+            if (cat.isEmpty() && !keepPages) cat = "Other";
+            final String matter = vaultName(mpk.matter());
+            final String stage = norm(mpk.stage());
+
+            FileCaption.set(a, path, LegalUi.str(nameEt));
+            if (!keepPages) {
+                List<Integer> pages = new ArrayList<>(marks.keySet());
+                if (pages.isEmpty()) {
+                    if (pdf) { int pc = DocEdit.pageCount(new File(path)); for (int i = 0; i < pc; i++) pages.add(i); }
+                    else pages.add(0);
+                }
+                for (Integer pg : pages) store.set(path, pg, cat);
+            }
+            a.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE).edit()
+                    .putString(path, matter.equals("General Document Vault") ? MatterPicker.VAULT : matter).apply();
+
+            // the card itself: only when it holds just this file do category / matter follow it;
+            // with several files the card keeps its place and only the stage (card-level) is updated
+            boolean only = doc.more.isEmpty();
+            if (only) {
+                if (!keepPages) doc.category = cat;
+                doc.caseName = matter.equals("General Document Vault") ? "" : matter;
+            } else if (!keepPages && !norm(doc.category).equals(cat)) {
+                doc.category = "Multiple";
+            }
+            doc.stage = stage;
+            ls.saveDoc(doc);
+            done(a, after, "Saved - file stays in this card");
             return true;
         }, null);
     }
