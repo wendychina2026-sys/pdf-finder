@@ -77,11 +77,13 @@ final class UpdateChecker {
         long have = cur == null ? 0 : ApkInstaller.code(cur);
         if (build <= have) {
             final UpdateDialog.Ctl[] uc = new UpdateDialog.Ctl[1];
-            uc[0] = UpdateDialog.show(a, tag, notes, "YOU'RE UP TO DATE", "OK", () -> uc[0].close());
+            uc[0] = UpdateDialog.show(a, tag, notes, "YOU'RE UP TO DATE", "OK", () -> uc[0].close(), true);
             return;
         }
         final UpdateDialog.Ctl[] ctl = new UpdateDialog.Ctl[1];
-        ctl[0] = UpdateDialog.show(a, tag, notes, () -> {
+        final long n = build - have;           // build number = versionCode, so the gap is how many updates are waiting
+        final String heading = n + (n == 1 ? " UPDATE FOUND" : " UPDATES FOUND");
+        ctl[0] = UpdateDialog.show(a, tag, notes, heading, "Update", () -> {
             ctl[0].busy("Downloading 0%");
             download(a, url, ctl[0]);
         });

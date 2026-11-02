@@ -84,6 +84,12 @@ final class UpdateDialog {
     }
 
     static Ctl show(Activity a, String version, String notes, String heading, String buttonText, final Runnable onUpdate) {
+        return show(a, version, notes, heading, buttonText, onUpdate, false);
+    }
+
+    /** center: heading sits in the middle of the card with the version under it (used for "up to date"). */
+    static Ctl show(Activity a, String version, String notes, String heading, String buttonText, final Runnable onUpdate,
+                    boolean center) {
         final Dialog d = new Dialog(a, android.R.style.Theme_Translucent_NoTitleBar);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout card = new LinearLayout(a);
@@ -101,8 +107,18 @@ final class UpdateDialog {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(pad, CaseViews.dp(a, 18), pad, CaseViews.dp(a, 6));
         TextView about = CaseViews.text(a, heading, 15, 0xFF1B1B1F, true);
-        head.addView(about, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        head.addView(CaseViews.text(a, version, 15, 0xFFF0454A, true));
+        if (center) {
+            head.setOrientation(LinearLayout.VERTICAL);
+            head.setGravity(Gravity.CENTER_HORIZONTAL);
+            about.setGravity(Gravity.CENTER);
+            head.addView(about, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            TextView ver = CaseViews.text(a, version, 13, 0xFFF0454A, true);
+            ver.setGravity(Gravity.CENTER);
+            head.addView(ver, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        } else {
+            head.addView(about, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            head.addView(CaseViews.text(a, version, 15, 0xFFF0454A, true));
+        }
         card.addView(head);
 
         List<String> lines = noteLines(notes);

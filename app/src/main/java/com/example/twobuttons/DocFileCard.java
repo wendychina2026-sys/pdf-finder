@@ -403,6 +403,67 @@ final class DocFileCard {
             Toast.makeText(a, "File not stored on this device", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (files.size() < 2) { mergeAndOpen(a, files, title); return; }
+        PickerDialogs.optionSheet(a, "Page order", "Which file should come first in the PDF?",
+                java.util.Arrays.asList("Card order (file 1 first)", "Reverse order (last file first)", "Choose the order myself"),
+                0, which -> {
+                    if (which == 0) { mergeAndOpen(a, files, title); return; }
+                    if (which == 1) {
+                        java.util.List<Uri> r = new java.util.ArrayList<>(files);
+                        java.util.Collections.reverse(r);
+                        mergeAndOpen(a, r, title);
+                        return;
+                    }
+                    chooseOrder(a, files, title);
+                });
+    }
+
+    /** Up / down arrows beside each file; "Make PDF" joins them in the order shown. */
+    private static void chooseOrder(final Activity a, java.util.List<Uri> files, final String title) {
+        final java.util.List<Uri> order = new java.util.ArrayList<>(files);
+        final java.util.List<String> names = new java.util.ArrayList<>();
+        for (Uri u : order) names.add(PdfTools.fileName(a, u));
+        final java.util.List<String> nm = names;
+        final LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pd = CaseViews.dp(a, 16);
+        box.setPadding(pd, pd / 2, pd, 0);
+        final Runnable[] draw = new Runnable[1];
+        draw[0] = () -> {
+            box.removeAllViews();
+            for (int i = 0; i < order.size(); i++) {
+                final int idx = i;
+                LinearLayout row = new LinearLayout(a);
+                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                TextView t = CaseViews.text(a, (i + 1) + ". " + nm.get(i), 14, 0xFF1B1B1F, false);
+                row.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                TextView up = CaseViews.text(a, "\u25B2", 18, idx > 0 ? 0xFF1B1B1F : 0xFFBBBBC4, true);
+                TextView dn = CaseViews.text(a, "\u25BC", 18, idx < order.size() - 1 ? 0xFF1B1B1F : 0xFFBBBBC4, true);
+                up.setPadding(pd, pd / 2, pd, pd / 2);
+                dn.setPadding(pd, pd / 2, pd, pd / 2);
+                up.setOnClickListener(v -> {
+                    if (idx > 0) { java.util.Collections.swap(order, idx, idx - 1); java.util.Collections.swap(nm, idx, idx - 1); draw[0].run(); }
+                });
+                dn.setOnClickListener(v -> {
+                    if (idx < order.size() - 1) { java.util.Collections.swap(order, idx, idx + 1); java.util.Collections.swap(nm, idx, idx + 1); draw[0].run(); }
+                });
+                row.addView(up);
+                row.addView(dn);
+                box.addView(row);
+            }
+        };
+        draw[0].run();
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.addView(box);
+        new android.app.AlertDialog.Builder(a)
+                .setTitle("Choose page order")
+                .setView(sv)
+                .setPositiveButton("Make PDF", (d, w) -> mergeAndOpen(a, order, title))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private static void mergeAndOpen(final Activity a, final java.util.List<Uri> files, final String title) {
         Toast.makeText(a, "Making one PDF\u2026", Toast.LENGTH_SHORT).show();
         final java.util.List<Uri> copy = new java.util.ArrayList<>(files);
         new Thread(() -> {
