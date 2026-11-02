@@ -782,9 +782,9 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.kind = gk;
                     sb.open = () -> openMarker(g.path, null, null);
                     sb.details = () -> showPath(g);
-                    sb.edit = () -> PickerDialogs.optionSheet(this, "Edit file", shownLabel,
+                    sb.edit = () -> PickerDialogs.optionSheet(c, "Edit file", shownLabel,
                             java.util.Arrays.asList("Change category / stage / matter (moves this file)", "Rename file"), 0, which -> {
-                        if (which == 0) DocMove.show(this, g.path, this::reload);
+                        if (which == 0) DocMove.show(c, g.path, c::reload);
                         else editFileName(g, shownLabel);
                     });
                     sb.share = () -> shareFile(g.path);
