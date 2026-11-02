@@ -137,12 +137,11 @@ public class ShareReceiverActivity extends Activity {
         startActivity(i);
     }
 
-    /** Saved documents the shared files can join. An image / Word file skips PDF documents (those are marked page by page). */
+    /** Saved documents the shared files can join: any saved document, PDF or not (images / Word files can be attached to a PDF card too). */
     private java.util.List<LegalStore.Doc> attachableDocs(boolean pdfShare) {
         java.util.List<LegalStore.Doc> out = new ArrayList<>();
         for (LegalStore.Doc d : new LegalStore(this).docs()) {
             if (d.uri == null || d.uri.isEmpty()) continue;
-            if (!pdfShare && DocFileCard.kind(d.name) == 0) continue;
             out.add(d);
         }
         return out;
@@ -150,9 +149,9 @@ public class ShareReceiverActivity extends Activity {
 
     private void askNewOrAttach(final ArrayList<File> files, final boolean pdf) {
         java.util.List<String> items = new ArrayList<>();
-        items.add("New document");
-        items.add("New document, same case as an existing one");
-        items.add("Add to an existing document (same card)");
+        items.add("New document (its own separate card)");
+        items.add("New document under an already saved case");
+        items.add("Add to a saved document (joins that card)");
         PickerDialogs.optionSheet(this, "Shared file",
                 files.size() + (files.size() == 1 ? " file" : " files"), items, -1, which -> {
                     if (which == 0) {
@@ -198,7 +197,7 @@ public class ShareReceiverActivity extends Activity {
             items.add(d.name + "  \u2022  " + m + "  \u2022  " + d.category
                     + (d.more.isEmpty() ? "" : "  \u2022  " + (1 + d.more.size()) + " files"));
         }
-        PickerDialogs.optionSheet(this, "Add to which document?", null, items, -1,
+        PickerDialogs.optionSheet(this, "Add to which document?", "These files will join that document's card", items, -1,
                 which -> attach(files, docs.get(which), pdf), () -> askNewOrAttach(files, pdf));
     }
 
