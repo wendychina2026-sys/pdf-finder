@@ -28,6 +28,8 @@ final class DocFileCard {
         int kind;
         boolean notesFilled;
         Runnable open, details, edit, share, notes;
+        Runnable reset, delete;     // per-file buttons (reset marking / delete from this card); null = not shown
+        Runnable longPress;         // long-press on the row: move this file up / down
     }
 
     static final class Info {
@@ -166,11 +168,16 @@ final class DocFileCard {
             top.addView(pl);
         }
         for (final Sub sb : in.subs) {
+            LinearLayout wrap = new LinearLayout(a);
+            wrap.setOrientation(LinearLayout.VERTICAL);
+            wrap.setTag("subrow");
+            wrap.setBackground(CaseViews.box(a, AppTheme.field(a), 10, AppTheme.fieldStroke(a), 1));
             LinearLayout r = new LinearLayout(a);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(dp(a, 8), dp(a, 2), dp(a, 2), dp(a, 2));
-            r.setBackground(CaseViews.box(a, AppTheme.field(a), 10, AppTheme.fieldStroke(a), 1));
+            wrap.addView(r, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             r.addView(CaseViews.icon(a, kindIcon(sb.kind), kindColor(a, sb.kind), 16));
             LinearLayout txt = new LinearLayout(a);
             txt.setOrientation(LinearLayout.VERTICAL);
@@ -194,10 +201,25 @@ final class DocFileCard {
             }
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
+            if (sb.reset != null || sb.delete != null) {
+                LinearLayout r2 = new LinearLayout(a);
+                r2.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                r2.setPadding(dp(a, 8), 0, dp(a, 6), dp(a, 4));
+                if (sb.reset != null) r2.addView(chip(a, R.drawable.ic_refresh, AppTheme.info(a), "Reset marking", sb.reset));
+                if (sb.delete != null) r2.addView(chip(a, R.drawable.ic_delete, 0xFFF44336, "Delete", sb.delete));
+                wrap.addView(r2, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            if (sb.longPress != null) {
+                final View.OnLongClickListener lp = v -> { sb.longPress.run(); return true; };
+                wrap.setOnLongClickListener(lp);
+                r.setOnLongClickListener(lp);
+                for (int k = 0; k < r.getChildCount(); k++) r.getChildAt(k).setOnLongClickListener(lp);
+            }
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             slp.topMargin = dp(a, 4);
-            top.addView(r, slp);
+            top.addView(wrap, slp);
         }
         if (!in.rangeLine.isEmpty()) {
             TextView rl = CaseViews.text(a, in.rangeLine, 11, AppTheme.sub(a), false);
@@ -326,6 +348,20 @@ final class DocFileCard {
         return b;
     }
 
+    /** Small icon + label button under a file row (Reset marking / Delete). */
+    private static View chip(Activity a, int icon, int color, String label, Runnable click) {
+        LinearLayout b = new LinearLayout(a);
+        b.setGravity(Gravity.CENTER_VERTICAL);
+        b.setPadding(dp(a, 8), dp(a, 4), dp(a, 8), dp(a, 4));
+        b.addView(CaseViews.icon(a, icon, color, 14));
+        TextView t = CaseViews.text(a, label, 11, color, true);
+        t.setPadding(dp(a, 4), 0, 0, 0);
+        b.addView(t);
+        b.setContentDescription(label);
+        b.setOnClickListener(v -> click.run());
+        return b;
+    }
+
     private static View tinyBtn(Activity a, int icon, int color, String desc, Runnable click) {
         LinearLayout b = new LinearLayout(a);
         b.setGravity(Gravity.CENTER);
@@ -403,67 +439,6 @@ final class DocFileCard {
             Toast.makeText(a, "File not stored on this device", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (files.size() < 2) { mergeAndOpen(a, files, title); return; }
-        PickerDialogs.optionSheet(a, "Page order", "Which file should come first in the PDF?",
-                java.util.Arrays.asList("Card order (file 1 first)", "Reverse order (last file first)", "Choose the order myself"),
-                0, which -> {
-                    if (which == 0) { mergeAndOpen(a, files, title); return; }
-                    if (which == 1) {
-                        java.util.List<Uri> r = new java.util.ArrayList<>(files);
-                        java.util.Collections.reverse(r);
-                        mergeAndOpen(a, r, title);
-                        return;
-                    }
-                    chooseOrder(a, files, title);
-                });
-    }
-
-    /** Up / down arrows beside each file; "Make PDF" joins them in the order shown. */
-    private static void chooseOrder(final Activity a, java.util.List<Uri> files, final String title) {
-        final java.util.List<Uri> order = new java.util.ArrayList<>(files);
-        final java.util.List<String> names = new java.util.ArrayList<>();
-        for (Uri u : order) names.add(PdfTools.fileName(a, u));
-        final java.util.List<String> nm = names;
-        final LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pd = CaseViews.dp(a, 16);
-        box.setPadding(pd, pd / 2, pd, 0);
-        final Runnable[] draw = new Runnable[1];
-        draw[0] = () -> {
-            box.removeAllViews();
-            for (int i = 0; i < order.size(); i++) {
-                final int idx = i;
-                LinearLayout row = new LinearLayout(a);
-                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                TextView t = CaseViews.text(a, (i + 1) + ". " + nm.get(i), 14, 0xFF1B1B1F, false);
-                row.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-                TextView up = CaseViews.text(a, "\u25B2", 18, idx > 0 ? 0xFF1B1B1F : 0xFFBBBBC4, true);
-                TextView dn = CaseViews.text(a, "\u25BC", 18, idx < order.size() - 1 ? 0xFF1B1B1F : 0xFFBBBBC4, true);
-                up.setPadding(pd, pd / 2, pd, pd / 2);
-                dn.setPadding(pd, pd / 2, pd, pd / 2);
-                up.setOnClickListener(v -> {
-                    if (idx > 0) { java.util.Collections.swap(order, idx, idx - 1); java.util.Collections.swap(nm, idx, idx - 1); draw[0].run(); }
-                });
-                dn.setOnClickListener(v -> {
-                    if (idx < order.size() - 1) { java.util.Collections.swap(order, idx, idx + 1); java.util.Collections.swap(nm, idx, idx + 1); draw[0].run(); }
-                });
-                row.addView(up);
-                row.addView(dn);
-                box.addView(row);
-            }
-        };
-        draw[0].run();
-        android.widget.ScrollView sv = new android.widget.ScrollView(a);
-        sv.addView(box);
-        new android.app.AlertDialog.Builder(a)
-                .setTitle("Choose page order")
-                .setView(sv)
-                .setPositiveButton("Make PDF", (d, w) -> mergeAndOpen(a, order, title))
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private static void mergeAndOpen(final Activity a, final java.util.List<Uri> files, final String title) {
         Toast.makeText(a, "Making one PDF\u2026", Toast.LENGTH_SHORT).show();
         final java.util.List<Uri> copy = new java.util.ArrayList<>(files);
         new Thread(() -> {

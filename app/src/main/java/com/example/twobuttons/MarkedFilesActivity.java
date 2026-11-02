@@ -93,6 +93,7 @@ public class MarkedFilesActivity extends BaseActivity {
         });
 
         list.setOnItemLongClickListener((parent, view, pos, id) -> {
+            if (!items.get(pos).extras.isEmpty()) return false;
             showFileOptions(items.get(pos));
             return true;
         });
@@ -790,6 +791,28 @@ public class MarkedFilesActivity extends BaseActivity {
                         else editFileName(g, shownLabel);
                     });
                     sb.share = () -> shareFile(g.path);
+                    if (gk == 0 && !g.marks.isEmpty()) sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
+                            "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be removed. The file is kept.",
+                            "Reset", () -> { store.clear(g.path); c.reload(); });
+                    sb.delete = () -> PickerDialogs.confirm(c, "Delete this file?",
+                            "\"" + shownLabel + "\" is removed from this card, with its marks and name.",
+                            "Delete", () -> {
+                                if (!DocMove.removeFromCard(c, g.path))
+                                    android.widget.Toast.makeText(c, "Could not delete this file", android.widget.Toast.LENGTH_SHORT).show();
+                                c.reload();
+                            });
+                    final int pos = gi, cnt = grp.size();
+                    sb.longPress = () -> {
+                        List<String> mv = new ArrayList<>();
+                        final boolean canUp = pos > 0, canDown = pos < cnt - 1;
+                        if (canUp) mv.add("Move up");
+                        if (canDown) mv.add("Move down");
+                        PickerDialogs.optionSheet(c, "Move file", shownLabel, mv, -1, w -> {
+                            boolean up = canUp && w == 0;
+                            DocMove.shift(c, g.path, up ? -1 : 1);
+                            c.reload();
+                        });
+                    };
                     sb.notes = () -> editFileNotes(g, shownLabel);
                     sb.notesFilled = !fileNote(g.path).isEmpty();
                     sb.meta = fileMeta(g, gk);
@@ -852,8 +875,10 @@ public class MarkedFilesActivity extends BaseActivity {
                 }
             };
             LinearLayout card = DocFileCard.build(c, info, act);
-            longPressAll(card, it);
-            card.setOnLongClickListener(v -> { showFileOptions(it); return true; });
+            if (it.extras.isEmpty()) {       // a multi-file card has no card-level long-press: its rows handle their own
+                longPressAll(card, it);
+                card.setOnLongClickListener(v -> { showFileOptions(it); return true; });
+            }
 
             outer.addView(card, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -959,6 +984,7 @@ public class MarkedFilesActivity extends BaseActivity {
 
     /** Long-press anywhere on a card (its tappable parts too) offers Delete file / Reset marking. */
     private void longPressAll(View v, final Item it) {
+        if ("subrow".equals(v.getTag())) return;
         if (v.hasOnClickListeners()) v.setOnLongClickListener(x -> { showFileOptions(it); return true; });
         if (v instanceof ViewGroup) {
             ViewGroup g = (ViewGroup) v;

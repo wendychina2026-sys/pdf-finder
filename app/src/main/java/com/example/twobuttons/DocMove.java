@@ -206,6 +206,65 @@ final class DocMove {
         }, null);
     }
 
+    private static void saveOrder(Activity a, LegalStore ls, LegalStore.Doc doc, List<Uri> files) {
+        doc.uri = files.get(0).toString();
+        doc.more.clear();
+        for (int k = 1; k < files.size(); k++) doc.more.add(files.get(k).toString());
+        doc.fileName = FileSetDialog.label(a, files);
+        doc.size = FileSetDialog.totalSize(a, files);
+        String nm = FileSetDialog.displayName(a, files.get(0));
+        int dot = nm.lastIndexOf('.');
+        if (dot > 0) doc.name = DocFileCard.stem(doc.name) + nm.substring(dot);
+        ls.saveDoc(doc);
+    }
+
+    private static List<Uri> filesOf(LegalStore.Doc doc) {
+        List<Uri> l = new ArrayList<>();
+        if (!doc.uri.isEmpty()) l.add(Uri.parse(doc.uri));
+        for (String m : doc.more) l.add(Uri.parse(m));
+        return l;
+    }
+
+    /** Move one file of a card up (-1) or down (+1) in the card's order. */
+    static boolean shift(Activity a, String path, int delta) {
+        try {
+            LegalStore ls = new LegalStore(a);
+            LegalStore.Doc doc = DocEdit.docFor(a, path);
+            if (doc == null) return false;
+            List<Uri> files = filesOf(doc);
+            String me = PhotoFlow.uri(a, new File(path)).toString();
+            int i = -1;
+            for (int k = 0; k < files.size(); k++) if (files.get(k).toString().equals(me)) i = k;
+            int j = i + delta;
+            if (i < 0 || j < 0 || j >= files.size()) return false;
+            java.util.Collections.swap(files, i, j);
+            saveOrder(a, ls, doc, files);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Take one file off its card (its marks and caption go too). The card must keep at least one file. */
+    static boolean removeFromCard(Activity a, String path) {
+        try {
+            LegalStore ls = new LegalStore(a);
+            LegalStore.Doc doc = DocEdit.docFor(a, path);
+            if (doc == null) return false;
+            List<Uri> files = filesOf(doc);
+            String me = PhotoFlow.uri(a, new File(path)).toString();
+            List<Uri> rest = new ArrayList<>();
+            for (Uri u : files) if (!u.toString().equals(me)) rest.add(u);
+            if (rest.isEmpty() || rest.size() == files.size()) return false;
+            saveOrder(a, ls, doc, rest);
+            new MarkStore(a).clear(path);
+            FileCaption.set(a, path, "");
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static void done(Activity a, Runnable after, String msg) {
         android.widget.Toast.makeText(a, msg, android.widget.Toast.LENGTH_SHORT).show();
         if (after != null) after.run();
