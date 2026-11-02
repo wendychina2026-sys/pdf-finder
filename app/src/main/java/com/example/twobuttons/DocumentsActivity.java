@@ -407,6 +407,15 @@ public class DocumentsActivity extends BaseActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         mlp2.topMargin = LegalUi.dp(this, 12);
         f.addView(mchip, mlp2);
+        if (groupOf(d).size() > 1) {
+            LinearLayout schip = LegalUi.chipButton(this, "Split: move some files to a new card",
+                    IconPalette.pick(this, 0xFF2E7D32, 0xFF81C784), R.drawable.ic_add_circle);
+            schip.setOnClickListener(v -> splitFiles(d));
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            slp.topMargin = LegalUi.dp(this, 12);
+            f.addView(schip, slp);
+        }
         LegalUi.formDialog(this, "Edit document", f, () -> {
             if (!LegalUi.need(this, name, "Document name")) return false;
             d.name = LegalUi.str(name) + ext;
@@ -418,6 +427,47 @@ public class DocumentsActivity extends BaseActivity {
             renderList();
             return true;
         }, null);
+    }
+
+    /** Tick the files that belong elsewhere: they leave this card (nothing is deleted) and form a NEW card. */
+    private void splitFiles(final LegalStore.Doc d) {
+        final java.util.List<android.net.Uri> g = groupOf(d);
+        final String[] names = new String[g.size()];
+        for (int i = 0; i < g.size(); i++) names[i] = (i + 1) + ".  " + FileSetDialog.displayName(this, g.get(i));
+        final boolean[] on = new boolean[g.size()];
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Tick files to move to a new card")
+                .setMultiChoiceItems(names, on, (dlg, which, checked) -> on[which] = checked)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Move to new card", (dlg, w) -> {
+                    java.util.List<android.net.Uri> moved = new java.util.ArrayList<>();
+                    java.util.List<android.net.Uri> keep = new java.util.ArrayList<>();
+                    for (int i = 0; i < g.size(); i++) (on[i] ? moved : keep).add(g.get(i));
+                    if (moved.isEmpty()) {
+                        android.widget.Toast.makeText(this, "No file ticked", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (keep.isEmpty()) {
+                        android.widget.Toast.makeText(this, "Leave at least one file in this card", android.widget.Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    LegalStore.Doc n = new LegalStore.Doc();
+                    n.date = d.date;
+                    n.caseName = d.caseName;
+                    n.category = "Other";
+                    n.stage = "";
+                    n.uri = moved.get(0).toString();
+                    for (int k = 1; k < moved.size(); k++) n.more.add(moved.get(k).toString());
+                    n.fileName = FileSetDialog.label(this, moved);
+                    n.size = FileSetDialog.totalSize(this, moved);
+                    n.name = FileSetDialog.displayName(this, moved.get(0));
+                    store.saveDoc(n);
+                    saveFiles(d, keep);             // this card keeps the rest
+                    android.widget.Toast.makeText(this, moved.size() + " file(s) moved to a new card. Set its category, stage and matter now.",
+                            android.widget.Toast.LENGTH_LONG).show();
+                    editSaved(n);
+                })
+                .show();
     }
 
     private void editDoc(LegalStore.Doc existing) {
