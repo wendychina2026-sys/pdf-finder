@@ -97,7 +97,7 @@ final class DocMove {
 
 
     /** Take the file (uri) out of doc's card and put it on the card with this matter + category + stage, else a new card. */
-    private static void moveToCard(Activity a, LegalStore ls, LegalStore.Doc doc, String uri,
+    static void moveToCard(Activity a, LegalStore ls, LegalStore.Doc doc, String uri,
                                    String matter, String stage, String newCat, Runnable after) {
             // 2. take the file out of its old card
             List<Uri> rest = new ArrayList<>();

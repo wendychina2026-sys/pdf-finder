@@ -23,6 +23,7 @@ public class ShareReceiverActivity extends Activity {
     private ArrayList<File> pendingFiles;
     private boolean pendingPdf;
     private String pendingName;       // typed after Confirm: this file's name
+    private String pendingStage;      // ... and its stage; a different stage puts the file on the card with that stage
     private String pendingCat;        // ... and its category (images / Word); a PDF is marked in the marker
 
     @Override
@@ -232,6 +233,29 @@ public class ShareReceiverActivity extends Activity {
                 DocFileCard.stem(files.get(0).getName()));
         String cur = d.category == null || d.category.equals("Multiple") ? "" : d.category;
         final CategoryPicker cp = new CategoryPicker(this, form, cur);
+        final String[] stg = {d.stage == null ? "" : d.stage};
+        LegalUi.label(this, form, "Stage");
+        final StageStore stages = new StageStore(this);
+        final android.widget.TextView[] stv = new android.widget.TextView[1];
+        stv[0] = FieldStyle.dropdown(this, form, "Select stage", v ->
+                PickerDialogs.stageSheet(this, "Stage", () -> stages.list(), stg[0],
+                        s -> { stg[0] = s; FieldStyle.setDropdownValue(stv[0], stg[0], "Select stage"); },
+                        s -> stages.add(s),
+                        (old, neu) -> {
+                            stages.rename(old, neu);
+                            if (old.equals(stg[0])) stg[0] = neu;
+                            FieldStyle.setDropdownValue(stv[0], stg[0], "Select stage");
+                        },
+                        gone -> {
+                            stages.delete(gone);
+                            if (gone.equals(stg[0])) stg[0] = "";
+                            FieldStyle.setDropdownValue(stv[0], stg[0], "Select stage");
+                        },
+                        (i, j) -> stages.swap(i, j)),
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        FieldStyle.setDropdownValue(stv[0], stg[0], "Select stage");
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(form);
         final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
@@ -246,9 +270,24 @@ public class ShareReceiverActivity extends Activity {
             if (!LegalUi.need(this, nameEt, "File name")) return;
             pendingName = LegalUi.str(nameEt);
             pendingCat = cp.get().trim();
+            pendingStage = stg[0];
             dlg.dismiss();
             manageThenAttach(files, d, pdf);
         });
+    }
+
+    /** Stage is card-level: a stage different from the card's sends the new files to the card with that stage. */
+    private void restage(LegalStore ls, LegalStore.Doc d, java.util.List<File> moved) {
+        if (pendingStage == null) return;
+        String st = pendingStage.trim();
+        if (st.equals(d.stage == null ? "" : d.stage.trim())) return;
+        String m = d.caseName == null ? "" : d.caseName.trim();
+        if (m.isEmpty() || m.equals("[]") || m.equals(MatterPicker.VAULT)) m = "General Document Vault";
+        String cat = pendingCat != null && !pendingCat.isEmpty() ? pendingCat : "Other";
+        for (File f : moved) {
+            if (d.more.isEmpty()) break;          // never strip the card's last file
+            DocMove.moveToCard(this, ls, d, PhotoFlow.uri(this, f).toString(), m, st, cat, null);
+        }
     }
 
     private void applyCaption(File moved, int idx, int total) {
@@ -284,6 +323,7 @@ public class ShareReceiverActivity extends Activity {
         java.util.List<Uri> finalList = new ArrayList<>();
         int added = 0;
         int ii = 0;
+        java.util.List<File> movedAll = new ArrayList<>();
         for (Uri u : list) {
             File f = incoming.get(u.toString());
             if (f == null) { finalList.add(u); continue; }
@@ -292,6 +332,7 @@ public class ShareReceiverActivity extends Activity {
             finalList.add(PhotoFlow.uri(this, moved));
             String path = moved.getAbsolutePath();
             applyCaption(moved, ii++, incoming.size());
+            movedAll.add(moved);
             if (pendingCat != null && !pendingCat.isEmpty()) {
                 ms.set(path, 0, pendingCat);
             } else if (general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
@@ -307,6 +348,7 @@ public class ShareReceiverActivity extends Activity {
         d.size = FileSetDialog.totalSize(this, finalList);
         d.fileName = FileSetDialog.label(this, finalList);
         ls.saveDoc(d);
+        restage(ls, d, movedAll);
         Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
                 Toast.LENGTH_LONG).show();
         startActivity(new Intent(this, MarkedFilesActivity.class));      // stay on the Document Vault, tabs enabled
@@ -321,6 +363,7 @@ public class ShareReceiverActivity extends Activity {
         boolean general = m.isEmpty() || m.equals("[]") || m.equals("General Document Vault");
         int added = 0;
         File firstAdded = null;
+        java.util.List<File> movedAll = new ArrayList<>();
         for (File f : files) {
             File moved = DataFolder.moveIntoDocuments(this, f);
             if (moved == null) continue;
@@ -330,6 +373,7 @@ public class ShareReceiverActivity extends Activity {
             String path = moved.getAbsolutePath();
             if (firstAdded == null) firstAdded = moved;
             applyCaption(moved, files.indexOf(f), files.size());
+            movedAll.add(moved);
             if (pdf && pendingCat != null && !pendingCat.isEmpty()) {
                 int pc = Math.max(1, DocEdit.pageCount(moved));      // every page starts in the chosen type; refine in the marker
                 for (int pg = 0; pg < pc; pg++) ms.set(path, pg, pendingCat);
@@ -353,6 +397,7 @@ public class ShareReceiverActivity extends Activity {
         d.size = FileSetDialog.totalSize(this, group);
         d.fileName = FileSetDialog.label(this, group);
         ls.saveDoc(d);            // also removes the originals the files were taken from
+        restage(ls, d, movedAll);
         Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
                 Toast.LENGTH_LONG).show();
         if (pdf) openMarker(firstAdded);          // PDF pages are marked in the Category marker
