@@ -90,6 +90,15 @@ final class DocMove {
                 return true;
             }
 
+            moveToCard(a, ls, doc, uri, matter, stage, newCat, after);
+            return true;
+        }, null);
+    }
+
+
+    /** Take the file (uri) out of doc's card and put it on the card with this matter + category + stage, else a new card. */
+    private static void moveToCard(Activity a, LegalStore ls, LegalStore.Doc doc, String uri,
+                                   String matter, String stage, String newCat, Runnable after) {
             // 2. take the file out of its old card
             List<Uri> rest = new ArrayList<>();
             if (!doc.uri.isEmpty() && !doc.uri.equals(uri)) rest.add(Uri.parse(doc.uri));
@@ -134,10 +143,76 @@ final class DocMove {
             target.size = FileSetDialog.totalSize(a, files);
             ls.saveDoc(target);
             done(a, after, "File moved to its own card");
+    }
+
+    /**
+     * ONE box for a file row: name, category, stage and attach to matter, each showing the current value.
+     * Same matter + stage: the file stays in its card. Changed matter or stage: the file follows it to the matching card.
+     */
+    static void editFile(final Activity a, final String path, final String currentLabel, final Runnable after) {
+        final LegalStore ls = new LegalStore(a);
+        final LegalStore.Doc doc = DocEdit.docFor(a, path);
+        if (doc == null) { DocEdit.show(a, path, after); return; }
+        final MarkStore store = new MarkStore(a);
+        final Map<Integer, String> marks = store.all(path);
+        final boolean pdf = path.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
+        java.util.Set<String> cats = new java.util.TreeSet<>(marks.values());
+        String curCat = cats.size() == 1 ? cats.iterator().next() : (cats.isEmpty() ? doc.category : "");
+        final String prevMatter = vaultName(DocEdit.matterOf(a, path));
+        final String prevStage = norm(doc.stage);
+
+        LinearLayout form = LegalUi.form(a);
+        final android.widget.EditText nameEt = LegalUi.text(a, form, "File name / caption", currentLabel);
+        final CategoryPicker cp = new CategoryPicker(a, form, curCat);
+        final MatterPicker mpk = new MatterPicker(a, form, DocEdit.matterOf(a, path), doc.stage, false);
+        if (cats.size() > 1) {
+            TextView w = CaseViews.text(a, "This PDF has pages in different categories. Picking one sets ALL its marked pages "
+                    + "to it; leave the category empty to keep the page categories.", 11, AppTheme.sub(a), false);
+            w.setPadding(0, CaseViews.dp(a, 4), 0, 0);
+            form.addView(w);
+        }
+        LegalUi.formDialog(a, "Edit file", form, () -> {
+            if (!LegalUi.need(a, nameEt, "File name")) return false;
+            if (!mpk.valid()) return false;
+            String cat = norm(cp.get());
+            final boolean keepPages = cat.isEmpty() && cats.size() > 1;
+            if (cat.isEmpty() && !keepPages) cat = "Other";
+            final String matter = vaultName(mpk.matter());
+            final String stage = norm(mpk.stage());
+
+            FileCaption.set(a, path, LegalUi.str(nameEt));
+            if (!keepPages) {
+                List<Integer> pages = new ArrayList<>(marks.keySet());
+                if (pages.isEmpty()) {
+                    if (pdf) { int pc = DocEdit.pageCount(new File(path)); for (int i = 0; i < pc; i++) pages.add(i); }
+                    else pages.add(0);
+                }
+                for (Integer pg : pages) store.set(path, pg, cat);
+            }
+            a.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE).edit()
+                    .putString(path, matter.equals("General Document Vault") ? MatterPicker.VAULT : matter).apply();
+            final String newCat = keepPages ? "Multiple" : cat;
+
+            boolean moved = !prevMatter.equals(matter) || !prevStage.equals(stage);
+            if (moved && !doc.more.isEmpty()) {
+                final String uri;
+                try { uri = PhotoFlow.uri(a, new File(path)).toString(); }
+                catch (Exception e) { return false; }
+                moveToCard(a, ls, doc, uri, matter, stage, newCat, after);
+                return true;
+            }
+            if (doc.more.isEmpty()) {
+                if (!keepPages) doc.category = cat;
+                doc.caseName = matter.equals("General Document Vault") ? "" : matter;
+            } else if (!keepPages && !norm(doc.category).equals(cat)) {
+                doc.category = "Multiple";
+            }
+            doc.stage = stage;
+            ls.saveDoc(doc);
+            done(a, after, "Saved");
             return true;
         }, null);
     }
-
 
     /**
      * Edit ONE file and KEEP it in its card: change its name, category, stage and matter in place.
