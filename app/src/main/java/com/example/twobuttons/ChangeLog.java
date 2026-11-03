@@ -118,7 +118,7 @@ final class ChangeLog {
         new Entry("22 Oct 2026", "Camera scan and categories",
             "Camera: take many photos in a row, review with per-photo delete, then save as PDF or image.",
             "Reopen a PDF to remove pages or add photos.",
-            "Document categories: Complaint > Return Complaint > Sent via Speed Post, level by level; Stage sits under Document Category.",
+            "Document categories: Complaint > Written Complaint > Sent via Speed Post, level by level; Stage sits under Document Category.",
             "Colourful icons and one placeholder style across the app."),
     };
 }

@@ -111,7 +111,7 @@ final class FieldStyle {
         String shown = has ? value : placeholder;
         t.setText(shown);
         t.setTextColor(has ? textColor(t.getContext()) : hintColor(t.getContext()));
-        // long values (e.g. Complaint > Return Complaint > Sent via Speed Post): smaller, two lines
+        // long values (e.g. Complaint > Written Complaint > Sent via Speed Post): smaller, two lines
         int n = shown == null ? 0 : shown.length();
         if (!has || isPlaceholder(shown)) {
             t.setTextSize(TypedValue.COMPLEX_UNIT_SP, HINT_SP);

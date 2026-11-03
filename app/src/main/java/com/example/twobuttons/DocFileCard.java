@@ -197,13 +197,13 @@ final class DocFileCard {
                 r.addView(tinyBtn(a, R.drawable.ic_eye, AppTheme.info(a), "Open", sb.open));
                 r.setOnClickListener(v -> sb.open.run());
             }
-            if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
             if (sb.notes != null) {
                 View nb = tinyBtn(a, R.drawable.ic_sticky_note, notesColor(a, sb.notesFilled), "Notes", sb.notes);
                 if (sb.notesFilled) blink(nb);
                 r.addView(nb);
             }
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
+            if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
             if (sb.reset != null || sb.delete != null) {
                 LinearLayout r2 = new LinearLayout(a);

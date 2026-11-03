@@ -12,8 +12,8 @@ import java.util.function.Consumer;
 
 /**
  * Document Category with drill-down: pick a category; if it has sub-options (e.g. Complaint),
- * a new list opens with them; pick one and, if that has sub-options too (Return Complaint),
- * another list opens. The saved value is the path, e.g. "Complaint › Return Complaint › Sent via Speed Post".
+ * a new list opens with them; pick one and, if that has sub-options too (Written Complaint),
+ * another list opens. The saved value is the path, e.g. "Complaint › Written Complaint › Sent via Speed Post".
  */
 final class CategoryPicker {
     static final String SEP = " \u203a ";

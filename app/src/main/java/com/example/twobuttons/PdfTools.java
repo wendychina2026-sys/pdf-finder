@@ -233,18 +233,19 @@ final class PdfTools {
                 PDPage page = dst.getPage(i);
                 PDRectangle box = page.getMediaBox();
                 com.tom_roush.pdfbox.pdmodel.font.PDType1Font font = com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD;
-                float fs = 9f;
+                float fs = Math.max(16f, box.getWidth() * 0.032f);   // scales with the page: readable on A4 / legal
                 float tw = font.getStringWidth(text) / 1000f * fs;
-                float x = box.getLowerLeftX() + 8f, y = box.getUpperRightY() - 24f;
+                float bh = fs * 1.9f;
+                float x = box.getLowerLeftX() + 10f, y = box.getUpperRightY() - 10f - bh;
                 PDPageContentStream cs = new PDPageContentStream(dst, page,
                         PDPageContentStream.AppendMode.APPEND, true, true);
                 cs.setNonStrokingColor(0.10f, 0.16f, 0.35f);
-                cs.addRect(x, y, tw + 14f, 16f);
+                cs.addRect(x, y, tw + fs * 1.6f, bh);
                 cs.fill();
                 cs.setNonStrokingColor(1f, 0.85f, 0.4f);
                 cs.beginText();
                 cs.setFont(font, fs);
-                cs.newLineAtOffset(x + 7f, y + 4.5f);
+                cs.newLineAtOffset(x + fs * 0.8f, y + bh * 0.3f);
                 cs.showText(text);
                 cs.endText();
                 cs.close();

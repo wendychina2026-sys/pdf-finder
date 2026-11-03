@@ -54,9 +54,9 @@ final class LegalStore {
 
     /** Next level of a category path (opens after picking it); empty when it has no sub-options. */
     static String[] docSubOptions(String path) {
-        if (path.equals("Complaint")) return new String[]{"Return Complaint", "Complaint Copy", "Complaint Reply"};
-        if (path.equals("Complaint › Return Complaint"))
-            return new String[]{"Sent via Speed Post", "Sent via Registered Post", "Delivered by Hand"};
+        if (path.equals("Complaint")) return new String[]{"Written Complaint", "Complaint Copy", "Complaint Reply"};
+        if (path.equals("Complaint › Written Complaint"))
+            return new String[]{"Sent via Speed Post", "Delivered by Hand"};
         return new String[0];
     }
 
