@@ -184,6 +184,74 @@ final class DocEdit {
         }
     }
 
+    /** Edit box of a card that holds several files: name / stage / matter once, then each file with its OWN category (PDF: page ranges). */
+    static void showGroup(final Activity a, final java.util.List<String> paths, final Runnable after) {
+        final MarkStore store = new MarkStore(a);
+        final LegalStore ls = new LegalStore(a);
+        final String head = paths.get(0);
+        final LegalStore.Doc cur = docFor(a, head);
+        if (cur == null) { DocEdit.show(a, head, after); return; }
+        final SharedPreferences mp = a.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE);
+        final String ext = DocFileCard.ext(new File(head).getName()).isEmpty() ? "" : "." + DocFileCard.ext(new File(head).getName());
+        LinearLayout form = LegalUi.form(a);
+        final EditText name = LegalUi.text(a, form, "Document name / caption",
+                DocFileCard.stem(cur.name.isEmpty() ? new File(head).getName() : cur.name));
+        final java.util.List<Ranges> rrs = new ArrayList<>();
+        final java.util.List<CategoryPicker> cps = new ArrayList<>();
+        for (int i = 0; i < paths.size(); i++) {
+            String p = paths.get(i);
+            File f = new File(p);
+            String cap = FileCaption.get(a, p);
+            TextView h = CaseViews.text(a, "File " + (i + 1) + ":  " + (cap.isEmpty() ? f.getName() : cap), 13, AppTheme.text(a), true);
+            h.setPadding(0, CaseViews.dp(a, 14), 0, CaseViews.dp(a, 2));
+            form.addView(h);
+            Map<Integer, String> mk = store.all(p);
+            if (f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")) {
+                rrs.add(new Ranges(a, form, mk, pageCount(f)));
+                cps.add(null);
+            } else {
+                rrs.add(null);
+                cps.add(new CategoryPicker(a, form, mk.isEmpty() ? "" : new TreeSet<>(mk.values()).iterator().next()));
+            }
+        }
+        final MatterPicker mpk = new MatterPicker(a, form, matterOf(a, head), cur.stage, false);
+        LegalUi.formDialog(a, "Edit document", form, () -> {
+            if (!LegalUi.need(a, name, "Document name")) return false;
+            for (Ranges r : rrs) {
+                if (r == null) continue;
+                String err = r.validate();
+                if (err != null) {
+                    android.widget.Toast.makeText(a, err, android.widget.Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+            }
+            Set<String> used = new TreeSet<>();
+            for (int i = 0; i < paths.size(); i++) {
+                String p = paths.get(i);
+                if (rrs.get(i) != null) {
+                    rrs.get(i).apply(p, store);
+                } else {
+                    String neu = cps.get(i).get().trim();
+                    if (neu.isEmpty()) neu = "Other";
+                    java.util.List<Integer> pg = new ArrayList<>(store.all(p).keySet());
+                    if (pg.isEmpty()) pg.add(0);
+                    for (Integer x : pg) store.set(p, x, neu);
+                }
+                used.addAll(store.all(p).values());
+            }
+            String newName = LegalUi.str(name);
+            cur.name = DocFileCard.ext(newName).isEmpty() ? newName + ext : newName;
+            cur.caseName = mpk.matter();
+            cur.stage = mpk.stage();
+            cur.category = used.size() == 1 ? used.iterator().next() : "Multiple";
+            ls.saveDoc(cur);
+            String m = mpk.matter();
+            for (String p : paths) mp.edit().putString(p, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
+            if (after != null) after.run();
+            return true;
+        }, null);
+    }
+
     static void show(final Activity a, final String path, final Runnable after) {
         show(a, path, after, null);
     }

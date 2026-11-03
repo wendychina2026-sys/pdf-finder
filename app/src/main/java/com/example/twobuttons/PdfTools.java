@@ -139,6 +139,12 @@ final class PdfTools {
      * Written to the cache folder; run off the main thread.
      */
     static File mergeToPdf(Context c, List<Uri> files, String title, int[] skipped) throws IOException {
+        return mergeToPdf(c, files, title, skipped, null);
+    }
+
+    /** marks: file uri -> (page index -> category). Marked pages get a small category banner in the merged PDF. */
+    static File mergeToPdf(Context c, List<Uri> files, String title, int[] skipped,
+                           java.util.Map<String, java.util.Map<Integer, String>> marks) throws IOException {
         PDFBoxResourceLoader.init(c.getApplicationContext());
         File dir = new File(c.getCacheDir(), "merged");
         dir.mkdirs();
@@ -150,6 +156,8 @@ final class PdfTools {
         PDDocument dst = new PDDocument();
         try {
             List<File> pendingImages = new ArrayList<>();
+            List<String> pendingCats = new ArrayList<>();
+            List<String> pageCats = new ArrayList<>();
             for (Uri u : files) {
                 String name = fileName(c, u);
                 int k = DocFileCard.kind(name);
@@ -163,9 +171,9 @@ final class PdfTools {
                     if (t == null) { if (skipped != null) skipped[0]++; continue; }
                     temps.add(t);
                     pendingImages.add(t);
+                    pendingCats.add(catOf(marks, u, 0));
                 } else if (k == 0) {
-                    addImagePages(dst, pendingImages);      // keep the saved order: images before this PDF first
-                    pendingImages.clear();
+                    flushImages(dst, pendingImages, pendingCats, pageCats);      // keep the saved order: images before this PDF first
                     File t = cacheCopy(c, u, ".pdf");
                     if (t == null) { if (skipped != null) skipped[0]++; continue; }
                     temps.add(t);
@@ -177,13 +185,15 @@ final class PdfTools {
                         copy.setResources(original.getResources());
                         copy.setMediaBox(original.getMediaBox());
                         copy.setRotation(original.getRotation());
+                        pageCats.add(catOf(marks, u, p));
                     }
                 } else if (skipped != null) {
                     skipped[0]++;
                 }
             }
-            addImagePages(dst, pendingImages);
+            flushImages(dst, pendingImages, pendingCats, pageCats);
             if (dst.getNumberOfPages() == 0) throw new IOException("no pages");
+            if (marks != null) stampMarks(dst, pageCats);
             dst.save(out);
         } finally {
             try { dst.close(); } catch (Exception ignored) { }
@@ -193,6 +203,55 @@ final class PdfTools {
             for (File t : temps) t.delete();
         }
         return out;
+    }
+
+    private static String catOf(java.util.Map<String, java.util.Map<Integer, String>> marks, Uri u, int page) {
+        if (marks == null) return null;
+        java.util.Map<Integer, String> m = marks.get(u.toString());
+        return m == null ? null : m.get(page);
+    }
+
+    private static void flushImages(PDDocument dst, List<File> imgs, List<String> cats, List<String> pageCats) throws IOException {
+        int before = dst.getNumberOfPages();
+        addImagePages(dst, imgs);
+        int added = dst.getNumberOfPages() - before;
+        for (int q = 0; q < added; q++) pageCats.add(added == cats.size() ? cats.get(q) : null);
+        imgs.clear();
+        cats.clear();
+    }
+
+    /** A small navy banner with the page's category at the top-left of every marked page. */
+    private static void stampMarks(PDDocument dst, List<String> cats) {
+        for (int i = 0; i < cats.size() && i < dst.getNumberOfPages(); i++) {
+            String cat = cats.get(i);
+            if (cat == null || cat.trim().isEmpty()) continue;
+            try {
+                String t = cat.replaceAll("[^\\x20-\\x7E]", "").trim();
+                if (t.isEmpty()) t = "Marked";
+                if (t.length() > 60) t = t.substring(0, 60);
+                String text = t + "  |  p." + (i + 1);
+                PDPage page = dst.getPage(i);
+                PDRectangle box = page.getMediaBox();
+                com.tom_roush.pdfbox.pdmodel.font.PDType1Font font = com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD;
+                float fs = 9f;
+                float tw = font.getStringWidth(text) / 1000f * fs;
+                float x = box.getLowerLeftX() + 8f, y = box.getUpperRightY() - 24f;
+                PDPageContentStream cs = new PDPageContentStream(dst, page,
+                        PDPageContentStream.AppendMode.APPEND, true, true);
+                cs.setNonStrokingColor(0.10f, 0.16f, 0.35f);
+                cs.addRect(x, y, tw + 14f, 16f);
+                cs.fill();
+                cs.setNonStrokingColor(1f, 0.85f, 0.4f);
+                cs.beginText();
+                cs.setFont(font, fs);
+                cs.newLineAtOffset(x + 7f, y + 4.5f);
+                cs.showText(text);
+                cs.endText();
+                cs.close();
+            } catch (Exception ignored) {
+                // a page that cannot be stamped is left as it is
+            }
+        }
     }
 
     static String fileName(Context c, Uri u) {

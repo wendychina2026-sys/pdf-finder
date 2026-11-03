@@ -465,6 +465,12 @@ final class DocFileCard {
 
     /** "View as one PDF": all files of a card (images and PDFs, in saved order) joined into one PDF and opened. */
     static void viewAsOnePdf(final Activity a, final java.util.List<Uri> files, final String title) {
+        viewAsOnePdf(a, files, title, null);
+    }
+
+    /** marks (file uri -> page -> category): marked pages show a category banner in the one PDF. */
+    static void viewAsOnePdf(final Activity a, final java.util.List<Uri> files, final String title,
+                             final java.util.Map<String, java.util.Map<Integer, String>> marks) {
         if (files == null || files.isEmpty()) {
             Toast.makeText(a, "File not stored on this device", Toast.LENGTH_SHORT).show();
             return;
@@ -475,7 +481,7 @@ final class DocFileCard {
             final int[] skipped = new int[1];
             File out = null;
             try {
-                out = PdfTools.mergeToPdf(a, copy, title, skipped);
+                out = PdfTools.mergeToPdf(a, copy, title, skipped, marks);
             } catch (Throwable e) {
                 out = null;
             }
