@@ -794,8 +794,9 @@ public class MarkedFilesActivity extends BaseActivity {
             info.fileName = f.getName();
             info.stage = it.stage;
             java.util.Set<String> cats = new TreeSet<>(it.marks.values());
-            for (Item x : it.extras) cats.addAll(x.marks.values());
-            info.category = cats.size() == 1 ? cats.iterator().next() : "Multiple";
+            java.util.Set<String> headCats = new TreeSet<>(cats);       // heading: categories of ALL files on the card
+            for (Item x : it.extras) headCats.addAll(x.marks.values());
+            info.category = headCats.size() == 1 ? headCats.iterator().next() : "Multiple";
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
             info.hideMeta = true;       // type, size and date are in the (i) dialog
