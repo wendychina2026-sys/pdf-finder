@@ -24,6 +24,7 @@ final class DocFileCard {
 
     /** One file inside a multi-file card: shown as a small row with its own Open and Details. */
     static final class Sub {
+        String groupKey = "";   // consecutive image / Word rows with the same key collapse into one group row
         String name = "", meta = "";     // meta: what tells this file apart (type, size, dimensions, date)
         int kind;
         boolean notesFilled;
@@ -42,6 +43,7 @@ final class DocFileCard {
         String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
         Runnable tagClick;
         boolean notesFilled;    // Document Vault: the attached case has notes (icon is lit)
+        String matchNote = "";  // search: where the typed text matched (Stage: Mediation ...)
         String dragKey = "";    // identifies this card while a file row is dragged
         java.util.function.BiConsumer<Integer, Integer> reorder;          // (fromRow, toRow) after a drag-drop of a file row
         java.util.function.BiConsumer<View, android.view.DragEvent> dragMove;  // for edge auto-scroll
@@ -157,6 +159,11 @@ final class DocFileCard {
         }
         top.addView(att);
 
+        if (!in.matchNote.isEmpty()) {
+            TextView mn = CaseViews.text(a, "Matched: " + in.matchNote, 12, IconPalette.pick(a, 0xFFE65100, 0xFFFFB74D), true);
+            mn.setPadding(0, dp(a, 4), 0, dp(a, 2));
+            top.addView(mn);
+        }
         if (!in.tag.isEmpty()) {
             TextView tg = CaseViews.text(a, in.tag, 12, IconPalette.pick(a, 0xFFE65100, 0xFFFFB74D), true);
             tg.setPadding(0, dp(a, 4), 0, dp(a, 2));
@@ -169,9 +176,54 @@ final class DocFileCard {
             pl.setPadding(0, dp(a, 4), 0, 0);
             top.addView(pl);
         }
+        // runs of 2+ rows with the same group key (same type, category, stage and matter) are ONE group row until expanded
+        final int ns = in.subs.size();
+        int[] runLen = new int[ns];
+        for (int i0 = 0; i0 < ns; ) {
+            String kk = in.subs.get(i0).groupKey;
+            int j0 = i0 + 1;
+            while (!kk.isEmpty() && j0 < ns && kk.equals(in.subs.get(j0).groupKey)) j0++;
+            if (j0 - i0 >= 2) runLen[i0] = j0 - i0;
+            i0 = j0;
+        }
+        LinearLayout curBox = null;
+        int curEnd = -1;
         for (int subI = 0; subI < in.subs.size(); subI++) {
             final Sub sb = in.subs.get(subI);
             final int subIdx = subI;
+            if (runLen[subI] > 0) {
+                curEnd = subI + runLen[subI] - 1;
+                final LinearLayout gbox = new LinearLayout(a);
+                gbox.setOrientation(LinearLayout.VERTICAL);
+                gbox.setVisibility(View.GONE);
+                LinearLayout gh = new LinearLayout(a);
+                gh.setOrientation(LinearLayout.HORIZONTAL);
+                gh.setGravity(Gravity.CENTER_VERTICAL);
+                gh.setPadding(dp(a, 8), dp(a, 6), dp(a, 6), dp(a, 6));
+                gh.setBackground(CaseViews.box(a, AppTheme.field(a), 10, AppTheme.fieldStroke(a), 1));
+                gh.addView(CaseViews.icon(a, kindIcon(sb.kind), kindColor(a, sb.kind), 16));
+                LinearLayout gt = new LinearLayout(a);
+                gt.setOrientation(LinearLayout.VERTICAL);
+                gt.setPadding(dp(a, 8), 0, dp(a, 4), 0);
+                String what = sb.kind == 2 ? "images" : (sb.kind == 0 ? "PDFs" : "files");
+                gt.addView(CaseViews.text(a, runLen[subI] + " " + what + "  \u2022  tap to show each file", 12, AppTheme.text(a), true));
+                if (!sb.meta.isEmpty()) gt.addView(CaseViews.text(a, sb.meta, 10, AppTheme.sub(a), false));
+                gh.addView(gt, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                final ImageView gchev = CaseViews.icon(a, R.drawable.ic_expand_more, AppTheme.text(a), 22);
+                gh.addView(gchev);
+                gh.setOnClickListener(v -> {
+                    boolean open = gbox.getVisibility() == View.VISIBLE;
+                    gbox.setVisibility(open ? View.GONE : View.VISIBLE);
+                    gchev.setRotation(open ? 0f : 180f);
+                });
+                LinearLayout.LayoutParams ghp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                ghp.topMargin = dp(a, 4);
+                top.addView(gh, ghp);
+                top.addView(gbox, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                curBox = gbox;
+            }
             LinearLayout wrap = new LinearLayout(a);
             wrap.setOrientation(LinearLayout.VERTICAL);
             wrap.setTag("subrow");
@@ -249,7 +301,8 @@ final class DocFileCard {
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             slp.topMargin = dp(a, 4);
-            top.addView(wrap, slp);
+            if (curBox != null && subI <= curEnd) curBox.addView(wrap, slp); else top.addView(wrap, slp);
+            if (subI == curEnd) curBox = null;
         }
         if (!in.rangeLine.isEmpty()) {
             TextView rl = CaseViews.text(a, in.rangeLine, 11, AppTheme.sub(a), false);

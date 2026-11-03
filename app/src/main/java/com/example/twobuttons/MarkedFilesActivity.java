@@ -288,23 +288,37 @@ public class MarkedFilesActivity extends BaseActivity {
         for (Item it : all) {
             if (q.isEmpty() || matches(it, q)) items.add(it);
         }
-        status.setText(items.size() + " marked files");
+        status.setText(items.size() + " marked files" + (q.isEmpty() ? "" : "  \u2022  filtered by \"" + q + "\""));
         adapter.notifyDataSetChanged();
     }
 
-    private boolean matches(Item it, String q) {
-        if (new File(it.path).getName().toLowerCase(Locale.ROOT).contains(q)) return true;
-        if (it.refName.toLowerCase(Locale.ROOT).contains(q)) return true;
-        if (it.path.toLowerCase(Locale.ROOT).contains(q)) return true;
-        if (FileCaption.get(this, it.path).toLowerCase(Locale.ROOT).contains(q)) return true;
-        for (Item x : it.extras) {
-            if (FileCaption.get(this, x.path).toLowerCase(Locale.ROOT).contains(q)) return true;
-            if (new File(x.path).getName().toLowerCase(Locale.ROOT).contains(q)) return true;
+    private boolean matches(Item it, String q) { return !matchNote(it, q).isEmpty(); }
+
+    /** Where the typed text matched on this card: Stage / Matter / Category / Name / Path (empty = no match). */
+    private String matchNote(Item it, String q) {
+        if (q.isEmpty()) return "";
+        List<String> hit = new ArrayList<>();
+        List<Item> fs = new ArrayList<>();
+        fs.add(it);
+        fs.addAll(it.extras);
+        if (it.stage != null && it.stage.toLowerCase(Locale.ROOT).contains(q)) hit.add("Stage: " + it.stage);
+        java.util.Set<String> ms = new TreeSet<>();
+        java.util.Set<String> cs = new TreeSet<>();
+        boolean nameHit = false;
+        for (Item x : fs) {
+            String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(x.path, "");
+            if (m.isEmpty() || m.equals(MatterPicker.VAULT)) m = "General Document Vault";
+            if (m.toLowerCase(Locale.ROOT).contains(q)) ms.add(m);
+            for (String sub : x.marks.values()) if (sub.toLowerCase(Locale.ROOT).contains(q)) cs.add(sub);
+            if (new File(x.path).getName().toLowerCase(Locale.ROOT).contains(q)
+                    || FileCaption.get(this, x.path).toLowerCase(Locale.ROOT).contains(q)) nameHit = true;
         }
-        for (String sub : it.marks.values()) {
-            if (sub.toLowerCase(Locale.ROOT).contains(q)) return true;
-        }
-        return false;
+        if (it.refName.toLowerCase(Locale.ROOT).contains(q)) nameHit = true;
+        for (String m : ms) hit.add("Matter: " + m);
+        for (String cc : cs) hit.add("Category: " + cc);
+        if (nameHit) hit.add("Name");
+        else if (it.path.toLowerCase(Locale.ROOT).contains(q)) hit.add("Path");
+        return TextUtils.join("  \u2022  ", hit);
     }
 
     /** PDFs open in the Category marker; an image, Word file (or any other file) opens in the phone's viewer. */
@@ -799,6 +813,7 @@ public class MarkedFilesActivity extends BaseActivity {
             info.category = headCats.size() == 1 ? headCats.iterator().next() : "Multiple";
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
+            info.matchNote = matchNote(it, search.getText().toString().trim().toLowerCase(Locale.ROOT));
             info.hideMeta = true;       // type, size and date are in the (i) dialog
             info.notesFilled = !cardNote(it).isEmpty() || !caseNote(it).isEmpty();
             if (!it.extras.isEmpty()) info.count = 1 + it.extras.size();
@@ -855,13 +870,7 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.kind = gk;
                     sb.open = () -> openMarker(g.path, null, null);
                     sb.details = () -> showPath(g);
-                    sb.edit = () -> PickerDialogs.optionSheet(c, "Edit file", shownLabel,
-                            java.util.Arrays.asList("Edit here: name / category / stage / matter (stays in this card)",
-                                    "Move to another card (category / stage / matter)", "Rename file only"), 0, which -> {
-                        if (which == 0) DocMove.showHere(c, g.path, shownLabel, c::reload);
-                        else if (which == 1) DocMove.show(c, g.path, c::reload);
-                        else editFileName(g, shownLabel);
-                    });
+                    sb.edit = () -> DocMove.editFile(c, g.path, shownLabel, c::reload);
                     sb.share = () -> shareFile(g.path);
                     if (gk != 1 && !g.marks.isEmpty()) sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
                             (gk == 0 ? "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be removed."
@@ -876,7 +885,13 @@ public class MarkedFilesActivity extends BaseActivity {
                             });
                     sb.notes = () -> editFileNotes(g, shownLabel);
                     sb.notesFilled = !fileNote(g.path).isEmpty();
-                    sb.meta = fileMeta(g, gk);
+                    java.util.Set<String> gc = new TreeSet<>(g.marks.values());
+                    String gcat = gc.size() == 1 ? gc.iterator().next() : (gc.isEmpty() ? "" : "Multiple");
+                    String gm = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(g.path, "");
+                    if (gm.isEmpty() || gm.equals(MatterPicker.VAULT)) gm = "General Document Vault";
+                    sb.meta = "Category: " + (gcat.isEmpty() ? "-" : gcat) + "  \u2022  Stage: "
+                            + (it.stage == null || it.stage.isEmpty() ? "-" : it.stage) + "  \u2022  Matter: " + gm;
+                    sb.groupKey = (gk == 0 || gcat.isEmpty() || gcat.equals("Multiple")) ? "" : gk + "|" + gcat + "|" + gm;
                     info.subs.add(sb);
                 }
                 info.dragKey = orderKey(it);
