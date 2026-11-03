@@ -77,15 +77,30 @@ final class FileSetDialog {
         show(a, flow, title, start, done, null);
     }
 
+    /** Optional look for the box: reference names instead of real file names, category line, NEW files with a Place button. */
+    static final class Options {
+        java.util.function.Function<Uri, String> label;     // reference name of a file
+        java.util.function.Function<Uri, String> sub;       // second line (category)
+        java.util.Set<String> fresh = new java.util.HashSet<>();   // uri strings of the files being added now
+        boolean allowAdd = true;                            // "Add more files" button
+        String hint;
+    }
+
     static void show(final Activity a, final PhotoFlow flow, String title, List<Uri> start, final Done done,
                      final Runnable onClosed) {
+        show(a, flow, title, start, done, onClosed, null);
+    }
+
+    static void show(final Activity a, final PhotoFlow flow, String title, List<Uri> start, final Done done,
+                     final Runnable onClosed, final Options opt) {
         final List<Uri> files = new ArrayList<>(start);
         final LinearLayout body = new LinearLayout(a);
         body.setOrientation(LinearLayout.VERTICAL);
         final Runnable[] draw = new Runnable[1];
         draw[0] = () -> {
             body.removeAllViews();
-            TextView hint = CaseViews.text(a, files.size() + (files.size() == 1 ? " file" : " files")
+            TextView hint = CaseViews.text(a, opt != null && opt.hint != null ? opt.hint
+                    : files.size() + (files.size() == 1 ? " file" : " files")
                     + " in this document. Use the arrows to change the order.", 12, AppTheme.sub(a), false);
             hint.setPadding(0, dp(a, 6), 0, dp(a, 8));
             body.addView(hint);
@@ -97,7 +112,9 @@ final class FileSetDialog {
                 LinearLayout card = new LinearLayout(a);
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setPadding(dp(a, 12), dp(a, 10), dp(a, 12), dp(a, 10));
-                card.setBackground(CaseViews.box(a, AppTheme.field(a), 14, AppTheme.fieldStroke(a), 1));
+                final boolean isNew = opt != null && opt.fresh.contains(u.toString());
+                card.setBackground(isNew ? CaseViews.box(a, AppTheme.field(a), 14, AppTheme.accent(a), 3)
+                        : CaseViews.box(a, AppTheme.field(a), 14, AppTheme.fieldStroke(a), 1));
                 LinearLayout top = new LinearLayout(a);
                 top.setOrientation(LinearLayout.HORIZONTAL);
                 top.setGravity(Gravity.CENTER_VERTICAL);
@@ -106,11 +123,23 @@ final class FileSetDialog {
                 LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(a, 20), dp(a, 20));
                 ilp.leftMargin = dp(a, 10);
                 top.addView(ic, ilp);
-                TextView t = CaseViews.text(a, nm, 13.5f, AppTheme.text(a), true);
-                t.setSingleLine(true);
-                t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-                t.setPadding(dp(a, 8), 0, 0, 0);
-                top.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                if (opt != null && opt.label != null) {
+                    LinearLayout col = new LinearLayout(a);
+                    col.setOrientation(LinearLayout.VERTICAL);
+                    col.setPadding(dp(a, 8), 0, 0, 0);
+                    TextView t = CaseViews.text(a, (isNew ? "NEW  " : "") + opt.label.apply(u), 13.5f,
+                            isNew ? AppTheme.accent(a) : AppTheme.text(a), true);
+                    col.addView(t);
+                    String sub = opt.sub == null ? "" : opt.sub.apply(u);
+                    if (sub != null && !sub.isEmpty()) col.addView(CaseViews.text(a, sub, 11, AppTheme.sub(a), false));
+                    top.addView(col, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                } else {
+                    TextView t = CaseViews.text(a, nm, 13.5f, AppTheme.text(a), true);
+                    t.setSingleLine(true);
+                    t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                    t.setPadding(dp(a, 8), 0, 0, 0);
+                    top.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                }
                 card.addView(top);
                 LinearLayout btns = new LinearLayout(a);
                 btns.setOrientation(LinearLayout.HORIZONTAL);
@@ -135,6 +164,24 @@ final class FileSetDialog {
                     files.remove(idx);
                     draw[0].run();
                 }), blp(a, 6, 1f));
+                if (isNew && files.size() > 1 && opt.label != null) {
+                    // put the new file anywhere: at the start, or right after any file (inside that file's range)
+                    btns.addView(btn(a, "Place", AppTheme.accent(a), () -> {
+                        final List<Uri> others = new ArrayList<>(files);
+                        others.remove(idx);
+                        List<String> opts = new ArrayList<>();
+                        opts.add("At the very start");
+                        for (Uri o : others) {
+                            String sb = opt.sub == null ? "" : opt.sub.apply(o);
+                            opts.add("After:  " + opt.label.apply(o) + (sb == null || sb.isEmpty() ? "" : "  \u2022  " + sb));
+                        }
+                        PickerDialogs.optionSheet(a, "Place this file", opt.label.apply(u), opts, -1, which -> {
+                            Uri mv = files.remove(idx);
+                            files.add(Math.min(which, files.size()), mv);
+                            draw[0].run();
+                        });
+                    }), blp(a, 6, 1f));
+                }
                 if (idx > 0) btns.addView(btn(a, "\u2191", AppTheme.text(a), () -> {
                     java.util.Collections.swap(files, idx, idx - 1);
                     draw[0].run();
@@ -152,15 +199,17 @@ final class FileSetDialog {
                 cl.bottomMargin = dp(a, 8);
                 body.addView(card, cl);
             }
-            LinearLayout add = LegalUi.chipButton(a, "Add more files",
-                    IconPalette.pick(a, 0xFF1565C0, 0xFF64B5F6), R.drawable.ic_add_circle);
-            add.setOnClickListener(v -> {
-                pendIdx = -1;
-                pendRedraw = draw[0];
-                curFiles = files;
-                source(a, flow);
-            });
-            body.addView(add);
+            if (opt == null || opt.allowAdd) {
+                LinearLayout add = LegalUi.chipButton(a, "Add more files",
+                        IconPalette.pick(a, 0xFF1565C0, 0xFF64B5F6), R.drawable.ic_add_circle);
+                add.setOnClickListener(v -> {
+                    pendIdx = -1;
+                    pendRedraw = draw[0];
+                    curFiles = files;
+                    source(a, flow);
+                });
+                body.addView(add);
+            }
         };
         draw[0].run();
         PickerDialogs.formSheet(a, title, null, body, "Save changes", () -> {

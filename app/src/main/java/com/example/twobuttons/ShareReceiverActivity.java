@@ -308,10 +308,42 @@ public class ShareReceiverActivity extends Activity {
             all.add(u);
         }
         final boolean[] saved = {false};
+        // reference names + category instead of real file names; the new files are marked and can be placed anywhere
+        final int existing = all.size() - files.size();
+        final java.util.Map<String, File> byUri = DataFolder.documentsByUri(this);
+        final MarkStore mst = new MarkStore(this);
+        final java.util.List<String> order = new ArrayList<>();
+        for (Uri u : all) order.add(u.toString());
+        final FileSetDialog.Options opt = new FileSetDialog.Options();
+        opt.allowAdd = false;
+        opt.hint = (files.size() == 1 ? "The NEW file is" : "The NEW files are") + " at the end. Use Place to put "
+                + (files.size() == 1 ? "it" : "one") + " at the start or after any file, or the arrows.";
+        opt.fresh.addAll(incoming.keySet());
+        opt.label = u -> {
+            String us = u.toString();
+            File f = incoming.get(us);
+            if (f != null) {
+                int n = 0;
+                for (File x : files) { if (x == f) break; n++; }
+                return pendingName == null ? DocFileCard.stem(f.getName())
+                        : (files.size() > 1 ? pendingName + " (" + (n + 1) + ")" : pendingName);
+            }
+            File ex = byUri.get(us);
+            String cap = ex == null ? "" : FileCaption.get(this, ex.getAbsolutePath());
+            return cap.isEmpty() ? DocFileCard.stem(d.name) + " (" + (order.indexOf(us) + 1) + ")" : cap;
+        };
+        opt.sub = u -> {
+            String us = u.toString();
+            if (incoming.containsKey(us)) return pendingCat == null || pendingCat.isEmpty() ? "" : pendingCat;
+            File ex = byUri.get(us);
+            if (ex == null) return "";
+            java.util.Set<String> cs = new java.util.TreeSet<>(mst.all(ex.getAbsolutePath()).values());
+            return cs.isEmpty() ? "" : (cs.size() == 1 ? cs.iterator().next() : "Multiple");
+        };
         FileSetDialog.show(this, flow, "Files in \"" + d.name + "\"", all, list -> {
             saved[0] = true;
             attachOrdered(list, incoming, d);
-        }, () -> { if (!saved[0]) askNewOrAttach(files, pdf); });
+        }, () -> { if (!saved[0]) askNewOrAttach(files, pdf); }, opt);
     }
 
     /** Saves the card with the files in the order chosen in the box; new files move into the Documents folder. */
