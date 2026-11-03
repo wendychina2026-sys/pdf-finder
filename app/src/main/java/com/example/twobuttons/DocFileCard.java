@@ -214,7 +214,7 @@ final class DocFileCard {
                 final View.OnLongClickListener lp = v -> { sb.longPress.run(); return true; };
                 wrap.setOnLongClickListener(lp);
                 r.setOnLongClickListener(lp);
-                for (int k = 0; k < r.getChildCount(); k++) r.getChildAt(k).setOnLongClickListener(lp);
+                for (int ci = 0; ci < r.getChildCount(); ci++) r.getChildAt(ci).setOnLongClickListener(lp);
             }
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
