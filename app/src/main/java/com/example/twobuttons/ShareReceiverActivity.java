@@ -19,10 +19,26 @@ import java.util.ArrayList;
 public class ShareReceiverActivity extends Activity {
 
     private final PhotoFlow flow = new PhotoFlow(this, 64);
+    private static final int REQ_PICK_DOC = 81;
+    private ArrayList<File> pendingFiles;
+    private boolean pendingPdf;
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_PICK_DOC) {
+            // Document Vault pick mode: OK = the chosen card, Cancel = back to the shared-file window
+            final ArrayList<File> files = pendingFiles;
+            if (files == null) { finish(); return; }
+            LegalStore.Doc chosen = null;
+            String id = data == null ? null : data.getStringExtra("doc_id");
+            if (res == RESULT_OK && id != null) {
+                for (LegalStore.Doc d : new LegalStore(this).docs()) if (id.equals(d.id)) { chosen = d; break; }
+            }
+            if (chosen != null) manageThenAttach(files, chosen, pendingPdf);
+            else askNewOrAttach(files, pendingPdf);
+            return;
+        }
         if (FileSetDialog.handle(this, req, res, data)) return;
         flow.handle(req, res);
     }
@@ -197,25 +213,13 @@ public class ShareReceiverActivity extends Activity {
                 }, () -> askNewOrAttach(files, pdf));
     }
 
+    /** The Document Vault opens in pick mode: a radio on each card, Confirm / Cancel at the bottom instead of the tabs. */
     private void pickDocument(final ArrayList<File> files, final boolean pdf) {
-        final java.util.List<LegalStore.Doc> docs = attachableDocs(pdf);
-        java.util.List<String> items = new ArrayList<>();
-        for (LegalStore.Doc d : docs) {
-            String m = d.caseName == null ? "" : d.caseName.trim();
-            if (m.isEmpty() || m.equals("[]")) m = "General Document Vault";
-            items.add(d.name + "  \u2022  " + m + "  \u2022  " + d.category
-                    + (d.more.isEmpty() ? "" : "  \u2022  " + (1 + d.more.size()) + " files"));
-        }
-        final java.util.Map<String, LegalStore.Doc> byLabel = new java.util.LinkedHashMap<>();
-        for (int i = 0; i < docs.size(); i++) {
-            String label = items.get(i);
-            if (byLabel.containsKey(label)) label = label + "  (" + (i + 1) + ")";
-            byLabel.put(label, docs.get(i));
-        }
-        PickerDialogs.searchSheet(this, "Add to which document?", "Search by name, case or category",
-                new ArrayList<>(byLabel.keySet()), null, null, null, null,
-                label -> manageThenAttach(files, byLabel.get(label), pdf),
-                () -> askNewOrAttach(files, pdf));
+        pendingFiles = files;
+        pendingPdf = pdf;
+        Intent i = new Intent(this, MarkedFilesActivity.class);
+        i.putExtra("pick_doc", true);
+        startActivityForResult(i, REQ_PICK_DOC);
     }
 
     /** Image / Word share: ONE box with the card's current files + the new ones, so they can be reordered / removed first. */
@@ -267,7 +271,7 @@ public class ShareReceiverActivity extends Activity {
         ls.saveDoc(d);
         Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
                 Toast.LENGTH_LONG).show();
-        startActivity(new Intent(this, DocumentsActivity.class));
+        startActivity(new Intent(this, MarkedFilesActivity.class));      // stay on the Document Vault, tabs enabled
         finish();
     }
 
@@ -308,7 +312,7 @@ public class ShareReceiverActivity extends Activity {
         Toast.makeText(this, added + (added == 1 ? " file" : " files") + " added to \"" + d.name + "\"",
                 Toast.LENGTH_LONG).show();
         if (pdf) openMarker(firstAdded);          // PDF pages are marked in the Category marker
-        else startActivity(new Intent(this, DocumentsActivity.class));
+        else startActivity(new Intent(this, MarkedFilesActivity.class));
         finish();
     }
 }

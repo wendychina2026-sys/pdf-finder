@@ -35,7 +35,7 @@ import java.util.TreeSet;
 public class MarkedFilesActivity extends BaseActivity {
 
     @Override
-    protected int navIndex() { return 2; }
+    protected int navIndex() { return pickMode ? -1 : 2; }
 
     static class Item {
         final String path;
@@ -61,11 +61,14 @@ public class MarkedFilesActivity extends BaseActivity {
     private TextView status;
     private EditText search;
     private MarkStore store;
+    private boolean pickMode;                 // opened from a shared file: choose the card the file joins
+    private String pickedDocId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("Document Vault");
+        pickMode = getIntent().getBooleanExtra("pick_doc", false);
+        setTitle(pickMode ? "Select document" : "Document Vault");
         store = new MarkStore(this);
 
         LinearLayout root = new LinearLayout(this);
@@ -91,6 +94,7 @@ public class MarkedFilesActivity extends BaseActivity {
         list.setDivider(null);
         list.setDividerHeight(0);
         list.setOnItemClickListener((parent, view, pos, id) -> {
+            if (pickMode) return;
             openMarker(items.get(pos).path, null, null);
         });
 
@@ -99,7 +103,7 @@ public class MarkedFilesActivity extends BaseActivity {
         LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         addLp.bottomMargin = CaseViews.dp(this, 8);
-        root.addView(addCase, addLp);
+        if (!pickMode) root.addView(addCase, addLp);
         root.addView(search, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         root.addView(status, new LinearLayout.LayoutParams(
@@ -107,7 +111,7 @@ public class MarkedFilesActivity extends BaseActivity {
         root.addView(list, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         list.setClipToPadding(false);
-        list.setPadding(0, 0, 0, CaseViews.dp(this, 84));   // keep the last rows clear of the + button
+        list.setPadding(0, 0, 0, CaseViews.dp(this, pickMode ? 8 : 84));   // keep the last rows clear of the + button
 
         TextView fab = new TextView(this);
         fab.setText("+");
@@ -124,7 +128,36 @@ public class MarkedFilesActivity extends BaseActivity {
         FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(
                 CaseViews.dp(this, 60), CaseViews.dp(this, 60), Gravity.BOTTOM | Gravity.END);
         fl.setMargins(0, 0, CaseViews.dp(this, 20), CaseViews.dp(this, 24));
-        frame.addView(fab, fl);
+        if (!pickMode) frame.addView(fab, fl);
+        if (pickMode) {
+            // Confirm / Cancel replace the tab bar until the choice is made
+            LinearLayout bar = new LinearLayout(this);
+            bar.setOrientation(LinearLayout.HORIZONTAL);
+            bar.setPadding(CaseViews.dp(this, 12), CaseViews.dp(this, 8), CaseViews.dp(this, 12), CaseViews.dp(this, 10));
+            Button cancel = LegalUi.outlineButton(this, "Cancel");
+            cancel.setOnClickListener(v -> { setResult(RESULT_CANCELED); finish(); });
+            Button ok = new Button(this);
+            ok.setText("Confirm");
+            ok.setAllCaps(false);
+            ok.setTextColor(0xFFFFFFFF);
+            ok.setBackground(CaseViews.box(this, AppTheme.accent(this), 12, 0, 0));
+            ok.setOnClickListener(v -> {
+                if (pickedDocId.isEmpty()) {
+                    android.widget.Toast.makeText(this, "Select a document first", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                setResult(RESULT_OK, new Intent().putExtra("doc_id", pickedDocId));
+                finish();
+            });
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            bl.rightMargin = CaseViews.dp(this, 6);
+            LinearLayout.LayoutParams bl2 = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            bl2.leftMargin = CaseViews.dp(this, 6);
+            bar.addView(cancel, bl);
+            bar.addView(ok, bl2);
+            root.addView(bar, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
         setContentView(frame);
     }
 
@@ -286,9 +319,10 @@ public class MarkedFilesActivity extends BaseActivity {
         String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
         items.clear();
         for (Item it : all) {
+            if (pickMode && it.doc == null) continue;          // only saved documents can take the shared file
             if (q.isEmpty() || matches(it, q)) items.add(it);
         }
-        status.setText(items.size() + " marked files" + (q.isEmpty() ? "" : "  \u2022  filtered by \"" + q + "\""));
+        status.setText((pickMode ? "Select the document the shared file(s) join  \u2022  " : "") + items.size() + " marked files" + (q.isEmpty() ? "" : "  \u2022  filtered by \"" + q + "\""));
         adapter.notifyDataSetChanged();
     }
 
@@ -986,8 +1020,21 @@ public class MarkedFilesActivity extends BaseActivity {
                 }
             });
 
-            outer.addView(card, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            if (pickMode && it.doc != null) {
+                final String pickId = it.doc.id;
+                android.widget.RadioButton rb = new android.widget.RadioButton(c);
+                rb.setChecked(pickId.equals(pickedDocId));
+                View.OnClickListener choose = v -> { pickedDocId = pickId; notifyDataSetChanged(); };
+                rb.setOnClickListener(choose);
+                card.setOnClickListener(choose);
+                outer.setGravity(Gravity.CENTER_VERTICAL);
+                outer.addView(rb, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                outer.addView(card, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            } else {
+                outer.addView(card, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
             return outer;
         }
     }
