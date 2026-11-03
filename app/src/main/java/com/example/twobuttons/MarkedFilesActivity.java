@@ -883,6 +883,8 @@ public class MarkedFilesActivity extends BaseActivity {
                                     android.widget.Toast.makeText(c, "Could not delete this file", android.widget.Toast.LENGTH_SHORT).show();
                                 c.reload();
                             });
+                    sb.add = () -> addFilesFrom(it, g);
+                    sb.addLabel = gk == 0 ? "Add page" : "Add more";
                     sb.notes = () -> editFileNotes(g, shownLabel);
                     sb.notesFilled = !fileNote(g.path).isEmpty();
                     java.util.Set<String> gc = new TreeSet<>(g.marks.values());
@@ -1005,10 +1007,15 @@ public class MarkedFilesActivity extends BaseActivity {
 
     private static final int REQ_ADD = 72;
     private Item addTarget;
+    private Item addRow;       // set when the add started from a file row (null = card-level add)
 
     /** Add button on a card: pick more images / PDFs / Word files; they join THIS card's document. */
-    private void addFiles(Item it) {
+    private void addFiles(Item it) { addFilesFrom(it, null); }
+
+    /** row == null: card-level add. PDF row: more pages join that PDF. Image / Word row: more files join the card beside it, same category. */
+    private void addFilesFrom(Item it, Item row) {
         addTarget = it;
+        addRow = row;
         Intent in = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         in.addCategory(Intent.CATEGORY_OPENABLE);
         in.setType("*/*");
@@ -1037,13 +1044,74 @@ public class MarkedFilesActivity extends BaseActivity {
             got.add(data.getData());
         }
         if (got.isEmpty()) return;
-        java.util.Set<String> cats = new TreeSet<>(it.marks.values());
+        final Item row = addRow;
+        addRow = null;
+        if (row != null && DocFileCard.kind(new File(row.path).getName()) == 0) {
+            java.util.Set<String> rc = new TreeSet<>(row.marks.values());
+            if (rc.size() == 1) appendPages(row, got, rc.iterator().next());
+            else CategoryPicker.pick(this, "", cat -> appendPages(row, got, cat));
+            return;
+        }
+        java.util.Set<String> cats = new TreeSet<>((row != null ? row : it).marks.values());
+        final String after = row == null ? null : row.path;
+        if (row != null && cats.size() == 1) { attachFiles(it, got, cats.iterator().next(), after); return; }
         CategoryPicker.pick(this, cats.size() == 1 ? cats.iterator().next() : "",
-                cat -> attachFiles(it, got, cat));
+                cat -> attachFiles(it, got, cat, after));
     }
 
     /** New files are stored in the app folder, marked with the category, and listed on this card. */
-    private void attachFiles(Item it, List<android.net.Uri> uris, String cat) {
+    /** Add page(s) (images / PDF pages) to the END of an existing PDF; the new pages get cat. */
+    private void appendPages(final Item row, final List<android.net.Uri> picked, final String cat) {
+        if (cat == null || cat.trim().isEmpty()) return;
+        android.widget.Toast.makeText(this, "Adding pages...", android.widget.Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String err = null;
+            final int before = totalPages(row.path);
+            int total = -1;
+            try {
+                if (before < 1) throw new java.io.IOException("cannot read this PDF");
+                List<android.net.Uri> all2 = new ArrayList<>();
+                all2.add(PhotoFlow.uri(this, new File(row.path)));
+                all2.addAll(picked);
+                File merged = PdfTools.mergeToPdf(this, all2, "append", new int[1]);
+                int mp = totalPages(merged.getAbsolutePath());
+                if (mp <= before) throw new java.io.IOException("nothing was added (use PDF or image files)");
+                try (java.io.InputStream in = new java.io.FileInputStream(merged);
+                     java.io.OutputStream out = new java.io.FileOutputStream(new File(row.path))) {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                total = totalPages(row.path);
+            } catch (Exception e) {
+                err = e.getMessage() == null ? "failed" : e.getMessage();
+            }
+            final String fErr = err;
+            final int fTotal = total;
+            runOnUiThread(() -> {
+                if (fErr != null || fTotal <= before) {
+                    android.widget.Toast.makeText(this, "Could not add pages: " + (fErr == null ? "no new page" : fErr),
+                            android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                for (int pg = before; pg < fTotal; pg++) store.set(row.path, pg, cat.trim());
+                LegalStore.Doc d = DocEdit.docFor(this, row.path);
+                if (d != null) {
+                    List<android.net.Uri> grp = new ArrayList<>();
+                    if (!d.uri.isEmpty()) grp.add(android.net.Uri.parse(d.uri));
+                    for (String m : d.more) grp.add(android.net.Uri.parse(m));
+                    d.fileName = FileSetDialog.label(this, grp);
+                    d.size = FileSetDialog.totalSize(this, grp);
+                    new LegalStore(this).saveDoc(d);
+                }
+                android.widget.Toast.makeText(this, (fTotal - before) + " page(s) added: now " + fTotal + " pages",
+                        android.widget.Toast.LENGTH_SHORT).show();
+                reload();
+            });
+        }).start();
+    }
+
+    private void attachFiles(Item it, List<android.net.Uri> uris, String cat, String afterPath) {
         if (cat == null || cat.trim().isEmpty()) return;
         List<android.net.Uri> added = new ArrayList<>();
         for (android.net.Uri u : uris) {
@@ -1075,9 +1143,24 @@ public class MarkedFilesActivity extends BaseActivity {
             d.category = cs.size() == 1 ? cs.iterator().next() : cat.trim();
             try { d.uri = PhotoFlow.uri(this, lead).toString(); } catch (Exception ignored) { }
         }
+        List<String> order = new ArrayList<>();
+        if (!d.uri.isEmpty()) order.add(d.uri);
+        order.addAll(d.more);
+        int at = order.size();
+        if (afterPath != null) {          // new files sit right after the row they were added from
+            try {
+                int ix = order.indexOf(PhotoFlow.uri(this, new File(afterPath)).toString());
+                if (ix >= 0) at = ix + 1;
+            } catch (Exception ignored) { }
+        }
         for (android.net.Uri u : added) {
             String us = u.toString();
-            if (!us.equals(d.uri) && !d.more.contains(us)) d.more.add(us);
+            if (!order.contains(us)) order.add(at++, us);
+        }
+        if (!order.isEmpty()) {
+            d.uri = order.get(0);
+            d.more.clear();
+            d.more.addAll(order.subList(1, order.size()));
         }
         List<android.net.Uri> grp = new ArrayList<>();
         if (!d.uri.isEmpty()) grp.add(android.net.Uri.parse(d.uri));
