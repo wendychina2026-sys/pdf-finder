@@ -906,10 +906,24 @@ public class MarkedFilesActivity extends BaseActivity {
                     sb.details = () -> showPath(g);
                     sb.edit = () -> DocMove.editFile(c, g.path, shownLabel, c::reload);
                     sb.share = () -> shareFile(g.path);
-                    if (gk != 1 && !g.marks.isEmpty()) sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
-                            (gk == 0 ? "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be removed."
-                                    : "The marking of \"" + shownLabel + "\" will be removed.") + " The file is kept.",
-                            "Reset", () -> { store.clear(g.path); c.reload(); });
+                    if (gk != 1 && !g.marks.isEmpty()) {
+                        // REMOVE wipes the marking (the file leaves the Vault); RESET clears it and reopens the marker to mark the pages again
+                        sb.remove = () -> PickerDialogs.confirm(c, "Remove marking?",
+                                (gk == 0 ? "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be wiped."
+                                        : "The marking of \"" + shownLabel + "\" will be wiped.")
+                                        + " The file is kept but leaves the Document Vault.",
+                                "Remove", () -> { store.clear(g.path); c.reload(); });
+                        if (g.total > 1) {
+                            sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
+                                    "All page marks of \"" + shownLabel + "\" are cleared and the marker opens so you can mark "
+                                            + "its pages again. If you leave without marking, the file leaves the Document Vault.",
+                                    "Reset", () -> { store.clear(g.path); c.openMarker(g.path, null, null); });
+                        } else {
+                            sb.resetOff = true;
+                            sb.reset = () -> android.widget.Toast.makeText(c,
+                                    "Only single page document, no reset available", android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                    }
                     sb.delete = () -> PickerDialogs.confirm(c, "Delete this file?",
                             "\"" + shownLabel + "\" is removed from this card, with its marks and name.",
                             "Delete", () -> {

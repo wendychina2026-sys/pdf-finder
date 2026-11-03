@@ -31,7 +31,8 @@ final class DocFileCard {
         Runnable open, details, edit, share, notes;
         Runnable add;               // PDF row: add page(s) to this PDF; image / Word row: add more files like it
         String addLabel = "Add";
-        Runnable reset, delete;     // per-file buttons (reset marking / delete from this card); null = not shown
+        Runnable reset, remove, delete;     // per-file buttons: reset = mark the pages again, remove = wipe the marking
+        boolean resetOff;           // single-page file: reset is greyed out and only explains why (reset marking / delete from this card); null = not shown
     }
 
     static final class Info {
@@ -261,12 +262,17 @@ final class DocFileCard {
             if (sb.edit != null) r.addView(tinyBtn(a, R.drawable.ic_edit, AppTheme.info(a), "Edit file name", sb.edit));
             if (sb.details != null) r.addView(tinyBtn(a, R.drawable.ic_info, AppTheme.sub(a), "File details", sb.details));
             if (sb.share != null) r.addView(tinyBtn(a, R.drawable.ic_share, AppTheme.sub(a), "Share this file", sb.share));
-            if (sb.add != null || sb.reset != null || sb.delete != null) {
+            if (sb.add != null || sb.reset != null || sb.remove != null || sb.delete != null) {
                 LinearLayout r2 = new LinearLayout(a);
                 r2.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
                 r2.setPadding(dp(a, 8), 0, dp(a, 6), dp(a, 4));
                 if (sb.add != null) r2.addView(chip(a, R.drawable.ic_add_circle, AppTheme.accent(a), sb.addLabel, sb.add));
-                if (sb.reset != null) r2.addView(chip(a, R.drawable.ic_refresh, AppTheme.info(a), "Reset marking", sb.reset));
+                if (sb.reset != null) {
+                    View rb = chip(a, R.drawable.ic_refresh, AppTheme.info(a), "Reset", sb.reset);
+                    if (sb.resetOff) rb.setAlpha(0.4f);
+                    r2.addView(rb);
+                }
+                if (sb.remove != null) r2.addView(chip(a, R.drawable.ic_close, 0xFFE65100, "Remove", sb.remove));
                 if (sb.delete != null) r2.addView(chip(a, R.drawable.ic_delete, 0xFFF44336, "Delete", sb.delete));
                 wrap.addView(r2, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
