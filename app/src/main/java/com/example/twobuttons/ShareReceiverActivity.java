@@ -22,6 +22,8 @@ public class ShareReceiverActivity extends Activity {
     private static final int REQ_PICK_DOC = 81;
     private ArrayList<File> pendingFiles;
     private boolean pendingPdf;
+    private String pendingName;       // typed after Confirm: this file's name
+    private String pendingCat;        // ... and its category (images / Word); a PDF is marked in the marker
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
@@ -35,7 +37,7 @@ public class ShareReceiverActivity extends Activity {
             if (res == RESULT_OK && id != null) {
                 for (LegalStore.Doc d : new LegalStore(this).docs()) if (id.equals(d.id)) { chosen = d; break; }
             }
-            if (chosen != null) manageThenAttach(files, chosen, pendingPdf);
+            if (chosen != null) askDetails(files, chosen, pendingPdf);
             else askNewOrAttach(files, pendingPdf);
             return;
         }
@@ -222,6 +224,38 @@ public class ShareReceiverActivity extends Activity {
         startActivityForResult(i, REQ_PICK_DOC);
     }
 
+    /** After Confirm: this file's name (+ category for images / Word). The matter is already the card's: it is NOT asked again. */
+    private void askDetails(final ArrayList<File> files, final LegalStore.Doc d, final boolean pdf) {
+        android.widget.LinearLayout form = LegalUi.form(this);
+        final android.widget.EditText nameEt = LegalUi.text(this, form,
+                files.size() > 1 ? "Name / caption (numbered 1, 2, 3...)" : "File name / caption",
+                DocFileCard.stem(files.get(0).getName()));
+        String cur = d.category == null || d.category.equals("Multiple") ? "" : d.category;
+        final CategoryPicker cp = pdf ? null : new CategoryPicker(this, form, cur);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(form);
+        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle("Add to \"" + d.name + "\"")
+                .setView(sv)
+                .setPositiveButton("OK", null)
+                .setNegativeButton("Cancel", (x, w) -> askNewOrAttach(files, pdf))
+                .setOnCancelListener(x -> askNewOrAttach(files, pdf))
+                .create();
+        dlg.show();
+        dlg.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!LegalUi.need(this, nameEt, "File name")) return;
+            pendingName = LegalUi.str(nameEt);
+            pendingCat = cp == null ? null : cp.get().trim();
+            dlg.dismiss();
+            manageThenAttach(files, d, pdf);
+        });
+    }
+
+    private void applyCaption(File moved, int idx, int total) {
+        if (pendingName == null || moved == null) return;
+        FileCaption.set(this, moved.getAbsolutePath(), total > 1 ? pendingName + " (" + (idx + 1) + ")" : pendingName);
+    }
+
     /** Image / Word share: ONE box with the card's current files + the new ones, so they can be reordered / removed first. */
     private void manageThenAttach(final ArrayList<File> files, final LegalStore.Doc d, final boolean pdf) {
         if (pdf) { attach(files, d, true); return; }
@@ -249,6 +283,7 @@ public class ShareReceiverActivity extends Activity {
         boolean general = m.isEmpty() || m.equals("[]") || m.equals("General Document Vault");
         java.util.List<Uri> finalList = new ArrayList<>();
         int added = 0;
+        int ii = 0;
         for (Uri u : list) {
             File f = incoming.get(u.toString());
             if (f == null) { finalList.add(u); continue; }
@@ -256,7 +291,10 @@ public class ShareReceiverActivity extends Activity {
             if (moved == null) continue;
             finalList.add(PhotoFlow.uri(this, moved));
             String path = moved.getAbsolutePath();
-            if (general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
+            applyCaption(moved, ii++, incoming.size());
+            if (pendingCat != null && !pendingCat.isEmpty()) {
+                ms.set(path, 0, pendingCat);
+            } else if (general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
                     && !d.category.equals("Multiple")) {
                 ms.set(path, 0, d.category);
             }
@@ -291,7 +329,10 @@ public class ShareReceiverActivity extends Activity {
             d.more.add(u);
             String path = moved.getAbsolutePath();
             if (firstAdded == null) firstAdded = moved;
-            if (!pdf && general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
+            applyCaption(moved, files.indexOf(f), files.size());
+            if (!pdf && pendingCat != null && !pendingCat.isEmpty()) {
+                ms.set(path, 0, pendingCat);
+            } else if (!pdf && general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
                     && !d.category.equals("Multiple")) {
                 ms.set(path, 0, d.category);          // an image / Word file = one page, marked like the first file
             }
