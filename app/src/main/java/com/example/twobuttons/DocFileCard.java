@@ -29,7 +29,6 @@ final class DocFileCard {
         boolean notesFilled;
         Runnable open, details, edit, share, notes;
         Runnable reset, delete;     // per-file buttons (reset marking / delete from this card); null = not shown
-        Runnable longPress;         // long-press on the row: move this file up / down
     }
 
     static final class Info {
@@ -43,6 +42,9 @@ final class DocFileCard {
         String tag = "";        // small orange line under "Attached to" (e.g. marks pending); tagClick runs on tap
         Runnable tagClick;
         boolean notesFilled;    // Document Vault: the attached case has notes (icon is lit)
+        String dragKey = "";    // identifies this card while a file row is dragged
+        java.util.function.BiConsumer<Integer, Integer> reorder;          // (fromRow, toRow) after a drag-drop of a file row
+        java.util.function.BiConsumer<View, android.view.DragEvent> dragMove;  // for edge auto-scroll
     }
 
     static final class Actions {
@@ -167,7 +169,9 @@ final class DocFileCard {
             pl.setPadding(0, dp(a, 4), 0, 0);
             top.addView(pl);
         }
-        for (final Sub sb : in.subs) {
+        for (int subI = 0; subI < in.subs.size(); subI++) {
+            final Sub sb = in.subs.get(subI);
+            final int subIdx = subI;
             LinearLayout wrap = new LinearLayout(a);
             wrap.setOrientation(LinearLayout.VERTICAL);
             wrap.setTag("subrow");
@@ -210,11 +214,37 @@ final class DocFileCard {
                 wrap.addView(r2, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             }
-            if (sb.longPress != null) {
-                final View.OnLongClickListener lp = v -> { sb.longPress.run(); return true; };
+            if (in.reorder != null && in.subs.size() > 1) {
+                final View.OnLongClickListener lp = vw -> {
+                    android.content.ClipData cd = android.content.ClipData.newPlainText("sub", String.valueOf(subIdx));
+                    return wrap.startDragAndDrop(cd, new View.DragShadowBuilder(wrap),
+                            new Object[]{"sub", in.dragKey, subIdx}, 0);
+                };
                 wrap.setOnLongClickListener(lp);
                 r.setOnLongClickListener(lp);
                 for (int ci = 0; ci < r.getChildCount(); ci++) r.getChildAt(ci).setOnLongClickListener(lp);
+                wrap.setOnDragListener((vw, ev) -> {
+                    Object st = ev.getLocalState();
+                    boolean mine = st instanceof Object[] && ((Object[]) st).length == 3
+                            && "sub".equals(((Object[]) st)[0]) && in.dragKey.equals(((Object[]) st)[1]);
+                    switch (ev.getAction()) {
+                        case android.view.DragEvent.ACTION_DRAG_STARTED: return mine;
+                        case android.view.DragEvent.ACTION_DRAG_ENTERED: vw.setAlpha(0.5f); return true;
+                        case android.view.DragEvent.ACTION_DRAG_LOCATION:
+                            if (in.dragMove != null) in.dragMove.accept(vw, ev);
+                            return true;
+                        case android.view.DragEvent.ACTION_DRAG_EXITED: vw.setAlpha(1f); return true;
+                        case android.view.DragEvent.ACTION_DROP:
+                            vw.setAlpha(1f);
+                            if (mine) {
+                                int from = (Integer) ((Object[]) st)[2];
+                                if (from != subIdx) in.reorder.accept(from, subIdx);
+                            }
+                            return true;
+                        case android.view.DragEvent.ACTION_DRAG_ENDED: vw.setAlpha(1f); return true;
+                        default: return false;
+                    }
+                });
             }
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);

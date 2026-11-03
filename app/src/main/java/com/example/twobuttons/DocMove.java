@@ -245,6 +245,30 @@ final class DocMove {
         }
     }
 
+    /** Drag-drop: move file fromPath to the place of file toPath within the same card. */
+    static boolean reorder(Activity a, String fromPath, String toPath) {
+        try {
+            LegalStore ls = new LegalStore(a);
+            LegalStore.Doc doc = DocEdit.docFor(a, fromPath);
+            if (doc == null) return false;
+            List<Uri> files = filesOf(doc);
+            String fu = PhotoFlow.uri(a, new File(fromPath)).toString();
+            String tu = PhotoFlow.uri(a, new File(toPath)).toString();
+            int i = -1, j = -1;
+            for (int k = 0; k < files.size(); k++) {
+                if (files.get(k).toString().equals(fu)) i = k;
+                if (files.get(k).toString().equals(tu)) j = k;
+            }
+            if (i < 0 || j < 0 || i == j) return false;
+            Uri m = files.remove(i);
+            files.add(j, m);
+            saveOrder(a, ls, doc, files);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** Take one file off its card (its marks and caption go too). The card must keep at least one file. */
     static boolean removeFromCard(Activity a, String path) {
         try {

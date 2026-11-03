@@ -57,6 +57,7 @@ public class MarkedFilesActivity extends BaseActivity {
     private final List<Item> all = new ArrayList<>();
     private final List<Item> items = new ArrayList<>();
     private BaseAdapter adapter;
+    private ListView listView;
     private TextView status;
     private EditText search;
     private MarkStore store;
@@ -85,17 +86,12 @@ public class MarkedFilesActivity extends BaseActivity {
 
         adapter = new ItemAdapter();
         ListView list = new ListView(this);
+        listView = list;
         list.setAdapter(adapter);
         list.setDivider(null);
         list.setDividerHeight(0);
         list.setOnItemClickListener((parent, view, pos, id) -> {
             openMarker(items.get(pos).path, null, null);
-        });
-
-        list.setOnItemLongClickListener((parent, view, pos, id) -> {
-            if (!items.get(pos).extras.isEmpty()) return false;
-            showFileOptions(items.get(pos));
-            return true;
         });
 
         Button addCase = LegalUi.outlineButton(this, "+  Add Case");
@@ -209,7 +205,81 @@ public class MarkedFilesActivity extends BaseActivity {
             h.grouped = true;
             for (Item x : h.extras) x.grouped = true;
         }
+        // files inside one card follow the document's own order (drag-drop changes it)
+        for (int mi = 0; mi < merged.size(); mi++) {
+            Item h = merged.get(mi);
+            if (h.extras.isEmpty() || h.doc == null) continue;
+            final List<String> docOrder = new ArrayList<>();
+            docOrder.add(h.doc.uri);
+            docOrder.addAll(h.doc.more);
+            List<Item> grp = new ArrayList<>();
+            grp.add(h);
+            grp.addAll(h.extras);
+            Collections.sort(grp, (x, y) -> {
+                int a = docOrder.indexOf(uriOf(x)), b = docOrder.indexOf(uriOf(y));
+                if (a < 0) a = Integer.MAX_VALUE;
+                if (b < 0) b = Integer.MAX_VALUE;
+                return a == b ? 0 : (a < b ? -1 : 1);
+            });
+            for (Item x : grp) x.extras.clear();
+            Item head = grp.get(0);
+            head.extras.addAll(grp.subList(1, grp.size()));
+            merged.set(mi, head);
+        }
+        // cards follow the order the user dragged them into; new cards keep the name order after those
+        final List<String> saved = savedOrder();
+        if (!saved.isEmpty()) {
+            Collections.sort(merged, (x, y) -> {
+                int a = saved.indexOf(orderKey(x)), b = saved.indexOf(orderKey(y));
+                if (a < 0) a = Integer.MAX_VALUE;
+                if (b < 0) b = Integer.MAX_VALUE;
+                return a == b ? 0 : (a < b ? -1 : 1);
+            });
+        }
         return merged;
+    }
+
+    private String uriOf(Item x) {
+        try { return PhotoFlow.uri(this, new File(x.path)).toString(); } catch (Exception e) { return ""; }
+    }
+
+    private static String orderKey(Item it) {
+        return it.doc != null ? "doc:" + it.doc.id : it.path;
+    }
+
+    private List<String> savedOrder() {
+        String s = getSharedPreferences("vault_order", MODE_PRIVATE).getString("order", "");
+        return s.isEmpty() ? new ArrayList<String>() : new ArrayList<>(java.util.Arrays.asList(s.split("\n")));
+    }
+
+    /** Drag-drop of a whole card: it takes the place of the card it was dropped on, and the order is kept. */
+    private void moveCard(String fromKey, String toKey) {
+        List<String> keys = new ArrayList<>();
+        for (Item x : all) keys.add(orderKey(x));
+        int i = keys.indexOf(fromKey), j = keys.indexOf(toKey);
+        if (i < 0 || j < 0 || i == j) return;
+        keys.add(j, keys.remove(i));
+        getSharedPreferences("vault_order", MODE_PRIVATE).edit().putString("order", TextUtils.join("\n", keys)).apply();
+        Item moved = all.remove(i);
+        all.add(j, moved);
+        applyFilter();
+    }
+
+    /** While dragging near the top / bottom edge of the list, scroll it. */
+    private void autoScroll(View v, android.view.DragEvent ev) {
+        if (listView == null) return;
+        int[] lv = new int[2], vv = new int[2];
+        listView.getLocationOnScreen(lv);
+        v.getLocationOnScreen(vv);
+        float y = vv[1] + ev.getY();
+        int edge = CaseViews.dp(this, 70), step = CaseViews.dp(this, 30);
+        if (y < lv[1] + edge) listView.smoothScrollBy(-step, 0);
+        else if (y > lv[1] + listView.getHeight() - edge) listView.smoothScrollBy(step, 0);
+    }
+
+    private boolean startCardDrag(View root, Item it) {
+        android.content.ClipData cd = android.content.ClipData.newPlainText("card", it.path);
+        return root.startDragAndDrop(cd, new View.DragShadowBuilder(root), new Object[]{"card", orderKey(it)}, 0);
     }
 
     private void applyFilter() {
@@ -791,8 +861,9 @@ public class MarkedFilesActivity extends BaseActivity {
                         else editFileName(g, shownLabel);
                     });
                     sb.share = () -> shareFile(g.path);
-                    if (gk == 0 && !g.marks.isEmpty()) sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
-                            "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be removed. The file is kept.",
+                    if (gk != 1 && !g.marks.isEmpty()) sb.reset = () -> PickerDialogs.confirm(c, "Reset marking?",
+                            (gk == 0 ? "All " + g.marks.size() + " page marks of \"" + shownLabel + "\" will be removed."
+                                    : "The marking of \"" + shownLabel + "\" will be removed.") + " The file is kept.",
                             "Reset", () -> { store.clear(g.path); c.reload(); });
                     sb.delete = () -> PickerDialogs.confirm(c, "Delete this file?",
                             "\"" + shownLabel + "\" is removed from this card, with its marks and name.",
@@ -801,23 +872,17 @@ public class MarkedFilesActivity extends BaseActivity {
                                     android.widget.Toast.makeText(c, "Could not delete this file", android.widget.Toast.LENGTH_SHORT).show();
                                 c.reload();
                             });
-                    final int pos = gi, cnt = grp.size();
-                    sb.longPress = () -> {
-                        List<String> mv = new ArrayList<>();
-                        final boolean canUp = pos > 0, canDown = pos < cnt - 1;
-                        if (canUp) mv.add("Move up");
-                        if (canDown) mv.add("Move down");
-                        PickerDialogs.optionSheet(c, "Move file", shownLabel, mv, -1, w -> {
-                            boolean up = canUp && w == 0;
-                            DocMove.shift(c, g.path, up ? -1 : 1);
-                            c.reload();
-                        });
-                    };
                     sb.notes = () -> editFileNotes(g, shownLabel);
                     sb.notesFilled = !fileNote(g.path).isEmpty();
                     sb.meta = fileMeta(g, gk);
                     info.subs.add(sb);
                 }
+                info.dragKey = orderKey(it);
+                info.reorder = (from, to) -> {
+                    DocMove.reorder(c, grp.get(from).path, grp.get(to).path);
+                    c.reload();
+                };
+                info.dragMove = (vw, ev) -> c.autoScroll(vw, ev);
                 // images / Word files are one page each: only PDFs get the marked / unmarked / total line
                 info.pagesLine = grp.size() + " files in this document"
                         + (anyPdf ? "  \u2022  Marked pages: " + marked
@@ -874,11 +939,26 @@ public class MarkedFilesActivity extends BaseActivity {
                     android.widget.Toast.makeText(c, "Cannot share this file", android.widget.Toast.LENGTH_SHORT).show();
                 }
             };
+            if (it.extras.isEmpty()) act.delete = () -> showFileOptions(it);
             LinearLayout card = DocFileCard.build(c, info, act);
-            if (it.extras.isEmpty()) {       // a multi-file card has no card-level long-press: its rows handle their own
-                longPressAll(card, it);
-                card.setOnLongClickListener(v -> { showFileOptions(it); return true; });
-            }
+            longPressAll(card, it, card);     // long-press a card (not a file row) and drag it up / down
+            card.setOnLongClickListener(v -> startCardDrag(card, it));
+            card.setOnDragListener((vw, ev) -> {
+                Object st = ev.getLocalState();
+                boolean mine = st instanceof Object[] && ((Object[]) st).length == 2 && "card".equals(((Object[]) st)[0]);
+                switch (ev.getAction()) {
+                    case android.view.DragEvent.ACTION_DRAG_STARTED: return mine;
+                    case android.view.DragEvent.ACTION_DRAG_ENTERED: vw.setAlpha(0.5f); return true;
+                    case android.view.DragEvent.ACTION_DRAG_LOCATION: c.autoScroll(vw, ev); return true;
+                    case android.view.DragEvent.ACTION_DRAG_EXITED: vw.setAlpha(1f); return true;
+                    case android.view.DragEvent.ACTION_DROP:
+                        vw.setAlpha(1f);
+                        if (mine) c.moveCard((String) ((Object[]) st)[1], orderKey(it));
+                        return true;
+                    case android.view.DragEvent.ACTION_DRAG_ENDED: vw.setAlpha(1f); return true;
+                    default: return false;
+                }
+            });
 
             outer.addView(card, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -982,13 +1062,13 @@ public class MarkedFilesActivity extends BaseActivity {
         reload();
     }
 
-    /** Long-press anywhere on a card (its tappable parts too) offers Delete file / Reset marking. */
-    private void longPressAll(View v, final Item it) {
+    /** Long-press anywhere on a card (its tappable parts too) starts dragging the card. */
+    private void longPressAll(View v, final Item it, final View root) {
         if ("subrow".equals(v.getTag())) return;
-        if (v.hasOnClickListeners()) v.setOnLongClickListener(x -> { showFileOptions(it); return true; });
+        if (v.hasOnClickListeners()) v.setOnLongClickListener(x -> startCardDrag(root, it));
         if (v instanceof ViewGroup) {
             ViewGroup g = (ViewGroup) v;
-            for (int k = 0; k < g.getChildCount(); k++) longPressAll(g.getChildAt(k), it);
+            for (int k = 0; k < g.getChildCount(); k++) longPressAll(g.getChildAt(k), it, root);
         }
     }
 }
