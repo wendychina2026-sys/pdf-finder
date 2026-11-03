@@ -231,7 +231,7 @@ public class ShareReceiverActivity extends Activity {
                 files.size() > 1 ? "Name / caption (numbered 1, 2, 3...)" : "File name / caption",
                 DocFileCard.stem(files.get(0).getName()));
         String cur = d.category == null || d.category.equals("Multiple") ? "" : d.category;
-        final CategoryPicker cp = pdf ? null : new CategoryPicker(this, form, cur);
+        final CategoryPicker cp = new CategoryPicker(this, form, cur);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(form);
         final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
@@ -245,7 +245,7 @@ public class ShareReceiverActivity extends Activity {
         dlg.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (!LegalUi.need(this, nameEt, "File name")) return;
             pendingName = LegalUi.str(nameEt);
-            pendingCat = cp == null ? null : cp.get().trim();
+            pendingCat = cp.get().trim();
             dlg.dismiss();
             manageThenAttach(files, d, pdf);
         });
@@ -330,7 +330,10 @@ public class ShareReceiverActivity extends Activity {
             String path = moved.getAbsolutePath();
             if (firstAdded == null) firstAdded = moved;
             applyCaption(moved, files.indexOf(f), files.size());
-            if (!pdf && pendingCat != null && !pendingCat.isEmpty()) {
+            if (pdf && pendingCat != null && !pendingCat.isEmpty()) {
+                int pc = Math.max(1, DocEdit.pageCount(moved));      // every page starts in the chosen type; refine in the marker
+                for (int pg = 0; pg < pc; pg++) ms.set(path, pg, pendingCat);
+            } else if (!pdf && pendingCat != null && !pendingCat.isEmpty()) {
                 ms.set(path, 0, pendingCat);
             } else if (!pdf && general && ms.all(path).isEmpty() && d.category != null && !d.category.isEmpty()
                     && !d.category.equals("Multiple")) {
