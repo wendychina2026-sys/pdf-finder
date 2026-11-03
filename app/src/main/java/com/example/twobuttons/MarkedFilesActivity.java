@@ -794,6 +794,7 @@ public class MarkedFilesActivity extends BaseActivity {
             info.fileName = f.getName();
             info.stage = it.stage;
             java.util.Set<String> cats = new TreeSet<>(it.marks.values());
+            for (Item x : it.extras) cats.addAll(x.marks.values());
             info.category = cats.size() == 1 ? cats.iterator().next() : "Multiple";
             String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
             info.matter = (m.isEmpty() || m.equals(MatterPicker.VAULT)) ? "General Document Vault" : m;
@@ -907,14 +908,21 @@ public class MarkedFilesActivity extends BaseActivity {
             act.details = !it.extras.isEmpty() ? null : () -> showDetails(it);
             if (!it.extras.isEmpty()) act.viewPdf = () -> {
                 List<android.net.Uri> us = new ArrayList<>();
+                Map<String, Map<Integer, String>> pageMarks = new java.util.HashMap<>();
                 try {
-                    us.add(PhotoFlow.uri(c, new File(it.path)));
-                    for (Item g : it.extras) us.add(PhotoFlow.uri(c, new File(g.path)));
+                    android.net.Uri u0 = PhotoFlow.uri(c, new File(it.path));
+                    us.add(u0);
+                    pageMarks.put(u0.toString(), it.marks);
+                    for (Item g : it.extras) {
+                        android.net.Uri ug = PhotoFlow.uri(c, new File(g.path));
+                        us.add(ug);
+                        pageMarks.put(ug.toString(), g.marks);
+                    }
                 } catch (Exception e) {
                     android.widget.Toast.makeText(c, "Cannot read these files", android.widget.Toast.LENGTH_SHORT).show();
                     return;
                 }
-                DocFileCard.viewAsOnePdf(c, us, DocFileCard.stem(info.name));
+                DocFileCard.viewAsOnePdf(c, us, DocFileCard.stem(info.name), pageMarks);
             };
             act.edit = () -> editItem(it);
             act.notes = () -> editCardNotes(it);
@@ -972,7 +980,11 @@ public class MarkedFilesActivity extends BaseActivity {
      * all marked pages share one category; with several categories they are edited in Show details.
      */
     private void editItem(final Item it) {
-        DocEdit.show(this, it.path, this::reload);
+        if (it.extras.isEmpty()) { DocEdit.show(this, it.path, this::reload); return; }
+        List<String> ps = new ArrayList<>();
+        ps.add(it.path);
+        for (Item x : it.extras) ps.add(x.path);
+        DocEdit.showGroup(this, ps, this::reload);
     }
 
     private static final int REQ_ADD = 72;
