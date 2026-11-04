@@ -1284,11 +1284,16 @@ public class NewCaseActivity extends BaseActivity {
                     thumbView.setBackground(thumbBg);
                     thumbView.setClipToOutline(true);
                     dlgThumb(thumbView, dlgUris.get(fi), kind);
+                    TextView numView = CaseViews.text(this, String.valueOf(fi + 1), 15, AppTheme.text(this), true);
+                    numView.setGravity(Gravity.CENTER);
+                    numView.setPadding(0, 0, dp(8), 0);
+                    topRow.addView(numView, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     topRow.addView(thumbView, new LinearLayout.LayoutParams(dp(72), dp(72)));
                     LinearLayout infoCol = new LinearLayout(this);
                     infoCol.setOrientation(LinearLayout.VERTICAL);
                     infoCol.setPadding(dp(12), 0, 0, 0);
-                    TextView t1 = CaseViews.text(this, (fi + 1) + ".  " + fname, 13.5f, AppTheme.text(this), true);
+                    TextView t1 = CaseViews.text(this, fname, 13.5f, AppTheme.text(this), true);
                     t1.setSingleLine(true);
                     t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
                     infoCol.addView(t1);
@@ -1370,8 +1375,10 @@ public class NewCaseActivity extends BaseActivity {
                                         dlgUris.remove(idx);
                                         dlgRefresh.run();
                                     })), dlgBtnLp(true));
-                    fileCard.addView(btns, new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    LinearLayout.LayoutParams btnsLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    btnsLp.topMargin = dp(10);
+                    fileCard.addView(btns, btnsLp);
                     if (kind == 0) {       // PDF: reopen it to delete pages or add photos
                         View pages = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit pages (add / remove)", () ->
                                 PdfPageEditor.open(this, flow, dlgUris.get(idx), neu -> {
@@ -1741,11 +1748,13 @@ public class NewCaseActivity extends BaseActivity {
         LinearLayout b = new LinearLayout(this);
         b.setOrientation(LinearLayout.HORIZONTAL);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(6), dp(8), dp(6), dp(8));
+        b.setPadding(dp(4), dp(5), dp(4), dp(5));
         b.setBackground(CaseViews.box(this, AppTheme.field(this), 10, color, 1));
-        b.addView(CaseViews.icon(this, icon, color, 16));
-        TextView t = CaseViews.text(this, label, 12, color, true);
-        t.setPadding(dp(5), 0, 0, 0);
+        b.addView(CaseViews.icon(this, icon, color, 14));
+        TextView t = CaseViews.text(this, label, 11, color, true);
+        t.setSingleLine(true);
+        t.setEllipsize(null);
+        t.setPadding(dp(3), 0, 0, 0);
         b.addView(t);
         b.setOnClickListener(v -> click.run());
         return b;
