@@ -1375,6 +1375,14 @@ public class NewCaseActivity extends BaseActivity {
                                         dlgUris.remove(idx);
                                         dlgRefresh.run();
                                     })), dlgBtnLp(true));
+                    if (kind == 2) {        // image: turn 90 degrees clockwise, the turned picture is what gets saved
+                        View rot = dlgBtn(R.drawable.ic_rotate, AppTheme.accent(this), "", () -> dlgRotate(idx));
+                        rot.setContentDescription("Rotate 90 degrees");
+                        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(dp(46),
+                                ViewGroup.LayoutParams.MATCH_PARENT);
+                        rlp.leftMargin = dp(8);
+                        btns.addView(rot, rlp);
+                    }
                     LinearLayout.LayoutParams btnsLp = new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                     btnsLp.topMargin = dp(10);
@@ -1757,11 +1765,13 @@ public class NewCaseActivity extends BaseActivity {
         b.setPadding(dp(4), dp(5), dp(4), dp(5));
         b.setBackground(CaseViews.box(this, AppTheme.field(this), 10, color, 1));
         b.addView(CaseViews.icon(this, icon, color, 14));
-        TextView t = CaseViews.text(this, label, 11, color, true);
-        t.setSingleLine(true);
-        t.setEllipsize(null);
-        t.setPadding(dp(3), 0, 0, 0);
-        b.addView(t);
+        if (!label.isEmpty()) {
+            TextView t = CaseViews.text(this, label, 11, color, true);
+            t.setSingleLine(true);
+            t.setEllipsize(null);
+            t.setPadding(dp(3), 0, 0, 0);
+            b.addView(t);
+        }
         b.setOnClickListener(v -> click.run());
         return b;
     }
@@ -1979,6 +1989,57 @@ public class NewCaseActivity extends BaseActivity {
         vd.setOnDismissListener(x -> gen[0]++);
         vd.show();
         show[0].run();
+    }
+
+    /** Turn the image of an upload-dialog file 90 degrees clockwise and keep it turned (re-encoded, no EXIF tag left). */
+    private void dlgRotate(final int idx) {
+        if (idx < 0 || idx >= dlgUris.size()) return;
+        final Uri old = dlgUris.get(idx);
+        final String oldName = displayName(old);
+        final String markedPath = markerFiles.get(old.toString());
+        new Thread(() -> {
+            File out = null;
+            try {
+                android.graphics.Bitmap bm = dlgDecode(old, Integer.MAX_VALUE);
+                if (bm == null) throw new java.io.IOException("decode");
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                m.postRotate(90);
+                android.graphics.Bitmap r = android.graphics.Bitmap.createBitmap(
+                        bm, 0, 0, bm.getWidth(), bm.getHeight(), m, true);
+                if (markedPath != null && new File(markedPath).isFile()) {
+                    out = new File(markedPath);                 // a file the app already owns: turned in place
+                } else {
+                    File dir = new File(getCacheDir(), "rotated");
+                    dir.mkdirs();
+                    int dot = oldName.lastIndexOf('.');
+                    String base = dot > 0 ? oldName.substring(0, dot) : oldName;
+                    boolean png = oldName.toLowerCase(Locale.ROOT).endsWith(".png");
+                    out = new File(dir, base + (png ? ".png" : ".jpg"));
+                }
+                boolean png = out.getName().toLowerCase(Locale.ROOT).endsWith(".png");
+                File tmp = new File(out.getParentFile(), out.getName() + ".tmp");
+                try (java.io.FileOutputStream fo = new java.io.FileOutputStream(tmp)) {
+                    if (!r.compress(png ? android.graphics.Bitmap.CompressFormat.PNG
+                            : android.graphics.Bitmap.CompressFormat.JPEG, 95, fo)) throw new java.io.IOException("encode");
+                }
+                if (out.exists() && !out.delete()) throw new java.io.IOException("replace");
+                if (!tmp.renameTo(out)) throw new java.io.IOException("rename");
+                final File done = out;
+                runOnUiThread(() -> {
+                    Uri nu = PhotoFlow.uri(this, done);
+                    dlgThumbs.remove(old.toString());
+                    dlgThumbs.remove(nu.toString());
+                    if (idx < dlgUris.size() && dlgUris.get(idx).equals(old)) dlgUris.set(idx, nu);
+                    if (markedPath != null && !nu.equals(old)) {
+                        markerFiles.remove(old.toString());
+                        markerFiles.put(nu.toString(), markedPath);
+                    }
+                    if (dlgRefresh != null) dlgRefresh.run();
+                });
+            } catch (Throwable e) {
+                runOnUiThread(() -> Toast.makeText(this, "Could not rotate this image", Toast.LENGTH_SHORT).show());
+            }
+        }, "dlg-rotate").start();
     }
 
     private void dlgViewAdd(LinearLayout col, android.graphics.Bitmap bm, android.app.Dialog vd, int[] gen, int my) {
