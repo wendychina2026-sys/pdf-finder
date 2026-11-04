@@ -85,6 +85,7 @@ public class ShareReceiverActivity extends Activity {
         File firstWord = null;      // first Word file -> Upload Legal Document popup
         final ArrayList<File> words = new ArrayList<>();   // every shared image / Word file
         final ArrayList<File> pdfs = new ArrayList<>();    // every shared PDF
+        final ArrayList<File> all = new ArrayList<>();     // everything shared, in the order it came
         int copied = 0, wordCount = 0;
         for (Uri u : uris) {
             String type = getContentResolver().getType(u);
@@ -100,6 +101,7 @@ public class ShareReceiverActivity extends Activity {
                 if (f != null) DataFolder.registerOriginal(this, u, f);
             }
             if (f == null) continue;
+            all.add(f);
             if (word) {
                 wordCount++;
                 words.add(f);
@@ -111,36 +113,47 @@ public class ShareReceiverActivity extends Activity {
             }
         }
 
-        if (first == null && firstWord == null) {
-            Toast.makeText(this, "Cannot read the shared file", Toast.LENGTH_LONG).show();
-        } else if (first != null) {
-            if (copied > 1) {
-                Toast.makeText(this, copied + " PDFs saved. Opening the first.",
-                        Toast.LENGTH_LONG).show();
+        final File first0 = first, firstWord0 = firstWord;
+        final int copied0 = copied, wordCount0 = wordCount;
+        final Runnable normal = () -> {
+            if (first0 == null && firstWord0 == null) {
+                Toast.makeText(this, "Cannot read the shared file", Toast.LENGTH_LONG).show();
+            } else if (first0 != null) {
+                if (copied0 > 1) {
+                    Toast.makeText(this, copied0 + " PDFs saved. Opening the first.",
+                            Toast.LENGTH_LONG).show();
+                }
+                if (wordCount0 > 0) {
+                    Toast.makeText(this, wordCount0 + " file(s) saved in the Documents folder.",
+                            Toast.LENGTH_LONG).show();
+                }
+                // new document (page marker) or attach to a document already in the Vault
+                if (!attachableDocs(true).isEmpty()) {
+                    askNewOrAttach(pdfs, true);
+                    return;                 // finishes after the choice
+                }
+                openMarker(first0);
+            } else {
+                if (wordCount0 > 1) {
+                    Toast.makeText(this, wordCount0 + " files saved. All of them open in one upload box.",
+                            Toast.LENGTH_LONG).show();
+                }
+                // a Word file or image has no pages to mark: new document, or attach to a document already in the Vault
+                if (!attachableDocs(false).isEmpty()) {
+                    askNewOrAttach(words, false);
+                    return;                 // finishes after the choice
+                }
+                openNew(words);
             }
-            if (wordCount > 0) {
-                Toast.makeText(this, wordCount + " file(s) saved in the Documents folder.",
-                        Toast.LENGTH_LONG).show();
-            }
-            // new document (page marker) or attach to a document already in the Vault
-            if (!attachableDocs(true).isEmpty()) {
-                askNewOrAttach(pdfs, true);
-                return;                 // finishes after the choice
-            }
-            openMarker(first);
-        } else {
-            if (wordCount > 1) {
-                Toast.makeText(this, wordCount + " files saved. All of them open in one upload box.",
-                        Toast.LENGTH_LONG).show();
-            }
-            // a Word file or image has no pages to mark: new document, or attach to a document already in the Vault
-            if (!attachableDocs(false).isEmpty()) {
-                askNewOrAttach(words, false);
-                return;                 // finishes after the choice
-            }
-            openNew(words);
+            finish();
+        };
+        if (all.size() > 1) {
+            // more than one file shared: wait for the user to confirm, then details are set per file
+            MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
+                    () -> { openNew(all, null, MultiDocDetector.YES); finish(); }, normal);
+            return;
         }
-        finish();
+        normal.run();
     }
 
     /** Category marker: the shared PDF becomes a NEW document, pages marked there. */
@@ -154,7 +167,12 @@ public class ShareReceiverActivity extends Activity {
     private void openNew(ArrayList<File> files) { openNew(files, null); }
 
     private void openNew(ArrayList<File> files, String matter) {
+        openNew(files, matter, MultiDocDetector.NO);
+    }
+
+    private void openNew(ArrayList<File> files, String matter, int multiMode) {
         Intent i = new Intent(this, NewCaseActivity.class);
+        i.putExtra(MultiDocDetector.EXTRA_MODE, multiMode);
         i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, files.get(0).getAbsolutePath());
         if (files.size() > 1) {
             ArrayList<String> rest = new ArrayList<>();

@@ -143,6 +143,10 @@ public class NewCaseActivity extends BaseActivity {
     private String markerPdf = "";
     private java.util.ArrayList<String> markerExtras = new java.util.ArrayList<>();
     private String markerMatter = "";
+    private int markerMulti = MultiDocDetector.ASK;     // shared files: did the user confirm "details per file"?
+    private static final String DLG_GENERAL = "-- General Document Vault --";
+    /** Details per file in "multi" mode, keyed by file uri: name, category, stage, matter, file numbers (pages). */
+    private final java.util.Map<String, String[]> dlgMeta = new java.util.HashMap<>();
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
     /** Uris of documents saved with "Create new case": they join this case when it is created. */
@@ -171,6 +175,8 @@ public class NewCaseActivity extends BaseActivity {
         markerPdf = (mp == null || savedInstanceState != null) ? "" : mp;
         java.util.ArrayList<String> mx = getIntent().getStringArrayListExtra(EXTRA_UPLOAD_EXTRA);
         markerExtras = (mx == null || savedInstanceState != null) ? new java.util.ArrayList<>() : mx;
+        markerMulti = savedInstanceState != null ? MultiDocDetector.ASK
+                : getIntent().getIntExtra(MultiDocDetector.EXTRA_MODE, MultiDocDetector.ASK);
         String mm = getIntent().getStringExtra(EXTRA_UPLOAD_MATTER);
         markerMatter = (mm == null || savedInstanceState != null) ? "" : mm;
         store = new DiaryStore(this);
@@ -1025,11 +1031,12 @@ public class NewCaseActivity extends BaseActivity {
             // not every provider offers a persistable grant
         }
         if (dlgReplaceIdx >= 0 && dlgReplaceIdx < dlgUris.size()) {
-            dlgUris.set(dlgReplaceIdx, uri);
+            dlgSet(dlgReplaceIdx, uri);
             dlgReplaceIdx = -1;
             return;
         }
         dlgUris.add(uri);
+        dlgPagesReset();
     }
 
     private long fileSize(Uri uri) {
@@ -1058,6 +1065,9 @@ public class NewCaseActivity extends BaseActivity {
     /** Document name + category + matter (+ stage), then "Tap to choose" (PDF / Word / image, or a photo). */
     private void uploadDialog() {
         dlgUris.clear();
+        dlgMeta.clear();
+        final int multiIn = markerMulti;
+        markerMulti = MultiDocDetector.ASK;
         // the PDF handed over by the Category marker is used once, for the popup opened on arrival
         final String markerPath = markerPdf;
         markerPdf = "";
@@ -1105,6 +1115,8 @@ public class NewCaseActivity extends BaseActivity {
         final boolean[] dupOk = {false};
         final int[] wholeMode = {-1};              // multi-page PDF, one category: -1 not asked, 0 all pages, 1 some pages, 2 mark later
         final String[] wholeRange = {""};
+        final boolean[] multi = {multiIn == MultiDocDetector.YES};     // details are set per file (Edit details)
+        final boolean[] asked = {multiIn != MultiDocDetector.ASK};      // "more than one file" already answered
         final boolean[] matterTouched = {false};   // matter changed in this popup (wins over the marker's latest pick)
 
         LinearLayout f = new LinearLayout(this);
@@ -1202,6 +1214,21 @@ public class NewCaseActivity extends BaseActivity {
                         }
                     });
         });
+        // multi mode: name / category / stage / matter are set per file, so these boxes are switched off
+        final Runnable applyMulti = () -> {
+            name.setText("");
+            name.setHint("Set for each file (Edit details)");
+            name.setEnabled(false);
+            name.setAlpha(0.4f);
+            View[] off = {(View) catTv.getTag(), (View) stageTv.getTag(), (View) matterTv.getTag()};
+            for (View ov : off) ov.setEnabled(false);
+            for (View ov : new View[]{(View) catTv.getTag(), stageBox, (View) matterTv.getTag()}) ov.setAlpha(0.4f);
+            autoCat[0] = false;
+            setChosen(catTv, "", "Set for each file");
+            setChosen(stageTv, "", "Set for each file");
+            setChosen(matterTv, "", "Set for each file");
+        };
+        if (multi[0]) applyMulti.run();
         // dashed "tap to choose" area (accent colour, upload icon)
         final LinearLayout drop = new LinearLayout(this);
         drop.setOrientation(LinearLayout.VERTICAL);
@@ -1217,6 +1244,14 @@ public class NewCaseActivity extends BaseActivity {
         final int[] landed = {0};
         final Runnable draw = () -> {
             drop.removeAllViews();
+            if (!multi[0] && !asked[0] && dlgUris.size() > 1) {      // global detection: more than one file
+                asked[0] = true;
+                drop.post(() -> MultiDocDetector.confirm(this, dlgUris.size(), dlgUris.size(), () -> {
+                    multi[0] = true;
+                    applyMulti.run();
+                    if (dlgRefresh != null) dlgRefresh.run();
+                }, () -> { }));
+            }
             final boolean has = !dlgUris.isEmpty();
             final int ok = AppTheme.topics(this);
             // file chosen: solid green frame + soft green fill; empty: dashed accent frame
@@ -1265,6 +1300,7 @@ public class NewCaseActivity extends BaseActivity {
                     orderHint.setPadding(0, 0, 0, dp(6));
                     drop.addView(orderHint);
                 }
+                final int[] lead = multi[0] ? dlgLeaders() : null;
                 for (int fi = 0; fi < dlgUris.size(); fi++) {
                     final int idx = fi;
                     final String fname = displayName(dlgUris.get(fi));
@@ -1302,6 +1338,7 @@ public class NewCaseActivity extends BaseActivity {
                             11, AppTheme.sub(this), false);
                     t2.setPadding(0, dp(3), 0, 0);
                     infoCol.addView(t2);
+                    if (multi[0]) infoCol.addView(dlgMetaLine(idx, lead));
                     topRow.addView(infoCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                     fileCard.addView(topRow, new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1340,6 +1377,7 @@ public class NewCaseActivity extends BaseActivity {
                                 if (from >= 0 && from < dlgUris.size() && from != idx) {
                                     Uri dragged = dlgUris.remove(from);
                                     dlgUris.add(Math.min(idx, dlgUris.size()), dragged);
+                                    dlgPagesReset();
                                     dv.post(() -> dlgRefresh.run());
                                 }
                                 return true;
@@ -1373,6 +1411,7 @@ public class NewCaseActivity extends BaseActivity {
                                     "\"" + displayName(dlgUris.get(idx)) + "\" will be removed from this upload.",
                                     "Delete", () -> {
                                         dlgUris.remove(idx);
+                                        dlgPagesReset();
                                         dlgRefresh.run();
                                     })), dlgBtnLp(true));
                     if (kind == 2) {        // image: turn 90 degrees clockwise, the turned picture is what gets saved
@@ -1387,10 +1426,17 @@ public class NewCaseActivity extends BaseActivity {
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                     btnsLp.topMargin = dp(10);
                     fileCard.addView(btns, btnsLp);
+                    if (multi[0]) {         // details of this file (same fields as a Document Vault card Edit)
+                        View ed = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit details", () -> dlgEditMeta(idx));
+                        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                        elp.topMargin = dp(8);
+                        fileCard.addView(ed, elp);
+                    }
                     if (kind == 0) {       // PDF: reopen it to delete pages or add photos
                         View pages = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit pages (add / remove)", () ->
                                 PdfPageEditor.open(this, flow, dlgUris.get(idx), neu -> {
-                                    dlgUris.set(idx, neu);
+                                    dlgSet(idx, neu);
                                     dlgRefresh.run();
                                 }));
                         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
@@ -1590,9 +1636,55 @@ public class NewCaseActivity extends BaseActivity {
             refresh();
             return true;
         };
+        final java.util.function.BooleanSupplier coreSave = saver[0];
+        // multi mode: one document per details set; the files named in its page range join it
+        final java.util.function.BooleanSupplier multiSave = () -> {
+            if (!multi[0]) return coreSave.getAsBoolean();
+            if (dlgUris.isEmpty()) {
+                Toast.makeText(this, "Choose a file first", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            int[] lead = dlgLeaders();
+            for (int i = 0; i < lead.length; i++) {
+                if (lead[i] < 0) {
+                    Toast.makeText(this, "Set details for file " + (i + 1), Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+            }
+            final List<Uri> all = new ArrayList<>(dlgUris);
+            java.util.LinkedHashMap<Integer, List<Uri>> groups = new java.util.LinkedHashMap<>();
+            for (int i = 0; i < all.size(); i++) {
+                List<Uri> g = groups.get(lead[i]);
+                if (g == null) { g = new ArrayList<>(); groups.put(lead[i], g); }
+                g.add(all.get(i));
+            }
+            wholeMode[0] = 0;          // pages of a multi-page PDF: all marked with that document's category
+            dupOk[0] = true;
+            matterTouched[0] = true;
+            autoCat[0] = false;
+            List<Uri> left = new ArrayList<>(all);
+            for (java.util.Map.Entry<Integer, List<Uri>> ge : groups.entrySet()) {
+                String[] m = dlgMeta.get(all.get(ge.getKey()).toString());
+                name.setText(m[0]);
+                catSel[0] = m[1];
+                stageSel[0] = m[2];
+                matterSel[0] = m[3];
+                dlgUris.clear();
+                dlgUris.addAll(ge.getValue());
+                if (!coreSave.getAsBoolean()) {
+                    dlgUris.clear();
+                    dlgUris.addAll(left);       // what is not saved yet stays in the box
+                    if (dlgRefresh != null) dlgRefresh.run();
+                    return false;
+                }
+                left.removeAll(ge.getValue());
+            }
+            dlgMeta.clear();
+            return true;
+        };
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
-                () -> saver[0].getAsBoolean(), () -> dlgRefresh = null,
+                () -> multiSave.getAsBoolean(), () -> dlgRefresh = null,
                 () -> PickerDialogs.confirm(this, "Discard upload?",
                         "Attached files and details entered here will be discarded.", "Discard", () -> {
                             dlgUris.clear();
@@ -1991,6 +2083,159 @@ public class NewCaseActivity extends BaseActivity {
         show[0].run();
     }
 
+    /** A file's uri changes (replace / rotate / page edit): its details stay with it. */
+    private void dlgSet(int idx, Uri nu) {
+        Uri old = dlgUris.get(idx);
+        String[] m = dlgMeta.remove(old.toString());
+        dlgUris.set(idx, nu);
+        if (m != null) dlgMeta.put(nu.toString(), m);
+    }
+
+    /** File order / count changed: page ranges (file numbers) would point at the wrong files, so they go back to "own number". */
+    private void dlgPagesReset() {
+        for (String[] m : dlgMeta.values()) m[4] = "";
+    }
+
+    /**
+     * For each file: the index of the file whose details it uses. Itself when it has its own details, the
+     * earlier file that lists its number in Page / page range, or -1 when nothing is set yet.
+     */
+    private int[] dlgLeaders() {
+        int n = dlgUris.size();
+        int[] lead = new int[n];
+        java.util.Arrays.fill(lead, -1);
+        for (int i = 0; i < n; i++) {
+            if (lead[i] != -1) continue;
+            String[] m = dlgMeta.get(dlgUris.get(i).toString());
+            if (m == null || m[0].isEmpty()) continue;
+            lead[i] = i;
+            String pg = m[4].isEmpty() ? String.valueOf(i + 1) : m[4];
+            for (int j : parsePages(pg, n)) {
+                if (lead[j] == -1) lead[j] = i;
+            }
+        }
+        return lead;
+    }
+
+    private TextView dlgMetaLine(int idx, int[] lead) {
+        String[] m = dlgMeta.get(dlgUris.get(idx).toString());
+        String text;
+        int color;
+        if (lead[idx] >= 0 && lead[idx] != idx) {
+            text = "Saved together with file " + (lead[idx] + 1);
+            color = AppTheme.sub(this);
+        } else if (lead[idx] == idx && m != null) {
+            StringBuilder sb = new StringBuilder(m[0]);
+            if (!m[1].isEmpty()) sb.append("  \u2022  ").append(m[1]);
+            if (!m[2].isEmpty()) sb.append("  \u2022  ").append(m[2]);
+            sb.append("  \u2022  ").append(m[3].equals(DLG_GENERAL) ? "General Document Vault"
+                    : m[3].equals(CREATE_NEW_CASE) ? "This new case" : m[3]);
+            if (!m[4].isEmpty()) sb.append("  \u2022  Files ").append(m[4]);
+            text = sb.toString();
+            color = AppTheme.topics(this);
+        } else {
+            text = "Details not set";
+            color = RoundEdit.RED;
+        }
+        TextView t = CaseViews.text(this, text, 11.5f, color, true);
+        t.setPadding(0, dp(3), 0, 0);
+        return t;
+    }
+
+    /** Details of one file: Document name, Category, Stage, Attach to matter, plus Page / page range (file numbers). */
+    private void dlgEditMeta(final int idx) {
+        if (idx < 0 || idx >= dlgUris.size()) return;
+        final String key = dlgUris.get(idx).toString();
+        final String[] cur = dlgMeta.containsKey(key) ? dlgMeta.get(key).clone()
+                : new String[]{"", "Other", "", DLG_GENERAL, ""};
+        final List<DiaryStore.HCase> cs = store.cases();
+        LinearLayout f = new LinearLayout(this);
+        f.setOrientation(LinearLayout.VERTICAL);
+
+        f.addView(dlgLbl("Document Name / Caption *"));
+        final EditText nm = new RoundEdit(this);
+        FieldStyle.smallHint(nm, "e.g. Interim Injunction Application");
+        nm.setSingleLine(true);
+        nm.setText(cur[0]);
+        f.addView(nm, lpTop(0));
+
+        f.addView(dlgLbl("Document Category"));
+        final TextView catTv = dropdown(f, "Select category", null);
+        setChosen(catTv, cur[1], "Select category");
+        ((View) catTv.getTag()).setOnClickListener(v -> CategoryPicker.pick(this, cur[1], c -> {
+            cur[1] = c;
+            setChosen(catTv, c, "Select category");
+        }));
+
+        f.addView(dlgLbl("Stage"));
+        final TextView stageTv = dropdown(f, "Select stage", null);
+        setChosen(stageTv, cur[2], "Select stage");
+        final StageStore docStages = new StageStore(this);
+        ((View) stageTv.getTag()).setOnClickListener(v ->
+                PickerDialogs.stageSheet(this, "Stage", () -> docStages.list(), cur[2],
+                        s -> {
+                            cur[2] = s;
+                            setChosen(stageTv, s, "Select stage");
+                        },
+                        s -> docStages.add(s),
+                        (old, neu) -> {
+                            docStages.rename(old, neu);
+                            if (old.equals(cur[2])) {
+                                cur[2] = neu;
+                                setChosen(stageTv, neu, "Select stage");
+                            }
+                        },
+                        gone -> {
+                            docStages.delete(gone);
+                            if (gone.equals(cur[2])) {
+                                cur[2] = "";
+                                setChosen(stageTv, "", "Select stage");
+                            }
+                        },
+                        (i, j) -> docStages.swap(i, j)));
+
+        f.addView(dlgLbl("Attach to Matter (Optional)"));
+        final TextView matterTv = dropdown(f, DLG_GENERAL, null);
+        setChosen(matterTv, cur[3], DLG_GENERAL);
+        ((View) matterTv.getTag()).setOnClickListener(v -> {
+            List<String> items = new ArrayList<>();
+            items.add(DLG_GENERAL);
+            for (DiaryStore.HCase hc : cs) items.add(hc.title());
+            items.add(CREATE_NEW_CASE);          // the case being created on this page: last
+            PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", items, items.indexOf(cur[3]), i -> {
+                cur[3] = items.get(i);
+                setChosen(matterTv, cur[3], DLG_GENERAL);
+            });
+        });
+
+        f.addView(dlgLbl("Page / page range (file numbers of this document)"));
+        final EditText pg = new RoundEdit(this);
+        FieldStyle.smallHint(pg, "e.g. 1-3, 5");
+        pg.setSingleLine(true);
+        pg.setText(cur[4].isEmpty() ? String.valueOf(idx + 1) : cur[4]);
+        f.addView(pg, lpTop(0));
+        TextView hint = CaseViews.text(this,
+                "The files listed here are saved together as this one document, with these details.",
+                11, AppTheme.sub(this), false);
+        hint.setPadding(0, dp(4), 0, 0);
+        f.addView(hint);
+
+        PickerDialogs.formSheet(this, "Document details",
+                "File " + (idx + 1) + " of " + dlgUris.size() + ": " + displayName(dlgUris.get(idx)), f, "OK", () -> {
+                    if (!LegalUi.need(this, nm, "Document name")) return false;
+                    String ptxt = LegalUi.str(pg).trim();
+                    if (parsePages(ptxt, dlgUris.size()).isEmpty()) {
+                        Toast.makeText(this, "Enter valid file numbers, e.g. 1-3, 5", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
+                    cur[0] = LegalUi.str(nm);
+                    cur[4] = ptxt;
+                    dlgMeta.put(key, cur);
+                    if (dlgRefresh != null) dlgRefresh.run();
+                    return true;
+                }, () -> { });
+    }
+
     /** Turn the image of an upload-dialog file 90 degrees clockwise and keep it turned (re-encoded, no EXIF tag left). */
     private void dlgRotate(final int idx) {
         if (idx < 0 || idx >= dlgUris.size()) return;
@@ -2029,7 +2274,7 @@ public class NewCaseActivity extends BaseActivity {
                     Uri nu = PhotoFlow.uri(this, done);
                     dlgThumbs.remove(old.toString());
                     dlgThumbs.remove(nu.toString());
-                    if (idx < dlgUris.size() && dlgUris.get(idx).equals(old)) dlgUris.set(idx, nu);
+                    if (idx < dlgUris.size() && dlgUris.get(idx).equals(old)) dlgSet(idx, nu);
                     if (markedPath != null && !nu.equals(old)) {
                         markerFiles.remove(old.toString());
                         markerFiles.put(nu.toString(), markedPath);
