@@ -2220,7 +2220,17 @@ public class NewCaseActivity extends BaseActivity {
             act.share = grp ? () -> DocFileCard.shareAll(this, groupOf(idx))
                     : () -> DocFileCard.share(this, pickedUris.get(idx), pickedNames.get(idx));
             act.files = () -> manageFiles(idx);
-            if (grp) act.viewPdf = () -> DocFileCard.viewAsOnePdf(this, groupOf(idx), DocFileCard.stem(pickedNames.get(idx)));
+            if (grp) act.viewPdf = () -> {
+                // same as the Document Vault: marked pages carry their category banner in the one PDF
+                List<Uri> files = groupOf(idx);
+                java.util.Map<String, java.util.Map<Integer, String>> pageMarks = new java.util.HashMap<>();
+                MarkStore ms = new MarkStore(this);
+                for (Uri fu : files) {
+                    String fp = markerFiles.get(fu.toString());
+                    if (fp != null) pageMarks.put(fu.toString(), ms.all(fp));
+                }
+                DocFileCard.viewAsOnePdf(this, files, DocFileCard.stem(pickedNames.get(idx)), pageMarks);
+            };
             act.edit = () -> editPicked(idx);
             act.replace = () -> PickerDialogs.confirm(this, "Replace file?",
                     "\"" + pickedNames.get(idx) + "\" will be replaced by a new file.",
