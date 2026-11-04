@@ -1124,13 +1124,15 @@ public class NewCaseActivity extends BaseActivity {
         f.setOrientation(LinearLayout.VERTICAL);
 
         // all labels / boxes use the same helpers and scale as the New Case page
-        f.addView(dlgLbl("Document Name / Caption *"));
+        final TextView nameLbl = dlgLbl("Document Name / Caption *");
+        f.addView(nameLbl);
         EditText name = new RoundEdit(this);
         FieldStyle.smallHint(name, "e.g. Interim Injunction Application");
         name.setSingleLine(true);
         f.addView(name, lpTop(0));
 
-        f.addView(dlgLbl("Document Category"));
+        final TextView catLbl = dlgLbl("Document Category");
+        f.addView(catLbl);
         TextView catTv = dropdown(f, "Select category", null);
         setChosen(catTv, catSel[0], "Select category");
         // marks changed (page re-marked, category renamed / deleted): "Multiple" follows them
@@ -1218,16 +1220,10 @@ public class NewCaseActivity extends BaseActivity {
         });
         // multi mode: name / category / stage / matter are set per file, so these boxes are switched off
         final Runnable applyMulti = () -> {
+            // name / category / stage are set per file (Edit details): not shown here at all
             name.setText("");
-            name.setHint("Set for each file (Edit details)");
-            name.setEnabled(false);
-            name.setAlpha(0.4f);
-            View[] off = {(View) catTv.getTag(), (View) stageTv.getTag()};
-            for (View ov : off) ov.setEnabled(false);
-            for (View ov : new View[]{(View) catTv.getTag(), stageBox}) ov.setAlpha(0.4f);
+            for (View hv : new View[]{nameLbl, name, catLbl, (View) catTv.getTag(), stageBox}) hv.setVisibility(View.GONE);
             autoCat[0] = false;
-            setChosen(catTv, "", "Set for each file");
-            setChosen(stageTv, "", "Set for each file");
             // Attach to Matter stays usable; files start on "Create new case" (the case being made on this page)
             if (matterSel[0].equals(general)) matterSel[0] = CREATE_NEW_CASE;
             setChosen(matterTv, matterSel[0], general);
@@ -1703,7 +1699,7 @@ public class NewCaseActivity extends BaseActivity {
                         }));
         dlgSheet = dlg[0];
         dlgSaveLook(multi[0]);
-        if (fromMarker) {       // arriving from the Category marker: cursor straight in Document Name
+        if (fromMarker && !multi[0]) {       // arriving from the Category marker: cursor straight in Document Name
             name.requestFocus();
             if (dlg[0] != null && dlg[0].getWindow() != null) {
                 dlg[0].getWindow().setSoftInputMode(
