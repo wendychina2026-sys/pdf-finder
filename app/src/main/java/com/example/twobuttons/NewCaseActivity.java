@@ -1355,7 +1355,7 @@ public class NewCaseActivity extends BaseActivity {
                     drop.addView(fileCard, fileCardLp);
                     LinearLayout btns = new LinearLayout(this);
                     btns.setOrientation(LinearLayout.HORIZONTAL);
-                    btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> openUri(dlgUris.get(idx))),
+                    btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> dlgView(idx)),
                             dlgBtnLp(false));
                     btns.addView(dlgBtn(R.drawable.ic_replace, AppTheme.accent(this), "Replace", () ->
                             PickerDialogs.confirm(this, "Replace file?",
@@ -1584,7 +1584,13 @@ public class NewCaseActivity extends BaseActivity {
         };
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
-                () -> saver[0].getAsBoolean(), () -> dlgRefresh = null);
+                () -> saver[0].getAsBoolean(), () -> dlgRefresh = null,
+                () -> PickerDialogs.confirm(this, "Discard upload?",
+                        "Attached files and details entered here will be discarded.", "Discard", () -> {
+                            dlgUris.clear();
+                            if (dlg[0] != null) dlg[0].dismiss();
+                            finish();       // back to the screen it came from (Document Vault)
+                        }));
         if (fromMarker) {       // arriving from the Category marker: cursor straight in Document Name
             name.requestFocus();
             if (dlg[0] != null && dlg[0].getWindow() != null) {
@@ -1849,6 +1855,173 @@ public class NewCaseActivity extends BaseActivity {
         } catch (Exception e) {
             Toast.makeText(this, "No app found to open this file", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Full-screen viewer over the files attached in the upload dialog: swipe or arrows go to the previous / next file. */
+    private void dlgView(int start) {
+        if (dlgUris.isEmpty()) return;
+        final int[] cur = {Math.max(0, Math.min(start, dlgUris.size() - 1))};
+        final int[] gen = {0};
+        final android.app.Dialog vd = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        final android.widget.FrameLayout body = new android.widget.FrameLayout(this);
+        final TextView title = CaseViews.text(this, "", 14, 0xFFFFFFFF, true);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        final TextView prev = CaseViews.text(this, "\u2039", 34, 0xFFFFFFFF, true);
+        final TextView next = CaseViews.text(this, "\u203A", 34, 0xFFFFFFFF, true);
+        final Runnable[] show = new Runnable[1];
+        final java.util.function.IntConsumer go = delta -> {
+            int n = cur[0] + delta;
+            if (n < 0 || n >= dlgUris.size()) return;
+            cur[0] = n;
+            show[0].run();
+        };
+        for (TextView ar : new TextView[]{prev, next}) {
+            ar.setGravity(Gravity.CENTER);
+            ar.setBackground(CaseViews.box(this, 0x66000000, 24, 0, 0));
+        }
+        prev.setOnClickListener(v -> go.accept(-1));
+        next.setOnClickListener(v -> go.accept(1));
+        show[0] = () -> {
+            if (cur[0] >= dlgUris.size()) { vd.dismiss(); return; }
+            final int my = ++gen[0];
+            final Uri u = dlgUris.get(cur[0]);
+            final String fname = displayName(u);
+            final int kind = DocFileCard.kind(fname);
+            title.setText((cur[0] + 1) + " / " + dlgUris.size() + "   " + fname);
+            prev.setVisibility(cur[0] > 0 ? View.VISIBLE : View.INVISIBLE);
+            next.setVisibility(cur[0] < dlgUris.size() - 1 ? View.VISIBLE : View.INVISIBLE);
+            body.removeAllViews();
+            if (kind != 0 && kind != 2) {       // Word etc: cannot draw here, hand over to another app
+                TextView open = CaseViews.text(this, "Open in another app", 15, 0xFFFFFFFF, true);
+                open.setPadding(dp(24), dp(14), dp(24), dp(14));
+                open.setBackground(CaseViews.box(this, 0x33FFFFFF, 12, 0xFFFFFFFF, 1));
+                open.setOnClickListener(v -> openUri(u));
+                body.addView(open, new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+                return;
+            }
+            final android.widget.ScrollView sv = new android.widget.ScrollView(this);
+            final LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setGravity(Gravity.CENTER_HORIZONTAL);
+            col.setPadding(0, dp(56), 0, dp(16));
+            sv.addView(col, new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            body.addView(sv, new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            final int w = Math.min(1000, getResources().getDisplayMetrics().widthPixels);
+            new Thread(() -> {
+                try {
+                    if (kind == 2) {
+                        final android.graphics.Bitmap bm = dlgDecode(u, w);
+                        if (bm != null) runOnUiThread(() -> dlgViewAdd(col, bm, vd, gen, my));
+                    } else {
+                        try (android.os.ParcelFileDescriptor pf = getContentResolver().openFileDescriptor(u, "r");
+                             android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+                            for (int pi = 0; pi < pr.getPageCount() && gen[0] == my; pi++) {
+                                android.graphics.pdf.PdfRenderer.Page pg = pr.openPage(pi);
+                                int h = Math.max(1, w * pg.getHeight() / Math.max(1, pg.getWidth()));
+                                final android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(
+                                        w, h, android.graphics.Bitmap.Config.ARGB_8888);
+                                bm.eraseColor(0xFFFFFFFF);
+                                pg.render(bm, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                                pg.close();
+                                runOnUiThread(() -> dlgViewAdd(col, bm, vd, gen, my));
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) { }
+            }, "dlg-view").start();
+        };
+        final android.view.GestureDetector gd = new android.view.GestureDetector(this,
+                new android.view.GestureDetector.SimpleOnGestureListener() {
+                    @Override public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
+                        if (e1 == null || e2 == null) return false;
+                        float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
+                        if (Math.abs(dx) > dp(80) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                            go.accept(dx < 0 ? 1 : -1);
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+        android.widget.FrameLayout root = new android.widget.FrameLayout(this) {
+            @Override public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+                gd.onTouchEvent(ev);
+                return super.dispatchTouchEvent(ev);
+            }
+        };
+        root.setBackgroundColor(0xFF000000);
+        root.addView(body, new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setBackgroundColor(0xCC000000);
+        bar.setPadding(dp(16), dp(10), dp(4), dp(10));
+        bar.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView close = CaseViews.text(this, "\u2715", 20, 0xFFFFFFFF, true);
+        close.setPadding(dp(16), dp(6), dp(16), dp(6));
+        close.setOnClickListener(v -> vd.dismiss());
+        bar.addView(close);
+        root.addView(bar, new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+        android.widget.FrameLayout.LayoutParams pl = new android.widget.FrameLayout.LayoutParams(dp(44), dp(64),
+                Gravity.START | Gravity.CENTER_VERTICAL);
+        pl.leftMargin = dp(6);
+        root.addView(prev, pl);
+        android.widget.FrameLayout.LayoutParams nl = new android.widget.FrameLayout.LayoutParams(dp(44), dp(64),
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        nl.rightMargin = dp(6);
+        root.addView(next, nl);
+        vd.setContentView(root);
+        vd.setOnDismissListener(x -> gen[0]++);
+        vd.show();
+        show[0].run();
+    }
+
+    private void dlgViewAdd(LinearLayout col, android.graphics.Bitmap bm, android.app.Dialog vd, int[] gen, int my) {
+        if (!vd.isShowing() || gen[0] != my) return;
+        ImageView iv = new ImageView(this);
+        iv.setAdjustViewBounds(true);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iv.setImageBitmap(bm);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(8);
+        col.addView(iv, lp);
+    }
+
+    /** Picture scaled down to about maxW wide, turned upright by its EXIF tag. */
+    private android.graphics.Bitmap dlgDecode(Uri u, int maxW) throws java.io.IOException {
+        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+            android.graphics.BitmapFactory.decodeStream(is, null, o);
+        }
+        int sample = 1;
+        while (o.outWidth / (sample * 2) >= maxW) sample *= 2;
+        android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+        o2.inSampleSize = sample;
+        android.graphics.Bitmap bmp;
+        try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+            bmp = android.graphics.BitmapFactory.decodeStream(is, null, o2);
+        }
+        int rot = 0;
+        try (java.io.InputStream is = getContentResolver().openInputStream(u)) {
+            int ori = new android.media.ExifInterface(is).getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+            rot = ori == android.media.ExifInterface.ORIENTATION_ROTATE_90 ? 90
+                    : ori == android.media.ExifInterface.ORIENTATION_ROTATE_180 ? 180
+                    : ori == android.media.ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+        } catch (Exception ignored) { }
+        if (bmp != null && rot != 0) {
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.postRotate(rot);
+            bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+        }
+        return bmp;
     }
 
     private void pickFile() {

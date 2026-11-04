@@ -183,6 +183,12 @@ final class PickerDialogs {
      */
     static Dialog formSheet(Activity a, String title, String subtitle, View body, String saveLabel,
                             java.util.function.BooleanSupplier onSave, Runnable onClose) {
+        return formSheet(a, title, subtitle, body, saveLabel, onSave, onClose, null);
+    }
+
+    /** Same, but Cancel runs onCancel (e.g. a discard confirmation) instead of closing straight away. */
+    static Dialog formSheet(Activity a, String title, String subtitle, View body, String saveLabel,
+                            java.util.function.BooleanSupplier onSave, Runnable onClose, Runnable onCancel) {
         final Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -205,7 +211,7 @@ final class PickerDialogs {
         foot.setPadding(dp(a, 22), dp(a, 14), dp(a, 22), dp(a, 18));
         TextView cancel = CaseViews.text(a, "Cancel", 15, soft(a), false);
         cancel.setPadding(dp(a, 16), dp(a, 12), dp(a, 20), dp(a, 12));
-        cancel.setOnClickListener(v -> d.dismiss());
+        cancel.setOnClickListener(v -> { if (onCancel != null) onCancel.run(); else d.dismiss(); });
         foot.addView(cancel);
         TextView save = CaseViews.text(a, saveLabel, 15, ink(a), true);
         save.setGravity(Gravity.CENTER);
