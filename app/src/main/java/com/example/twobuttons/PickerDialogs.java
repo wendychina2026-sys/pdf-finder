@@ -569,6 +569,7 @@ final class PickerDialogs {
             root.addView(pill, topMargin(a, 16));
         }
         final List<String> items = new ArrayList<>(source);
+        final String[] selNow = {selected};          // a name just added becomes the ticked one
         final MaxScroll sv = new MaxScroll(a, 0.55f);
         final LinearLayout list = new LinearLayout(a);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -585,6 +586,8 @@ final class PickerDialogs {
                         int at = items.size() > 0 && items.get(items.size() - 1).equals("Other")
                                 ? items.size() - 1 : items.size();
                         items.add(at, s);
+                        selNow[0] = s;
+                        if (onPick != null && checked == null) onPick.accept(s);     // field and tick agree at once
                         search.setText("");
                         fill[0].run();
                     })), topMargin(a, 16));
@@ -597,7 +600,7 @@ final class PickerDialogs {
             for (int i = 0; i < items.size(); i++) {
                 final String it = items.get(i);
                 if (!q.isEmpty() && !it.toLowerCase(Locale.ROOT).contains(q)) continue;
-                boolean on = checked != null ? checked.test(it) : it.equals(selected);
+                boolean on = checked != null ? checked.test(it) : it.equals(selNow[0]);
                 LinearLayout r = optionRow(a, it, on, note == null ? null : note.apply(it));
                 final int green = AppTheme.topics(a);
                 if (checked != null && on) {
@@ -625,6 +628,7 @@ final class PickerDialogs {
                                     confirm(a, "Rename category?", "\"" + it + "\" will become \"" + s
                                             + "\". Pages already marked with it are updated too.", "Rename", () -> {
                                         manage.rename(it, s);
+                                        if (it.equals(selNow[0])) selNow[0] = s;
                                         items.set(items.indexOf(it), s);
                                         fill[0].run();
                                     });
@@ -636,6 +640,7 @@ final class PickerDialogs {
                         dl.setOnClickListener(v -> confirm(a, "Delete category?", "\"" + it
                                 + "\" will be removed from the list. " + manage.deleteNote(it), "Delete", () -> {
                             manage.delete(it);
+                            if (it.equals(selNow[0])) selNow[0] = "";
                             items.remove(it);
                             fill[0].run();
                         }));
@@ -716,6 +721,8 @@ final class PickerDialogs {
                         return;
                     }
                     onAdd.accept(s);
+                    sel[0] = s;                          // the new stage is ticked and chosen at once
+                    onPick.accept(s);
                     fill[0].run();
                 })), topMargin(a, 16));
         root.addView(sc, topMargin(a, 4));

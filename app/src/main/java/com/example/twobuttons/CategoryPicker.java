@@ -67,6 +67,7 @@ final class CategoryPicker {
      */
     static void pick(Activity a, String current, Consumer<String> onDone, Map<Integer, String> marked,
                      PickerDialogs.Manage manage, boolean checkMarked) {
+        final PickerDialogs.Manage mg = manage != null ? manage : plainManage(a);   // rename / delete icons everywhere
         final List<String> top = visibleTop(a);
         final String top0 = current == null ? "" : current.split(SEP)[0];
         if (!top0.isEmpty() && !top.contains(top0)) top.add(0, top0);
@@ -76,7 +77,7 @@ final class CategoryPicker {
         again[0] = () -> PickerDialogs.searchSheet(a, "Document Category", null, top, top0,
                 "Add New Category", "Category Name", s -> saveCustom(a, s),
                 s -> drill(a, s, onDone, again[0], marked), null,
-                marked == null ? null : item -> pagesNote(marked, item), manage, chk);
+                marked == null ? null : item -> pagesNote(marked, item), mg, chk);
         again[0].run();
     }
 
@@ -249,6 +250,40 @@ final class CategoryPicker {
                 return n == 0 ? "" : n + (n == 1 ? " page" : " pages")
                         + " of this PDF marked with it will be unmarked.";
             }
+        };
+    }
+
+    /** Rename / delete for every category when the list is not tied to one PDF's marks. */
+    private static PickerDialogs.Manage plainManage(Activity a) {
+        final MarkStore ms = new MarkStore(a);
+        return new PickerDialogs.Manage() {
+            @Override public boolean hasPages(String item) { return false; }
+            @Override public boolean editable(String item) { return true; }
+            @Override public void editPages(String item, Runnable refresh) { }
+
+            @Override public void rename(String old, String neu) {
+                if (custom(a).contains(old)) {
+                    renameCustom(a, old, neu);
+                } else {
+                    Map<String, String> ren = renamed(a);
+                    ren.put(originalOf(a, old), neu);
+                    writeRenamed(a, ren);
+                }
+                ms.renameCategory(old, neu);
+            }
+
+            @Override public void delete(String item) {
+                if (custom(a).contains(item)) {
+                    deleteCustom(a, item);
+                } else if (isBuiltIn(a, item)) {
+                    List<String> gone = hidden(a);
+                    String orig = originalOf(a, item);
+                    if (!gone.contains(orig)) gone.add(orig);
+                    writeHidden(a, gone);
+                }
+            }
+
+            @Override public String deleteNote(String item) { return ""; }
         };
     }
 

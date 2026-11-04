@@ -1195,8 +1195,9 @@ public class NewCaseActivity extends BaseActivity {
         ((View) matterTv.getTag()).setOnClickListener(v -> {
             List<String> items = new ArrayList<>();
             items.add(general);
-            if (fromMarker) items.add(CREATE_NEW_CASE);
+            if (fromMarker && !multi[0]) items.add(CREATE_NEW_CASE);
             for (DiaryStore.HCase hc : cases) items.add(hc.title());
+            if (multi[0]) items.add(CREATE_NEW_CASE);          // last
             PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", items,
                     items.indexOf(matterSel[0]), i -> {
                         final String pick = items.get(i);
@@ -1206,7 +1207,7 @@ public class NewCaseActivity extends BaseActivity {
                             matterSel[0] = pick;
                             setChosen(matterTv, matterSel[0], general);
                         };
-                        if (markerChoseMatter) {       // it was chosen in the marker already: ask before changing it
+                        if (markerChoseMatter && !multi[0]) {       // it was chosen in the marker already: ask before changing it
                             PickerDialogs.confirm(this, "Change matter?", "Attach to Matter is \"" + matterSel[0]
                                     + "\". Change it to \"" + pick + "\"?", "Change", apply);
                         } else {
@@ -1220,13 +1221,15 @@ public class NewCaseActivity extends BaseActivity {
             name.setHint("Set for each file (Edit details)");
             name.setEnabled(false);
             name.setAlpha(0.4f);
-            View[] off = {(View) catTv.getTag(), (View) stageTv.getTag(), (View) matterTv.getTag()};
+            View[] off = {(View) catTv.getTag(), (View) stageTv.getTag()};
             for (View ov : off) ov.setEnabled(false);
-            for (View ov : new View[]{(View) catTv.getTag(), stageBox, (View) matterTv.getTag()}) ov.setAlpha(0.4f);
+            for (View ov : new View[]{(View) catTv.getTag(), stageBox}) ov.setAlpha(0.4f);
             autoCat[0] = false;
             setChosen(catTv, "", "Set for each file");
             setChosen(stageTv, "", "Set for each file");
-            setChosen(matterTv, "", "Set for each file");
+            // Attach to Matter stays usable; files start on "Create new case" (the case being made on this page)
+            if (matterSel[0].equals(general)) matterSel[0] = CREATE_NEW_CASE;
+            setChosen(matterTv, matterSel[0], general);
         };
         if (multi[0]) applyMulti.run();
         // dashed "tap to choose" area (accent colour, upload icon)
@@ -1427,7 +1430,7 @@ public class NewCaseActivity extends BaseActivity {
                     btnsLp.topMargin = dp(10);
                     fileCard.addView(btns, btnsLp);
                     if (multi[0]) {         // details of this file (same fields as a Document Vault card Edit)
-                        View ed = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit details", () -> dlgEditMeta(idx));
+                        View ed = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit details", () -> dlgEditMeta(idx, matterSel[0]));
                         LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                         elp.topMargin = dp(8);
@@ -2143,11 +2146,11 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     /** Details of one file: Document name, Category, Stage, Attach to matter, plus Page / page range (file numbers). */
-    private void dlgEditMeta(final int idx) {
+    private void dlgEditMeta(final int idx, final String defMatter) {
         if (idx < 0 || idx >= dlgUris.size()) return;
         final String key = dlgUris.get(idx).toString();
         final String[] cur = dlgMeta.containsKey(key) ? dlgMeta.get(key).clone()
-                : new String[]{"", "Other", "", DLG_GENERAL, ""};
+                : new String[]{"", "Other", "", defMatter == null || defMatter.isEmpty() ? CREATE_NEW_CASE : defMatter, ""};
         final List<DiaryStore.HCase> cs = store.cases();
         LinearLayout f = new LinearLayout(this);
         f.setOrientation(LinearLayout.VERTICAL);
