@@ -1320,6 +1320,8 @@ public class NewCaseActivity extends BaseActivity {
                     thumbView.setBackground(thumbBg);
                     thumbView.setClipToOutline(true);
                     dlgThumb(thumbView, dlgUris.get(fi), kind);
+                    thumbView.setContentDescription("View file");
+                    thumbView.setOnClickListener(tv -> dlgView(idx));      // tap the thumbnail = View
                     TextView numView = CaseViews.text(this, String.valueOf(fi + 1), 15, AppTheme.text(this), true);
                     numView.setGravity(Gravity.CENTER);
                     numView.setPadding(0, 0, dp(8), 0);
@@ -1340,6 +1342,22 @@ public class NewCaseActivity extends BaseActivity {
                     infoCol.addView(t2);
                     if (multi[0]) infoCol.addView(dlgMetaLine(idx, lead));
                     topRow.addView(infoCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                    if (multi[0] && lead != null && lead[idx] >= 0) {      // details set: its category sits on top of the file
+                        String[] lm = dlgMeta.get(dlgUris.get(lead[idx]).toString());
+                        if (lm != null && !lm[1].isEmpty()) {
+                            int gold = AppTheme.isDark(this) ? 0xFFF0B03A : 0xFFB7791F;
+                            TextView chip = CaseViews.text(this, lm[1].toUpperCase(Locale.ROOT), 11, gold, true);
+                            chip.setSingleLine(true);
+                            chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                            chip.setPadding(dp(10), dp(4), dp(10), dp(4));
+                            chip.setBackground(CaseViews.box(this, (gold & 0x00FFFFFF) | 0x22000000, 8,
+                                    (gold & 0x00FFFFFF) | 0x66000000, 1));
+                            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            chipLp.bottomMargin = dp(8);
+                            fileCard.addView(chip, chipLp);
+                        }
+                    }
                     fileCard.addView(topRow, new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     LinearLayout.LayoutParams fileCardLp = new LinearLayout.LayoutParams(
@@ -1393,8 +1411,6 @@ public class NewCaseActivity extends BaseActivity {
                     drop.addView(fileCard, fileCardLp);
                     LinearLayout btns = new LinearLayout(this);
                     btns.setOrientation(LinearLayout.HORIZONTAL);
-                    btns.addView(dlgBtn(R.drawable.ic_eye, AppTheme.accent(this), "View", () -> dlgView(idx)),
-                            dlgBtnLp(false));
                     btns.addView(dlgBtn(R.drawable.ic_replace, AppTheme.accent(this), "Replace", () ->
                             PickerDialogs.confirm(this, "Replace file?",
                                     "\"" + displayName(dlgUris.get(idx)) + "\" will be replaced by a new file.",
@@ -1405,7 +1421,7 @@ public class NewCaseActivity extends BaseActivity {
                                                 dlgReplaceIdx = idx;
                                                 if (i == 0) pickFile();
                                                 else takePhoto();
-                                            }))), dlgBtnLp(true));
+                                            }))), dlgBtnLp(false));
                     btns.addView(dlgBtn(R.drawable.ic_delete, RoundEdit.RED, "Delete", () ->
                             PickerDialogs.confirm(this, "Delete file?",
                                     "\"" + displayName(dlgUris.get(idx)) + "\" will be removed from this upload.",
