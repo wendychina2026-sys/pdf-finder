@@ -145,6 +145,7 @@ public class NewCaseActivity extends BaseActivity {
     private String markerMatter = "";
     private int markerMulti = MultiDocDetector.ASK;     // shared files: did the user confirm "details per file"?
     private static final String DLG_GENERAL = "-- General Document Vault --";
+    private android.app.Dialog dlgSheet;          // the open Upload Legal Document sheet (multi mode greys its Save button)
     /** Details per file in "multi" mode, keyed by file uri: name, category, stage, matter, file numbers (pages). */
     private final java.util.Map<String, String[]> dlgMeta = new java.util.HashMap<>();
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
@@ -1472,7 +1473,10 @@ public class NewCaseActivity extends BaseActivity {
             drop.setClickable(!has);
         };
         draw.run();
-        dlgRefresh = draw;
+        dlgRefresh = () -> {
+            draw.run();
+            dlgSaveLook(multi[0]);
+        };
 
         final java.util.function.BooleanSupplier[] saver = new java.util.function.BooleanSupplier[1];
         final android.app.Dialog[] dlg = new android.app.Dialog[1];
@@ -1648,9 +1652,12 @@ public class NewCaseActivity extends BaseActivity {
                 return false;
             }
             int[] lead = dlgLeaders();
+            int doneFiles = 0;
+            for (int l : lead) if (l >= 0) doneFiles++;
             for (int i = 0; i < lead.length; i++) {
-                if (lead[i] < 0) {
-                    Toast.makeText(this, "Set details for file " + (i + 1), Toast.LENGTH_SHORT).show();
+                if (lead[i] < 0) {          // every file must be marked before anything is saved
+                    Toast.makeText(this, "Set details for file " + (i + 1) + " first (" + doneFiles + " of "
+                            + lead.length + " files done)", Toast.LENGTH_LONG).show();
                     return false;
                 }
             }
@@ -1687,13 +1694,15 @@ public class NewCaseActivity extends BaseActivity {
         };
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
-                () -> multiSave.getAsBoolean(), () -> dlgRefresh = null,
+                () -> multiSave.getAsBoolean(), () -> { dlgRefresh = null; dlgSheet = null; },
                 () -> PickerDialogs.confirm(this, "Discard upload?",
                         "Attached files and details entered here will be discarded.", "Discard", () -> {
                             dlgUris.clear();
                             if (dlg[0] != null) dlg[0].dismiss();
                             finish();       // back to the screen it came from (Document Vault)
                         }));
+        dlgSheet = dlg[0];
+        dlgSaveLook(multi[0]);
         if (fromMarker) {       // arriving from the Category marker: cursor straight in Document Name
             name.requestFocus();
             if (dlg[0] != null && dlg[0].getWindow() != null) {
@@ -2084,6 +2093,31 @@ public class NewCaseActivity extends BaseActivity {
         vd.setOnDismissListener(x -> gen[0]++);
         vd.show();
         show[0].run();
+    }
+
+    /** Multi mode: Save to Vault looks off until every file has its details. */
+    private void dlgSaveLook(boolean multiOn) {
+        if (dlgSheet == null || dlgSheet.getWindow() == null) return;
+        boolean locked = false;
+        if (multiOn) {
+            int[] lead = dlgLeaders();
+            locked = lead.length == 0;
+            for (int l : lead) if (l < 0) locked = true;
+        }
+        TextView sv = dlgFindText(dlgSheet.getWindow().getDecorView(), "Save to Vault");
+        if (sv != null) sv.setAlpha(locked ? 0.4f : 1f);
+    }
+
+    private static TextView dlgFindText(View v, String text) {
+        if (v instanceof TextView && text.contentEquals(((TextView) v).getText())) return (TextView) v;
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                TextView r = dlgFindText(g.getChildAt(i), text);
+                if (r != null) return r;
+            }
+        }
+        return null;
     }
 
     /** A file's uri changes (replace / rotate / page edit): its details stay with it. */
