@@ -1331,7 +1331,8 @@ public class NewCaseActivity extends BaseActivity {
                     LinearLayout infoCol = new LinearLayout(this);
                     infoCol.setOrientation(LinearLayout.VERTICAL);
                     infoCol.setPadding(dp(12), 0, 0, 0);
-                    TextView t1 = CaseViews.text(this, fname, 13.5f, AppTheme.text(this), true);
+                    String shownName = multi[0] ? dlgDocName(idx, lead) : null;
+                    TextView t1 = CaseViews.text(this, shownName != null ? shownName : fname, 13.5f, AppTheme.text(this), true);
                     t1.setSingleLine(true);
                     t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
                     infoCol.addView(t1);
@@ -1340,7 +1341,10 @@ public class NewCaseActivity extends BaseActivity {
                             11, AppTheme.sub(this), false);
                     t2.setPadding(0, dp(3), 0, 0);
                     infoCol.addView(t2);
-                    if (multi[0]) infoCol.addView(dlgMetaLine(idx, lead));
+                    if (multi[0]) {
+                        TextView ml = dlgMetaLine(idx, lead);
+                        if (ml != null) infoCol.addView(ml);
+                    }
                     topRow.addView(infoCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                     if (multi[0] && lead != null && lead[idx] >= 0) {      // details set: its category sits on top of the file
                         String[] lm = dlgMeta.get(dlgUris.get(lead[idx]).toString());
@@ -1993,6 +1997,10 @@ public class NewCaseActivity extends BaseActivity {
         final TextView title = CaseViews.text(this, "", 14, 0xFFFFFFFF, true);
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        final TextView markChip = CaseViews.text(this, "", 12, 0xFFF0B03A, true);
+        markChip.setPadding(dp(12), dp(5), dp(12), dp(5));
+        markChip.setBackground(CaseViews.box(this, 0xCC000000, 8, 0xFFF0B03A, 1));
+        markChip.setVisibility(View.GONE);
         final TextView prev = CaseViews.text(this, "\u2039", 34, 0xFFFFFFFF, true);
         final TextView next = CaseViews.text(this, "\u203A", 34, 0xFFFFFFFF, true);
         final Runnable[] show = new Runnable[1];
@@ -2014,7 +2022,14 @@ public class NewCaseActivity extends BaseActivity {
             final Uri u = dlgUris.get(cur[0]);
             final String fname = displayName(u);
             final int kind = DocFileCard.kind(fname);
-            title.setText((cur[0] + 1) + " / " + dlgUris.size() + "   " + fname);
+            final int[] vLead = dlgLeaders();
+            final String vDoc = dlgDocName(cur[0], vLead);
+            final String[] vm = dlgLeadMeta(cur[0]);
+            title.setText((cur[0] + 1) + " / " + dlgUris.size() + "   " + (vDoc != null ? vDoc : fname));
+            if (vm != null && !vm[1].isEmpty()) {
+                markChip.setText(vm[1].toUpperCase(Locale.ROOT) + (vm[2].isEmpty() ? "" : "  \u2022  " + vm[2]));
+                markChip.setVisibility(View.VISIBLE);
+            } else markChip.setVisibility(View.GONE);
             prev.setVisibility(cur[0] > 0 ? View.VISIBLE : View.INVISIBLE);
             next.setVisibility(cur[0] < dlgUris.size() - 1 ? View.VISIBLE : View.INVISIBLE);
             body.removeAllViews();
@@ -2093,6 +2108,11 @@ public class NewCaseActivity extends BaseActivity {
         bar.addView(close);
         root.addView(bar, new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+        android.widget.FrameLayout.LayoutParams mcl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
+        mcl.leftMargin = dp(14);
+        mcl.bottomMargin = dp(18);
+        root.addView(markChip, mcl);
         android.widget.FrameLayout.LayoutParams pl = new android.widget.FrameLayout.LayoutParams(dp(44), dp(64),
                 Gravity.START | Gravity.CENTER_VERTICAL);
         pl.leftMargin = dp(6);
@@ -2166,22 +2186,34 @@ public class NewCaseActivity extends BaseActivity {
         return lead;
     }
 
+    /** Document name shown for a file: its details name; "<name> page N" when several files share one document. */
+    private String dlgDocName(int idx, int[] lead) {
+        if (lead == null || idx < 0 || idx >= lead.length || lead[idx] < 0) return null;
+        String[] m = dlgMeta.get(dlgUris.get(lead[idx]).toString());
+        if (m == null || m[0].isEmpty()) return null;
+        int total = 0, pos = 0;
+        for (int i = 0; i < lead.length; i++) {
+            if (lead[i] == lead[idx]) {
+                total++;
+                if (i < idx) pos++;
+            }
+        }
+        return total > 1 ? m[0] + " page " + (pos + 1) : m[0];
+    }
+
+    /** Details (name, category, stage, matter, pages) that apply to a file: its own, or its leader's. */
+    private String[] dlgLeadMeta(int idx) {
+        int[] lead = dlgLeaders();
+        if (idx < 0 || idx >= lead.length || lead[idx] < 0) return null;
+        return dlgMeta.get(dlgUris.get(lead[idx]).toString());
+    }
+
     private TextView dlgMetaLine(int idx, int[] lead) {
         String[] m = dlgMeta.get(dlgUris.get(idx).toString());
         String text;
         int color;
-        if (lead[idx] >= 0 && lead[idx] != idx) {
-            text = "Saved together with file " + (lead[idx] + 1);
-            color = AppTheme.sub(this);
-        } else if (lead[idx] == idx && m != null) {
-            StringBuilder sb = new StringBuilder(m[0]);
-            if (!m[1].isEmpty()) sb.append("  \u2022  ").append(m[1]);
-            if (!m[2].isEmpty()) sb.append("  \u2022  ").append(m[2]);
-            sb.append("  \u2022  ").append(m[3].equals(DLG_GENERAL) ? "General Document Vault"
-                    : m[3].equals(CREATE_NEW_CASE) ? "This new case" : m[3]);
-            if (!m[4].isEmpty()) sb.append("  \u2022  Files ").append(m[4]);
-            text = sb.toString();
-            color = AppTheme.topics(this);
+        if (lead[idx] >= 0) {
+            return null;            // details set: the name and category chip already show it
         } else {
             text = "Details not set";
             color = RoundEdit.RED;
@@ -2195,9 +2227,16 @@ public class NewCaseActivity extends BaseActivity {
     private void dlgEditMeta(final int idx, final String defMatter) {
         if (idx < 0 || idx >= dlgUris.size()) return;
         final String key = dlgUris.get(idx).toString();
-        final String[] cur = dlgMeta.containsKey(key) ? dlgMeta.get(key).clone()
-                : new String[]{"", "Other", "", defMatter == null || defMatter.isEmpty() ? CREATE_NEW_CASE : defMatter, ""};
-        final List<DiaryStore.HCase> cs = store.cases();
+        final int[] ld = dlgLeaders();
+        final String[] own = dlgMeta.get(key);
+        final String[] cur;
+        if (own != null) cur = own.clone();
+        else if (ld[idx] >= 0 && dlgMeta.get(dlgUris.get(ld[idx]).toString()) != null) {
+            cur = dlgMeta.get(dlgUris.get(ld[idx]).toString()).clone();     // listed in another file's pages: same details
+            String auto = dlgDocName(idx, ld);
+            if (auto != null) cur[0] = auto;
+            cur[4] = String.valueOf(idx + 1);
+        } else cur = new String[]{"", "Other", "", defMatter == null || defMatter.isEmpty() ? CREATE_NEW_CASE : defMatter, ""};
         LinearLayout f = new LinearLayout(this);
         f.setOrientation(LinearLayout.VERTICAL);
 
@@ -2242,20 +2281,6 @@ public class NewCaseActivity extends BaseActivity {
                             }
                         },
                         (i, j) -> docStages.swap(i, j)));
-
-        f.addView(dlgLbl("Attach to Matter (Optional)"));
-        final TextView matterTv = dropdown(f, DLG_GENERAL, null);
-        setChosen(matterTv, cur[3], DLG_GENERAL);
-        ((View) matterTv.getTag()).setOnClickListener(v -> {
-            List<String> items = new ArrayList<>();
-            items.add(DLG_GENERAL);
-            for (DiaryStore.HCase hc : cs) items.add(hc.title());
-            items.add(CREATE_NEW_CASE);          // the case being created on this page: last
-            PickerDialogs.optionSheet(this, "Attach to Matter", "Saved cases", items, items.indexOf(cur[3]), i -> {
-                cur[3] = items.get(i);
-                setChosen(matterTv, cur[3], DLG_GENERAL);
-            });
-        });
 
         f.addView(dlgLbl("Page / page range (file numbers of this document)"));
         final EditText pg = new RoundEdit(this);
