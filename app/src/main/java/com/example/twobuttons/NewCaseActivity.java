@@ -148,6 +148,8 @@ public class NewCaseActivity extends BaseActivity {
     private android.app.Dialog dlgSheet;          // the open Upload Legal Document sheet (multi mode greys its Save button)
     /** Details per file in "multi" mode, keyed by file uri: name, category, stage, matter, file numbers (pages). */
     private final java.util.Map<String, String[]> dlgMeta = new java.util.HashMap<>();
+    /** Note per file in the upload box, keyed by file uri (orange + blinking icon when filled). */
+    private final java.util.Map<String, String> dlgNotes = new java.util.HashMap<>();
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
     private final java.util.Map<String, String> markerFiles = new java.util.HashMap<>();
     /** Uris of documents saved with "Create new case": they join this case when it is created. */
@@ -1067,6 +1069,7 @@ public class NewCaseActivity extends BaseActivity {
     private void uploadDialog() {
         dlgUris.clear();
         dlgMeta.clear();
+        dlgNotes.clear();
         final int multiIn = markerMulti;
         markerMulti = MultiDocDetector.ASK;
         // the PDF handed over by the Category marker is used once, for the popup opened on arrival
@@ -1452,6 +1455,20 @@ public class NewCaseActivity extends BaseActivity {
                                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                         elp.topMargin = dp(8);
                         fileCard.addView(ed, elp);
+                        LinearLayout nr = new LinearLayout(this);
+                        nr.setOrientation(LinearLayout.HORIZONTAL);
+                        String curNote = dlgNotes.get(dlgUris.get(idx).toString());
+                        boolean hasNote = curNote != null && !curNote.trim().isEmpty();
+                        int noteCol = hasNote ? AppTheme.isDark(this) ? 0xFFFFB74D : 0xFFE65100 : AppTheme.sub(this);
+                        View rb = dlgBtn(R.drawable.ic_refresh, RoundEdit.RED, "Reset", () -> dlgResetFile(idx));
+                        View nb = dlgBtn(R.drawable.ic_sticky_note, noteCol, "Notes", () -> dlgEditNote(idx));
+                        if (hasNote) dlgBlink(nb);
+                        nr.addView(rb, dlgBtnLp(false));
+                        nr.addView(nb, dlgBtnLp(true));
+                        LinearLayout.LayoutParams nrlp = new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                        nrlp.topMargin = dp(8);
+                        fileCard.addView(nr, nrlp);
                     }
                     if (kind == 0) {       // PDF: reopen it to delete pages or add photos
                         View pages = dlgBtn(R.drawable.ic_edit, AppTheme.accent(this), "Edit pages (add / remove)", () ->
@@ -1596,6 +1613,8 @@ public class NewCaseActivity extends BaseActivity {
             dupOk[0] = false;
             // all files chosen in this dialog belong to ONE group: one card, one Vault entry
             List<Uri> group = new ArrayList<>(dlgUris);
+            final String[] groupNotes = new String[group.size()];
+            for (int ni = 0; ni < group.size(); ni++) groupNotes[ni] = dlgNotes.get(group.get(ni).toString());
             // a file saved from the marker leaves its original place and lives in the app's folder from now on
             for (int gi = 0; gi < group.size(); gi++) {
                 String oldPath = markerFiles.get(group.get(gi).toString());
@@ -1625,6 +1644,11 @@ public class NewCaseActivity extends BaseActivity {
                 markerFiles.remove(group.get(gi).toString());
                 markerFiles.put(nu.toString(), moved.getAbsolutePath());
                 group.set(gi, nu);
+            }
+            for (int ni = 0; ni < group.size(); ni++) {      // file notes go where the Document Vault file row reads them
+                String np = markerFiles.get(group.get(ni).toString());
+                if (np != null && groupNotes[ni] != null && !groupNotes[ni].isEmpty())
+                    getSharedPreferences("doc_notes", MODE_PRIVATE).edit().putString("file:" + np, groupNotes[ni]).apply();
             }
             Uri first = group.get(0);
             List<Uri> rest = new ArrayList<>(group.subList(1, group.size()));
@@ -1706,6 +1730,7 @@ public class NewCaseActivity extends BaseActivity {
                 left.removeAll(ge.getValue());
             }
             dlgMeta.clear();
+        dlgNotes.clear();
             return true;
         };
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
@@ -2156,6 +2181,8 @@ public class NewCaseActivity extends BaseActivity {
     private void dlgSet(int idx, Uri nu) {
         Uri old = dlgUris.get(idx);
         String[] m = dlgMeta.remove(old.toString());
+        String nt = dlgNotes.remove(old.toString());
+        if (nt != null) dlgNotes.put(nu.toString(), nt);
         dlgUris.set(idx, nu);
         if (m != null) dlgMeta.put(nu.toString(), m);
     }
@@ -2184,6 +2211,60 @@ public class NewCaseActivity extends BaseActivity {
             }
         }
         return lead;
+    }
+
+    /** Pulses a view (fade out / in, forever) while it is on screen. */
+    private static void dlgBlink(final View v) {
+        final android.animation.ObjectAnimator an = android.animation.ObjectAnimator.ofFloat(v, View.ALPHA, 1f, 0.2f);
+        an.setDuration(650);
+        an.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        an.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        v.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View x) { if (!an.isStarted()) an.start(); }
+            @Override public void onViewDetachedFromWindow(View x) { an.cancel(); x.setAlpha(1f); }
+        });
+    }
+
+    /** Reset one file: its details, page range, note and any file whose pages pointed at it go back to "not set". */
+    private void dlgResetFile(final int idx) {
+        if (idx < 0 || idx >= dlgUris.size()) return;
+        PickerDialogs.confirm(this, "Reset file " + (idx + 1) + "?",
+                "Document name, category, stage, page range and notes of this file will be cleared.", "Reset", () -> {
+                    int[] lead = dlgLeaders();
+                    int owner = lead[idx] >= 0 ? lead[idx] : idx;     // a file listed in another's pages resets that owner
+                    dlgMeta.remove(dlgUris.get(owner).toString());
+                    dlgNotes.remove(dlgUris.get(idx).toString());
+                    if (dlgRefresh != null) dlgRefresh.run();
+                });
+    }
+
+    /** Note for one file of the upload box. */
+    private void dlgEditNote(final int idx) {
+        if (idx < 0 || idx >= dlgUris.size()) return;
+        final String key = dlgUris.get(idx).toString();
+        final EditText et = new EditText(this);
+        et.setText(dlgNotes.getOrDefault(key, ""));
+        et.setHint("Notes");
+        et.setMinLines(3);
+        et.setGravity(Gravity.TOP | Gravity.START);
+        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        et.setTextColor(AppTheme.text(this));
+        et.setHintTextColor(AppTheme.sub(this));
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dp(20), dp(4), dp(20), 0);
+        box.addView(et, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Notes: file " + (idx + 1))
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (d, w) -> {
+                    String t = et.getText().toString().trim();
+                    if (t.isEmpty()) dlgNotes.remove(key); else dlgNotes.put(key, t);
+                    if (dlgRefresh != null) dlgRefresh.run();
+                })
+                .show();
     }
 
     /** Document name shown for a file: its details name; "<name> page N" when several files share one document. */
