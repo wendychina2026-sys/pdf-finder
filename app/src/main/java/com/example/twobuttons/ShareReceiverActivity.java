@@ -150,7 +150,11 @@ public class ShareReceiverActivity extends Activity {
         if (all.size() > 1) {
             // more than one file shared: wait for the user to confirm, then details are set per file
             MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
-                    () -> { openNew(all, null, MultiDocDetector.YES); finish(); }, normal);
+                    () -> {
+                        final boolean allPdf = pdfs.size() == all.size();
+                        if (attachableDocs(allPdf).isEmpty()) { openNew(all, null, MultiDocDetector.YES); finish(); }
+                        else askMulti(all, allPdf);        // same choice window as for a single file
+                    }, normal);
             return;
         }
         normal.run();
@@ -206,6 +210,36 @@ public class ShareReceiverActivity extends Activity {
                     } else if (which == 1) pickCase(files, pdf);
                     else pickDocument(files, pdf);
                 }, this::finish);
+    }
+
+    /** Several files shared and "per file" confirmed: still ask new document / under a saved case / add to a saved document. */
+    private void askMulti(final ArrayList<File> files, final boolean allPdf) {
+        java.util.List<String> items = new ArrayList<>();
+        items.add("New documents (set details for each file)");
+        items.add("New documents under an already saved case");
+        items.add("Add to a saved document (joins that card)");
+        PickerDialogs.optionSheet(this, "Shared files", files.size() + " files", items, -1, which -> {
+            if (which == 0) {
+                openNew(files, null, MultiDocDetector.YES);
+                finish();
+            } else if (which == 1) {
+                final java.util.List<String> matters = new ArrayList<>();
+                for (LegalStore.Doc d : attachableDocs(allPdf)) {
+                    String m = d.caseName == null ? "" : d.caseName.trim();
+                    if (m.isEmpty() || m.equals("[]") || m.equals("General Document Vault")) m = MatterPicker.VAULT;
+                    if (!matters.contains(m)) matters.add(m);
+                }
+                java.util.List<String> shown = new ArrayList<>();
+                for (String m : matters) shown.add(m.equals(MatterPicker.VAULT) ? "General Document Vault" : m);
+                PickerDialogs.optionSheet(this, "Same case as which?", "Each file keeps its own category and stage",
+                        shown, -1, w -> {
+                            openNew(files, matters.get(w), MultiDocDetector.YES);
+                            finish();
+                        }, () -> askMulti(files, allPdf));
+            } else {
+                pickDocument(files, allPdf);
+            }
+        }, this::finish);
     }
 
     /** Own card with its OWN category and stage, but under the same matter as a document already saved. */
