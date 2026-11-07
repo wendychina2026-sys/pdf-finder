@@ -2035,6 +2035,9 @@ public class NewCaseActivity extends BaseActivity {
         editBtn.setPadding(dp(18), dp(10), dp(18), dp(10));
         editBtn.setBackground(CaseViews.box(this, 0xCC1565C0, 22, 0xFFFFFFFF, 1));
         editBtn.setVisibility(View.GONE);
+        final TextView removeBtn = CaseViews.text(this, "\u2715  Remove file", 14, 0xFFFFFFFF, true);
+        removeBtn.setPadding(dp(18), dp(10), dp(18), dp(10));
+        removeBtn.setBackground(CaseViews.box(this, 0xCCC62828, 22, 0xFFFFFFFF, 1));
         final TextView prev = CaseViews.text(this, "\u2039", 34, 0xFFFFFFFF, true);
         final TextView next = CaseViews.text(this, "\u203A", 34, 0xFFFFFFFF, true);
         final Runnable[] show = new Runnable[1];
@@ -2051,6 +2054,18 @@ public class NewCaseActivity extends BaseActivity {
         markChip.setOnClickListener(v -> {      // tap the category text = edit this file's details again
             if (dlgMultiNow.getAsBoolean()) dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run());
         });
+        removeBtn.setOnClickListener(v -> PickerDialogs.confirm(this, "Remove file?",
+                "\"" + displayName(dlgUris.get(cur[0])) + "\" will be taken out of this upload. "
+                        + "The file itself is not deleted, it stays where it is on your phone.",
+                "Remove", () -> {
+                    if (cur[0] >= dlgUris.size()) return;
+                    dlgUris.remove(cur[0]);
+                    dlgPagesReset();
+                    if (dlgRefresh != null) dlgRefresh.run();
+                    if (dlgUris.isEmpty()) { vd.dismiss(); return; }
+                    cur[0] = Math.min(cur[0], dlgUris.size() - 1);
+                    show[0].run();
+                }));
         editBtn.setOnClickListener(v -> dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run()));
         prev.setOnClickListener(v -> go.accept(-1));
         next.setOnClickListener(v -> go.accept(1));
@@ -2153,11 +2168,19 @@ public class NewCaseActivity extends BaseActivity {
         mcl.leftMargin = dp(14);
         mcl.bottomMargin = dp(18);
         root.addView(markChip, mcl);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setGravity(Gravity.END);
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.topMargin = dp(8);
+        actions.addView(editBtn);
+        actions.addView(removeBtn, alp);
         android.widget.FrameLayout.LayoutParams ebl = new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
         ebl.rightMargin = dp(14);
         ebl.bottomMargin = dp(18);
-        root.addView(editBtn, ebl);
+        root.addView(actions, ebl);
         android.widget.FrameLayout.LayoutParams pl = new android.widget.FrameLayout.LayoutParams(dp(44), dp(64),
                 Gravity.START | Gravity.CENTER_VERTICAL);
         pl.leftMargin = dp(6);
