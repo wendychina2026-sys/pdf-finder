@@ -2048,6 +2048,9 @@ public class NewCaseActivity extends BaseActivity {
             ar.setGravity(Gravity.CENTER);
             ar.setBackground(CaseViews.box(this, 0x66000000, 24, 0, 0));
         }
+        markChip.setOnClickListener(v -> {      // tap the category text = edit this file's details again
+            if (dlgMultiNow.getAsBoolean()) dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run());
+        });
         editBtn.setOnClickListener(v -> dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run()));
         prev.setOnClickListener(v -> go.accept(-1));
         next.setOnClickListener(v -> go.accept(1));
@@ -2062,7 +2065,7 @@ public class NewCaseActivity extends BaseActivity {
             final String[] vm = dlgLeadMeta(cur[0]);
             title.setText((cur[0] + 1) + " / " + dlgUris.size() + "   " + (vDoc != null ? vDoc : fname));
             if (vm != null && !vm[1].isEmpty()) {
-                markChip.setText(vm[1].toUpperCase(Locale.ROOT) + (vm[2].isEmpty() ? "" : "  \u2022  " + vm[2]));
+                markChip.setText(vm[1].toUpperCase(Locale.ROOT) + (vm[2].isEmpty() ? "" : "  \u2022  " + vm[2]) + "  \u270E");
                 markChip.setVisibility(View.VISIBLE);
             } else markChip.setVisibility(View.GONE);
             // no details yet for this file: small Edit button opens the details box right over this image
