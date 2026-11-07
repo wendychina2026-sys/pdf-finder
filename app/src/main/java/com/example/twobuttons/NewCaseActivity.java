@@ -1120,6 +1120,8 @@ public class NewCaseActivity extends BaseActivity {
         final int[] wholeMode = {-1};              // multi-page PDF, one category: -1 not asked, 0 all pages, 1 some pages, 2 mark later
         final String[] wholeRange = {""};
         final boolean[] multi = {multiIn == MultiDocDetector.YES};     // details are set per file (Edit details)
+        dlgMultiNow = () -> multi[0];
+        dlgMatterNow = () -> matterSel[0];
         final boolean[] asked = {multiIn != MultiDocDetector.ASK};      // "more than one file" already answered
         final boolean[] matterTouched = {false};   // matter changed in this popup (wins over the marker's latest pick)
 
@@ -2013,6 +2015,9 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     /** Full-screen viewer over the files attached in the upload dialog: swipe or arrows go to the previous / next file. */
+    private java.util.function.BooleanSupplier dlgMultiNow = () -> false;
+    private java.util.function.Supplier<String> dlgMatterNow = () -> "";
+
     private void dlgView(int start) {
         if (dlgUris.isEmpty()) return;
         final int[] cur = {Math.max(0, Math.min(start, dlgUris.size() - 1))};
@@ -2026,6 +2031,10 @@ public class NewCaseActivity extends BaseActivity {
         markChip.setPadding(dp(12), dp(5), dp(12), dp(5));
         markChip.setBackground(CaseViews.box(this, 0xCC000000, 8, 0xFFF0B03A, 1));
         markChip.setVisibility(View.GONE);
+        final TextView editBtn = CaseViews.text(this, "\u270E  Edit details", 14, 0xFFFFFFFF, true);
+        editBtn.setPadding(dp(18), dp(10), dp(18), dp(10));
+        editBtn.setBackground(CaseViews.box(this, 0xCC1565C0, 22, 0xFFFFFFFF, 1));
+        editBtn.setVisibility(View.GONE);
         final TextView prev = CaseViews.text(this, "\u2039", 34, 0xFFFFFFFF, true);
         final TextView next = CaseViews.text(this, "\u203A", 34, 0xFFFFFFFF, true);
         final Runnable[] show = new Runnable[1];
@@ -2039,6 +2048,7 @@ public class NewCaseActivity extends BaseActivity {
             ar.setGravity(Gravity.CENTER);
             ar.setBackground(CaseViews.box(this, 0x66000000, 24, 0, 0));
         }
+        editBtn.setOnClickListener(v -> dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run()));
         prev.setOnClickListener(v -> go.accept(-1));
         next.setOnClickListener(v -> go.accept(1));
         show[0] = () -> {
@@ -2055,6 +2065,8 @@ public class NewCaseActivity extends BaseActivity {
                 markChip.setText(vm[1].toUpperCase(Locale.ROOT) + (vm[2].isEmpty() ? "" : "  \u2022  " + vm[2]));
                 markChip.setVisibility(View.VISIBLE);
             } else markChip.setVisibility(View.GONE);
+            // no details yet for this file: small Edit button opens the details box right over this image
+            editBtn.setVisibility(dlgMultiNow.getAsBoolean() && vLead[cur[0]] < 0 ? View.VISIBLE : View.GONE);
             prev.setVisibility(cur[0] > 0 ? View.VISIBLE : View.INVISIBLE);
             next.setVisibility(cur[0] < dlgUris.size() - 1 ? View.VISIBLE : View.INVISIBLE);
             body.removeAllViews();
@@ -2138,6 +2150,11 @@ public class NewCaseActivity extends BaseActivity {
         mcl.leftMargin = dp(14);
         mcl.bottomMargin = dp(18);
         root.addView(markChip, mcl);
+        android.widget.FrameLayout.LayoutParams ebl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        ebl.rightMargin = dp(14);
+        ebl.bottomMargin = dp(18);
+        root.addView(editBtn, ebl);
         android.widget.FrameLayout.LayoutParams pl = new android.widget.FrameLayout.LayoutParams(dp(44), dp(64),
                 Gravity.START | Gravity.CENTER_VERTICAL);
         pl.leftMargin = dp(6);
@@ -2305,7 +2322,9 @@ public class NewCaseActivity extends BaseActivity {
     }
 
     /** Details of one file: Document name, Category, Stage, Attach to matter, plus Page / page range (file numbers). */
-    private void dlgEditMeta(final int idx, final String defMatter) {
+    private void dlgEditMeta(final int idx, final String defMatter) { dlgEditMeta(idx, defMatter, null); }
+
+    private void dlgEditMeta(final int idx, final String defMatter, final Runnable after) {
         if (idx < 0 || idx >= dlgUris.size()) return;
         final String key = dlgUris.get(idx).toString();
         final int[] ld = dlgLeaders();
@@ -2387,6 +2406,7 @@ public class NewCaseActivity extends BaseActivity {
                     cur[4] = ptxt;
                     dlgMeta.put(key, cur);
                     if (dlgRefresh != null) dlgRefresh.run();
+                    if (after != null) after.run();
                     return true;
                 }, () -> { });
     }
