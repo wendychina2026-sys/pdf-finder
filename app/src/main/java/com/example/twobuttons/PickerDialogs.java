@@ -189,6 +189,13 @@ final class PickerDialogs {
     /** Same, but Cancel runs onCancel (e.g. a discard confirmation) instead of closing straight away. */
     static Dialog formSheet(Activity a, String title, String subtitle, View body, String saveLabel,
                             java.util.function.BooleanSupplier onSave, Runnable onClose, Runnable onCancel) {
+        return formSheet(a, title, subtitle, body, saveLabel, onSave, onClose, onCancel, null, null);
+    }
+
+    /** Same, plus an extra text button (e.g. "Save draft") in the footer, before Cancel. */
+    static Dialog formSheet(Activity a, String title, String subtitle, View body, String saveLabel,
+                            java.util.function.BooleanSupplier onSave, Runnable onClose, Runnable onCancel,
+                            String extraLabel, Runnable onExtra) {
         final Dialog d = shell(a);
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -209,8 +216,14 @@ final class PickerDialogs {
         foot.setOrientation(LinearLayout.HORIZONTAL);
         foot.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         foot.setPadding(dp(a, 22), dp(a, 14), dp(a, 22), dp(a, 18));
+        if (extraLabel != null && onExtra != null) {
+            TextView extra = CaseViews.text(a, extraLabel, 15, AppTheme.accent(a), true);
+            extra.setPadding(dp(a, 10), dp(a, 12), dp(a, 10), dp(a, 12));
+            extra.setOnClickListener(v -> onExtra.run());
+            foot.addView(extra);
+        }
         TextView cancel = CaseViews.text(a, "Cancel", 15, soft(a), false);
-        cancel.setPadding(dp(a, 16), dp(a, 12), dp(a, 20), dp(a, 12));
+        cancel.setPadding(dp(a, 12), dp(a, 12), dp(a, 14), dp(a, 12));
         cancel.setOnClickListener(v -> { if (onCancel != null) onCancel.run(); else d.dismiss(); });
         foot.addView(cancel);
         TextView save = CaseViews.text(a, saveLabel, 15, ink(a), true);

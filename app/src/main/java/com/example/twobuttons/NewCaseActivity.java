@@ -1067,9 +1067,40 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Document name + category + matter (+ stage), then "Tap to choose" (PDF / Word / image, or a photo). */
     private void uploadDialog() {
+        if (markerPdf.isEmpty() && DraftStore.exists(this)) {
+            final DraftStore.Draft dr = DraftStore.load(this);
+            if (dr != null) {
+                android.app.AlertDialog ad = new android.app.AlertDialog.Builder(this)
+                        .setTitle("Saved draft found")
+                        .setMessage(dr.files.size() + (dr.files.size() == 1 ? " file" : " files")
+                                + " with the details you filled are saved as a draft. Continue with it?")
+                        .setPositiveButton("Restore draft", (dd, w) -> uploadDialog(dr))
+                        .setNegativeButton("New upload", (dd, w) -> uploadDialog(null))
+                        .setNeutralButton("Delete draft", (dd, w) -> {
+                            DraftStore.clear(this);
+                            uploadDialog(null);
+                        })
+                        .create();
+                ad.setCanceledOnTouchOutside(false);
+                ad.show();
+                return;
+            }
+        }
+        uploadDialog(null);
+    }
+
+    private void uploadDialog(final DraftStore.Draft draft) {
         dlgUris.clear();
         dlgMeta.clear();
         dlgNotes.clear();
+        if (draft != null) {
+            for (int i = 0; i < draft.files.size(); i++) {
+                Uri du = DraftStore.uri(this, draft.files.get(i));
+                dlgUris.add(du);
+                if (draft.meta.get(i) != null) dlgMeta.put(du.toString(), draft.meta.get(i));
+                if (draft.notes.get(i) != null) dlgNotes.put(du.toString(), draft.notes.get(i));
+            }
+        }
         final int multiIn = markerMulti;
         markerMulti = MultiDocDetector.ASK;
         // the PDF handed over by the Category marker is used once, for the popup opened on arrival
@@ -1123,6 +1154,14 @@ public class NewCaseActivity extends BaseActivity {
         dlgMultiNow = () -> multi[0];
         dlgMatterNow = () -> matterSel[0];
         final boolean[] asked = {multiIn != MultiDocDetector.ASK};      // "more than one file" already answered
+        if (draft != null) {            // fields of the saved draft
+            if (draft.multi) { multi[0] = true; asked[0] = true; }
+            if (!draft.category.isEmpty()) catSel[0] = draft.category;
+            stageSel[0] = draft.stage;
+            boolean matterOk = draft.matter.equals(general) || draft.matter.equals(CREATE_NEW_CASE);
+            for (DiaryStore.HCase hc : cases) if (hc.title().equals(draft.matter)) matterOk = true;
+            if (matterOk && !draft.matter.isEmpty()) matterSel[0] = draft.matter;
+        }
         final boolean[] matterTouched = {false};   // matter changed in this popup (wins over the marker's latest pick)
 
         LinearLayout f = new LinearLayout(this);
@@ -1134,6 +1173,7 @@ public class NewCaseActivity extends BaseActivity {
         EditText name = new RoundEdit(this);
         FieldStyle.smallHint(name, "e.g. Interim Injunction Application");
         name.setSingleLine(true);
+        if (draft != null) name.setText(draft.name);
         f.addView(name, lpTop(0));
 
         final TextView catLbl = dlgLbl("Document Category");
@@ -1737,13 +1777,49 @@ public class NewCaseActivity extends BaseActivity {
         };
         dlg[0] = PickerDialogs.formSheet(this, "Upload Legal Document",
                 "Select PDF, Word or image file to store in the Document Vault.", f, "Save to Vault",
-                () -> multiSave.getAsBoolean(), () -> { dlgRefresh = null; dlgSheet = null; },
+                () -> {
+                    boolean saved = multiSave.getAsBoolean();
+                    if (saved && draft != null) DraftStore.clear(this);     // the draft became a real upload
+                    return saved;
+                }, () -> { dlgRefresh = null; dlgSheet = null; },
                 () -> PickerDialogs.confirm(this, "Discard upload?",
                         "Attached files and details entered here will be discarded.", "Discard", () -> {
                             dlgUris.clear();
                             if (dlg[0] != null) dlg[0].dismiss();
                             finish();       // back to the screen it came from (Document Vault)
-                        }));
+                        }),
+                "Save draft", () -> {
+                    if (dlgUris.isEmpty()) {
+                        Toast.makeText(this, "Choose a file first", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    final List<Uri> du = new ArrayList<>(dlgUris);
+                    final List<String> dn = new ArrayList<>();
+                    final List<String[]> dm = new ArrayList<>();
+                    final List<String> dnt = new ArrayList<>();
+                    for (Uri u : du) {
+                        dn.add(displayName(u));
+                        dm.add(dlgMeta.get(u.toString()));
+                        dnt.add(dlgNotes.get(u.toString()));
+                    }
+                    final String fName = LegalUi.str(name), fCat = catSel[0], fStage = stageSel[0], fMatter = matterSel[0];
+                    final boolean fMulti = multi[0];
+                    Toast.makeText(this, "Saving draft...", Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        final boolean ok = DraftStore.save(this, du, dn, dm, dnt, fName, fCat, fStage, fMatter, fMulti);
+                        runOnUiThread(() -> {
+                            if (!ok) {
+                                Toast.makeText(this, "Could not save the draft", Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            Toast.makeText(this, "Draft saved. It comes back when you open Upload next time.",
+                                    Toast.LENGTH_LONG).show();
+                            dlgUris.clear();
+                            if (dlg[0] != null) dlg[0].dismiss();
+                            finish();
+                        });
+                    }, "draft-save").start();
+                });
         dlgSheet = dlg[0];
         dlgSaveLook(multi[0]);
         if (fromMarker && !multi[0]) {       // arriving from the Category marker: cursor straight in Document Name
