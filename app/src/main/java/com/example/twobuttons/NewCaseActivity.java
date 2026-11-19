@@ -2162,10 +2162,15 @@ public class NewCaseActivity extends BaseActivity {
                 String[] sg = dlgSingleNow.get();
                 if (sg != null) {
                     String sn = sg[0] == null ? "" : sg[0].trim();
-                    String sc = sg[1] == null || sg[1].equals("Other") ? "" : sg[1];
+                    String sc = sg[1] == null ? "" : sg[1];
                     String ss = sg[2] == null ? "" : sg[2];
+                    if (sc.equals("Other") && sn.isEmpty() && ss.isEmpty()) sc = "";     // untouched default
                     if (!sn.isEmpty()) vDocTmp = dlgUris.size() > 1 ? sn + " page " + (cur[0] + 1) : sn;
-                    if (!sc.isEmpty() || !ss.isEmpty()) vmTmp = new String[]{sn, sc, ss, sg[3] == null ? "" : sg[3], ""};
+                    // chip text: name \u2022 category \u2022 stage (name sits in the category slot when no category)
+                    String chip = sn;
+                    if (!sc.isEmpty()) chip = chip.isEmpty() ? sc : sn + "  \u2022  " + sc;
+                    if (!chip.isEmpty() || !ss.isEmpty())
+                        vmTmp = new String[]{sn, chip.isEmpty() ? ss : chip, chip.isEmpty() ? "" : ss, sg[3] == null ? "" : sg[3], ""};
                 }
             }
             final String vDoc = vDocTmp;
