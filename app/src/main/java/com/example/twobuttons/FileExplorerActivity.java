@@ -1,6 +1,9 @@
 package com.example.twobuttons;
 
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.LruCache;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,6 +18,7 @@ import android.webkit.MimeTypeMap;
 import android.widget.BaseAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.GridView;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -63,6 +67,16 @@ public class FileExplorerActivity extends BaseActivity {
     private TextView summary, empty, sortLabel, pathView;
     private BaseAdapter adapter;
     private ListView listView;
+    private GridView gridView;
+    private BaseAdapter gridAdapter;
+    private TextView viewLabel;
+    private int viewMode = 0;                // 0 list, 1 grid (thumbnails), 2 large grid
+    private static final String[] VIEWS = {"List", "Grid", "Large grid"};
+    private final LruCache<String, Bitmap> thumbs = new LruCache<String, Bitmap>(
+            (int) Math.min(48L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 8)) {
+        @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
+    };
+    private final java.util.concurrent.ExecutorService thumbPool = java.util.concurrent.Executors.newFixedThreadPool(2);
     private File focus;          // the file the user came here for: marked and scrolled into view
     private boolean selMode = false;                         // select several files / folders to delete or share
     private final Set<String> picked = new LinkedHashSet<>();
@@ -94,6 +108,7 @@ public class FileExplorerActivity extends BaseActivity {
             root = getExternalFilesDir(null);
             if (root == null) root = getFilesDir();
         }
+        viewMode = getSharedPreferences("explorer", MODE_PRIVATE).getInt("view", 0);
         cur = root;
         String focusPath = getIntent().getStringExtra("focus");
         if (focusPath != null && !focusPath.isEmpty()) focus = underRoot(new File(focusPath));
@@ -190,7 +205,20 @@ public class FileExplorerActivity extends BaseActivity {
 
         summary = CaseViews.text(this, "", 12, AppTheme.sub(this), false);
         summary.setPadding(CaseViews.dp(this, 4), CaseViews.dp(this, 8), 0, CaseViews.dp(this, 6));
-        page.addView(summary);
+        LinearLayout viewChip = chip(R.drawable.ic_cat_apps, VIEWS[viewMode]);
+        viewLabel = (TextView) viewChip.getChildAt(1);
+        viewChip.setOnClickListener(v -> PickerDialogs.optionSheet(this, "View", "How files are shown",
+                Arrays.asList(VIEWS), viewMode, which -> {
+                    viewMode = which;
+                    getSharedPreferences("explorer", MODE_PRIVATE).edit().putInt("view", which).apply();
+                    applyView();
+                }));
+        LinearLayout sumRow = new LinearLayout(this);
+        sumRow.setOrientation(LinearLayout.HORIZONTAL);
+        sumRow.setGravity(Gravity.CENTER_VERTICAL);
+        sumRow.addView(summary, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        sumRow.addView(viewChip);
+        page.addView(sumRow);
 
         selBar = new LinearLayout(this);
         selBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -242,10 +270,26 @@ public class FileExplorerActivity extends BaseActivity {
         android.widget.FrameLayout body = new android.widget.FrameLayout(this);
         body.addView(list, new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        gridView = new GridView(this);
+        gridView.setHorizontalSpacing(CaseViews.dp(this, 8));
+        gridView.setVerticalSpacing(CaseViews.dp(this, 8));
+        gridView.setClipToPadding(false);
+        gridView.setPadding(0, 0, 0, CaseViews.dp(this, 16));
+        gridView.setSelector(new android.graphics.drawable.ColorDrawable(0));
+        gridView.setOnItemClickListener((parent, view, pos, id) -> {
+            if (selMode) toggle(shown.get(pos)); else open(shown.get(pos));
+        });
+        gridView.setOnItemLongClickListener((parent, view, pos, id) -> {
+            if (selMode) toggle(shown.get(pos)); else options(shown.get(pos));
+            return true;
+        });
+        body.addView(gridView, new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         body.addView(empty, new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         page.addView(body, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        applyView();
         setContentView(page);
     }
 
@@ -366,6 +410,7 @@ public class FileExplorerActivity extends BaseActivity {
                 if (shown.get(i).equals(focus)) {
                     final int at = i;
                     listView.post(() -> listView.setSelectionFromTop(at, CaseViews.dp(this, 80)));
+                    if (gridView != null) gridView.post(() -> gridView.setSelection(at));
                     break;
                 }
             }
@@ -768,7 +813,174 @@ public class FileExplorerActivity extends BaseActivity {
         return String.format(Locale.US, "%.2f GB", v / 1024);
     }
 
+    /** List or thumbnail grid (like a gallery app); the choice is remembered. */
+    private void applyView() {
+        if (viewLabel != null) viewLabel.setText(VIEWS[viewMode]);
+        boolean grid = viewMode != 0;
+        listView.setVisibility(grid ? View.GONE : View.VISIBLE);
+        gridView.setVisibility(grid ? View.VISIBLE : View.GONE);
+        if (grid) {
+            int cols = viewMode == 1 ? 3 : 2;
+            gridView.setNumColumns(cols);
+            gridAdapter = new GridAdapter(cols);
+            gridView.setAdapter(gridAdapter);
+        }
+        if (cur != null && shown != null && adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private static boolean isImage(File f) {
+        String e = ext(f).toLowerCase(Locale.ROOT);
+        return e.equals("jpg") || e.equals("jpeg") || e.equals("png") || e.equals("webp") || e.equals("gif");
+    }
+
+    /** Small preview of an image (upright) or of the first page of a PDF; null when it cannot be made. */
+    private static Bitmap makeThumb(File f, int px) {
+        try {
+            if (isImage(f)) {
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+                if (o.outWidth <= 0) return null;
+                int ss = 1;
+                while (o.outWidth / (ss * 2) >= px && o.outHeight / (ss * 2) >= px) ss *= 2;
+                o = new BitmapFactory.Options();
+                o.inSampleSize = ss;
+                Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+                if (b == null) return null;
+                int deg = 0;
+                int ori = new android.media.ExifInterface(f.getAbsolutePath())
+                        .getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
+                if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_90) deg = 90;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_180) deg = 180;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_270) deg = 270;
+                if (deg != 0) {
+                    android.graphics.Matrix mx = new android.graphics.Matrix();
+                    mx.postRotate(deg);
+                    b = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mx, true);
+                }
+                return b;
+            }
+            if (isPdf(f)) {
+                try (android.os.ParcelFileDescriptor pf = android.os.ParcelFileDescriptor.open(f,
+                             android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+                     android.graphics.pdf.PdfRenderer pr = new android.graphics.pdf.PdfRenderer(pf)) {
+                    if (pr.getPageCount() < 1) return null;
+                    try (android.graphics.pdf.PdfRenderer.Page pg = pr.openPage(0)) {
+                        float sc = (float) px / Math.max(1, pg.getWidth());
+                        Bitmap b = Bitmap.createBitmap(px, Math.max(1, Math.round(pg.getHeight() * sc)),
+                                Bitmap.Config.ARGB_8888);
+                        b.eraseColor(0xFFFFFFFF);
+                        pg.render(b, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                        return b;
+                    }
+                }
+            }
+        } catch (Throwable ignored) { }
+        return null;
+    }
+
+    private class GridAdapter extends BaseAdapter {
+        private final int cell;
+
+        GridAdapter(int cols) {
+            int w = getResources().getDisplayMetrics().widthPixels - 2 * CaseViews.dp(FileExplorerActivity.this, 12);
+            cell = (w - (cols - 1) * CaseViews.dp(FileExplorerActivity.this, 8)) / cols;
+        }
+
+        @Override public int getCount() { return shown.size(); }
+        @Override public Object getItem(int i) { return shown.get(i); }
+        @Override public long getItemId(int i) { return i; }
+
+        @Override
+        public View getView(int i, View convert, ViewGroup parent) {
+            final File f = shown.get(i);
+            final FileExplorerActivity c = FileExplorerActivity.this;
+            LinearLayout box = new LinearLayout(c);
+            box.setOrientation(LinearLayout.VERTICAL);
+            boolean sel = selMode && picked.contains(f.getAbsolutePath());
+            boolean mark = focus != null && f.equals(focus);
+            box.setBackground(sel || mark
+                    ? CaseViews.box(c, (AppTheme.accent(c) & 0x00FFFFFF) | 0x26000000, 12, AppTheme.accent(c), 2)
+                    : CaseViews.box(c, AppTheme.card(c), 12, AppTheme.cardStroke(c), 1));
+            box.setPadding(CaseViews.dp(c, 4), CaseViews.dp(c, 4), CaseViews.dp(c, 4), CaseViews.dp(c, 6));
+
+            int side = cell - CaseViews.dp(c, 8);
+            android.widget.FrameLayout pic = new android.widget.FrameLayout(c);
+            pic.setBackground(CaseViews.box(c, AppTheme.field(c), 8, 0, 0));
+            ImageView ic = CaseViews.icon(c, iconFor(f), colorFor(f), viewMode == 1 ? 34 : 48);
+            pic.addView(ic, new android.widget.FrameLayout.LayoutParams(
+                    CaseViews.dp(c, viewMode == 1 ? 34 : 48), CaseViews.dp(c, viewMode == 1 ? 34 : 48), Gravity.CENTER));
+            final ImageView iv = new ImageView(c);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            pic.addView(iv, new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            if (!f.isDirectory() && (isImage(f) || isPdf(f))) {
+                final String key = f.getAbsolutePath() + "|" + f.lastModified() + "|" + side;
+                iv.setTag(key);
+                Bitmap bm = thumbs.get(key);
+                if (bm != null) {
+                    iv.setImageBitmap(bm);
+                    ic.setVisibility(View.GONE);
+                } else {
+                    final int px = Math.max(160, side);
+                    thumbPool.execute(() -> {
+                        Bitmap b = makeThumb(f, px);
+                        if (b == null) return;
+                        thumbs.put(key, b);
+                        runOnUiThread(() -> {
+                            if (key.equals(iv.getTag())) {
+                                iv.setImageBitmap(b);
+                                ic.setVisibility(View.GONE);
+                            }
+                        });
+                    });
+                }
+            }
+            if (selMode) {
+                CheckBox cb = new CheckBox(c);
+                cb.setFocusable(false);
+                cb.setClickable(false);
+                cb.setChecked(sel);
+                pic.addView(cb, new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START));
+            }
+            if (!f.isDirectory() && markable(f) && markedPaths.contains(f.getAbsolutePath())) {
+                TextView star = CaseViews.text(c, "\u2605", 14, 0xFFFFFFFF, true);
+                star.setGravity(Gravity.CENTER);
+                star.setBackground(CaseViews.box(c, AppTheme.topics(c), 10, 0, 0));
+                android.widget.FrameLayout.LayoutParams sl = new android.widget.FrameLayout.LayoutParams(
+                        CaseViews.dp(c, 22), CaseViews.dp(c, 22), Gravity.TOP | Gravity.END);
+                sl.setMargins(0, CaseViews.dp(c, 4), CaseViews.dp(c, 4), 0);
+                pic.addView(star, sl);
+            }
+            box.addView(pic, new LinearLayout.LayoutParams(side, side));
+
+            TextView name = CaseViews.text(c, "", 12, AppTheme.text(c), true);
+            name.setText(Highlight.apply(f.getName(), query));
+            name.setMaxLines(2);
+            name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+            name.setPadding(CaseViews.dp(c, 2), CaseViews.dp(c, 4), CaseViews.dp(c, 2), 0);
+            box.addView(name);
+            String sub;
+            if (f.isDirectory()) {
+                Integer n = childCount.get(f);
+                int k = n == null ? 0 : n;
+                sub = k + (k == 1 ? " item" : " items");
+            } else {
+                sub = size(f.length());
+            }
+            TextView st = CaseViews.text(c, sub, 11, AppTheme.sub(c), false);
+            st.setPadding(CaseViews.dp(c, 2), 0, CaseViews.dp(c, 2), 0);
+            box.addView(st);
+            return box;
+        }
+    }
+
     private class RowAdapter extends BaseAdapter {
+        @Override public void notifyDataSetChanged() {
+            super.notifyDataSetChanged();
+            if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
+        }
         @Override public int getCount() { return shown.size(); }
         @Override public Object getItem(int i) { return shown.get(i); }
         @Override public long getItemId(int i) { return i; }
