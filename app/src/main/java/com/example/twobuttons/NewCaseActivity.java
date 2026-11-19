@@ -1176,6 +1176,15 @@ public class NewCaseActivity extends BaseActivity {
         if (draft != null) name.setText(draft.name);
         f.addView(name, lpTop(0));
         dlgSingleNow = () -> new String[]{LegalUi.str(name), catSel[0], stageSel[0], matterSel[0]};
+        final Runnable singleRedraw = () -> { if (!multi[0] && dlgRefresh != null) dlgRefresh.run(); };
+        name.addTextChangedListener(new TextWatcher() {      // one document: file card follows the typed name
+            @Override public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
+            @Override public void onTextChanged(CharSequence c, int a, int b, int d) { }
+            @Override public void afterTextChanged(Editable e) {
+                name.removeCallbacks(singleRedraw);
+                name.postDelayed(singleRedraw, 300);
+            }
+        });
 
         final TextView catLbl = dlgLbl("Document Category");
         f.addView(catLbl);
@@ -1195,12 +1204,14 @@ public class NewCaseActivity extends BaseActivity {
                     catSel[0] = c;
                     autoCat[0] = false;
                     setChosen(catTv, catSel[0], "Select category");
+                    singleRedraw.run();
                 }, marks, CategoryPicker.manage(this, markerPath, marks, syncCat), autoCat[0]);
                 return;
             }
             CategoryPicker.pick(this, catSel[0], c -> {
                 catSel[0] = c;
                 setChosen(catTv, catSel[0], "Select category");
+                singleRedraw.run();
             });
         });
 
@@ -1217,6 +1228,7 @@ public class NewCaseActivity extends BaseActivity {
                         s -> {
                             stageSel[0] = s;
                             setChosen(stageTv, s, "Select stage");
+                            singleRedraw.run();
                         },
                         s -> docStages.add(s),
                         (old, neu) -> {
@@ -1378,6 +1390,9 @@ public class NewCaseActivity extends BaseActivity {
                     infoCol.setOrientation(LinearLayout.VERTICAL);
                     infoCol.setPadding(dp(12), 0, 0, 0);
                     String shownName = multi[0] ? dlgDocName(idx, lead) : null;
+                    String[] sgl = multi[0] ? null : dlgSingleNow.get();      // one document: typed details show on the file
+                    if (sgl != null && sgl[0] != null && !sgl[0].trim().isEmpty())
+                        shownName = dlgUris.size() > 1 ? sgl[0].trim() + " page " + (idx + 1) : sgl[0].trim();
                     TextView t1 = CaseViews.text(this, shownName != null ? shownName : fname, 13.5f, AppTheme.text(this), true);
                     t1.setSingleLine(true);
                     t1.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
@@ -1392,6 +1407,24 @@ public class NewCaseActivity extends BaseActivity {
                         if (ml != null) infoCol.addView(ml);
                     }
                     topRow.addView(infoCol, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                    if (sgl != null) {
+                        String sCat = sgl[1] == null ? "" : sgl[1], sStg = sgl[2] == null ? "" : sgl[2];
+                        if (sCat.equals("Other") && sStg.isEmpty() && (sgl[0] == null || sgl[0].trim().isEmpty())) sCat = "";
+                        String sChip = sCat.isEmpty() ? sStg : sStg.isEmpty() ? sCat : sCat + "  \u2022  " + sStg;
+                        if (!sChip.isEmpty()) {
+                            int gold = AppTheme.isDark(this) ? 0xFFF0B03A : 0xFFB7791F;
+                            TextView chip = CaseViews.text(this, sChip.toUpperCase(Locale.ROOT), 11, gold, true);
+                            chip.setSingleLine(true);
+                            chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                            chip.setPadding(dp(10), dp(4), dp(10), dp(4));
+                            chip.setBackground(CaseViews.box(this, (gold & 0x00FFFFFF) | 0x22000000, 8,
+                                    (gold & 0x00FFFFFF) | 0x66000000, 1));
+                            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            chipLp.bottomMargin = dp(8);
+                            fileCard.addView(chip, chipLp);
+                        }
+                    }
                     if (multi[0] && lead != null && lead[idx] >= 0) {      // details set: its category sits on top of the file
                         String[] lm = dlgMeta.get(dlgUris.get(lead[idx]).toString());
                         if (lm != null && !lm[1].isEmpty()) {
