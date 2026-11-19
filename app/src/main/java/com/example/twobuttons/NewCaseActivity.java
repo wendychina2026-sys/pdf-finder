@@ -1175,6 +1175,7 @@ public class NewCaseActivity extends BaseActivity {
         name.setSingleLine(true);
         if (draft != null) name.setText(draft.name);
         f.addView(name, lpTop(0));
+        dlgSingleNow = () -> new String[]{LegalUi.str(name), catSel[0], stageSel[0], matterSel[0]};
 
         final TextView catLbl = dlgLbl("Document Category");
         f.addView(catLbl);
@@ -2093,6 +2094,8 @@ public class NewCaseActivity extends BaseActivity {
     /** Full-screen viewer over the files attached in the upload dialog: swipe or arrows go to the previous / next file. */
     private java.util.function.BooleanSupplier dlgMultiNow = () -> false;
     private java.util.function.Supplier<String> dlgMatterNow = () -> "";
+    /** Single-document mode: live form values {name, category, stage, matter} so the viewer can show them. */
+    private java.util.function.Supplier<String[]> dlgSingleNow = () -> null;
 
     private void dlgView(int start) {
         if (dlgUris.isEmpty()) return;
@@ -2129,6 +2132,7 @@ public class NewCaseActivity extends BaseActivity {
         }
         markChip.setOnClickListener(v -> {      // tap the category text = edit this file's details again
             if (dlgMultiNow.getAsBoolean()) dlgEditMeta(cur[0], dlgMatterNow.get(), () -> show[0].run());
+            else vd.dismiss();      // single document: details live in the upload box behind
         });
         removeBtn.setOnClickListener(v -> PickerDialogs.confirm(this, "Remove file?",
                 "\"" + displayName(dlgUris.get(cur[0])) + "\" will be taken out of this upload. "
@@ -2152,8 +2156,20 @@ public class NewCaseActivity extends BaseActivity {
             final String fname = displayName(u);
             final int kind = DocFileCard.kind(fname);
             final int[] vLead = dlgLeaders();
-            final String vDoc = dlgDocName(cur[0], vLead);
-            final String[] vm = dlgLeadMeta(cur[0]);
+            String vDocTmp = dlgDocName(cur[0], vLead);
+            String[] vmTmp = dlgLeadMeta(cur[0]);
+            if (!dlgMultiNow.getAsBoolean()) {      // one document: details typed in the upload box apply to every file
+                String[] sg = dlgSingleNow.get();
+                if (sg != null) {
+                    String sn = sg[0] == null ? "" : sg[0].trim();
+                    String sc = sg[1] == null || sg[1].equals("Other") ? "" : sg[1];
+                    String ss = sg[2] == null ? "" : sg[2];
+                    if (!sn.isEmpty()) vDocTmp = dlgUris.size() > 1 ? sn + " page " + (cur[0] + 1) : sn;
+                    if (!sc.isEmpty() || !ss.isEmpty()) vmTmp = new String[]{sn, sc, ss, sg[3] == null ? "" : sg[3], ""};
+                }
+            }
+            final String vDoc = vDocTmp;
+            final String[] vm = vmTmp;
             title.setText((cur[0] + 1) + " / " + dlgUris.size() + "   " + (vDoc != null ? vDoc : fname));
             if (vm != null && !vm[1].isEmpty()) {
                 markChip.setText(vm[1].toUpperCase(Locale.ROOT) + (vm[2].isEmpty() ? "" : "  \u2022  " + vm[2]) + "  \u270E");
