@@ -311,7 +311,7 @@ public class NewCaseActivity extends BaseActivity {
         ImageView back = CaseViews.icon(this, R.drawable.ic_arrow_back, AppTheme.text(this), 24);
         back.setPadding(dp(8), dp(8), dp(8), dp(8));
         back.setContentDescription("Back");
-        back.setOnClickListener(v -> finish());
+        back.setOnClickListener(v -> confirmLeave());
         top.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
         TextView t = CaseViews.text(this, "New Case", 19, AppTheme.text(this), true);
         t.setPadding(dp(8), 0, 0, 0);
@@ -1691,36 +1691,10 @@ public class NewCaseActivity extends BaseActivity {
             List<Uri> group = new ArrayList<>(dlgUris);
             final String[] groupNotes = new String[group.size()];
             for (int ni = 0; ni < group.size(); ni++) groupNotes[ni] = dlgNotes.get(group.get(ni).toString());
-            // a file saved from the marker leaves its original place and lives in the app's folder from now on
-            for (int gi = 0; gi < group.size(); gi++) {
-                String oldPath = markerFiles.get(group.get(gi).toString());
-                if (oldPath == null) continue;
-                File moved = DataFolder.moveIntoDocuments(this, new File(oldPath));
-                if (moved == null) continue;
-                new MarkStore(this).move(this, oldPath, moved.getAbsolutePath());
-                // no page marked yet: mark by the choice made above (all pages / listed pages / later)
-                MarkStore ms = new MarkStore(this);
-                String wholeCat = catSel[0];
-                String mp2 = moved.getAbsolutePath();
-                if (matterSel[0].equals(general) && ms.all(mp2).isEmpty()
-                        && !wholeCat.isEmpty() && !wholeCat.equals(MULTIPLE)) {
-                    if (wholeMode[0] == 2) {
-                        // marked later by the user: the one-time auto repair must not mark it
-                        getSharedPreferences("vault_repaired", MODE_PRIVATE).edit().putBoolean(mp2, true).apply();
-                    } else {
-                        int pc = DocFileCard.kind(moved.getName()) == 1 || DocFileCard.kind(moved.getName()) == 2
-                                ? 1 : pdfPageCount(moved);   // an image or a Word file is one unit = page 1
-                        java.util.Set<Integer> only = wholeMode[0] == 1 ? parsePages(wholeRange[0], pc) : null;
-                        for (int pg = 0; pg < pc; pg++) {
-                            if (only == null || only.contains(pg)) ms.set(mp2, pg, wholeCat);
-                        }
-                    }
-                }
-                Uri nu = PhotoFlow.uri(this, moved);
-                markerFiles.remove(group.get(gi).toString());
-                markerFiles.put(nu.toString(), moved.getAbsolutePath());
-                group.set(gi, nu);
-            }
+            // a file saved from the marker leaves its original place and lives in the app's folder from now on.
+            // New case: nothing moves yet. The files stay where they are until the case is really created
+            // (Create Case), or the user keeps them as General documents.
+            if (!newCase) vaultMove(group, catSel[0], matterSel[0].equals(general), wholeMode[0], wholeRange[0]);
             for (int ni = 0; ni < group.size(); ni++) {      // file notes go where the Document Vault file row reads them
                 String np = markerFiles.get(group.get(ni).toString());
                 if (np != null && groupNotes[ni] != null && !groupNotes[ni].isEmpty())
@@ -1736,18 +1710,19 @@ public class NewCaseActivity extends BaseActivity {
             pickedMore.add(rest);
             pickedNames.add(shown);
             pickedMeta.add(new String[]{catSel[0], shownMatter, stageSel[0], total, today, fname});
-            LegalStore.Doc d = new LegalStore.Doc();
-            d.name = shown;
-            d.caseName = matterName;
-            d.category = catSel[0];
-            d.stage = stageSel[0];
-            d.uri = first.toString();
-            for (Uri r : rest) d.more.add(r.toString());
-            d.fileName = fname;
-            d.size = total;
-            d.date = today;
-            ls.saveDoc(d);
-            if (newCase) pendingNewCaseDocs.add(d.uri);
+            if (!newCase) {          // new case: the Vault entry is made when the case is created
+                LegalStore.Doc d = new LegalStore.Doc();
+                d.name = shown;
+                d.caseName = matterName;
+                d.category = catSel[0];
+                d.stage = stageSel[0];
+                d.uri = first.toString();
+                for (Uri r : rest) d.more.add(r.toString());
+                d.fileName = fname;
+                d.size = total;
+                d.date = today;
+                ls.saveDoc(d);
+            }
             if (matterSel[0].equals(general)) {
                 String lead = markerFiles.get(first.toString());
                 vaultCardPath = lead == null ? "" : lead;
@@ -2082,6 +2057,105 @@ public class NewCaseActivity extends BaseActivity {
             renderFiles();
         }
     }
+
+    private static final String GENERAL_NAME = "General Document Vault";
+    private static final String THIS_NEW = "This new case";
+
+    /** Moves the files of one group into the app's Documents folder (and marks general ones). Rewrites the list with the new uris. */
+    private void vaultMove(List<Uri> group, String cat, boolean general, int wholeMode, String wholeRange) {
+        for (int gi = 0; gi < group.size(); gi++) {
+            String oldPath = markerFiles.get(group.get(gi).toString());
+            if (oldPath == null) continue;
+            File moved = DataFolder.moveIntoDocuments(this, new File(oldPath));
+            if (moved == null) continue;
+            new MarkStore(this).move(this, oldPath, moved.getAbsolutePath());
+            // no page marked yet: mark by the choice made (all pages / listed pages / later)
+            MarkStore ms = new MarkStore(this);
+            String mp2 = moved.getAbsolutePath();
+            if (general && ms.all(mp2).isEmpty() && cat != null && !cat.isEmpty() && !cat.equals(MULTIPLE)) {
+                if (wholeMode == 2) {
+                    getSharedPreferences("vault_repaired", MODE_PRIVATE).edit().putBoolean(mp2, true).apply();
+                } else {
+                    int pc = DocFileCard.kind(moved.getName()) == 1 || DocFileCard.kind(moved.getName()) == 2
+                            ? 1 : pdfPageCount(moved);   // an image or a Word file is one unit = page 1
+                    java.util.Set<Integer> only = wholeMode == 1 ? parsePages(wholeRange, pc) : null;
+                    for (int pg = 0; pg < pc; pg++) {
+                        if (only == null || only.contains(pg)) ms.set(mp2, pg, cat);
+                    }
+                }
+            }
+            Uri nu = PhotoFlow.uri(this, moved);
+            markerFiles.remove(group.get(gi).toString());
+            markerFiles.put(nu.toString(), moved.getAbsolutePath());
+            group.set(gi, nu);
+        }
+    }
+
+    /** True while some uploaded file only waits for the new case: nothing was moved or saved for it yet. */
+    private boolean hasUncommitted() {
+        for (String[] m : pickedMeta) if (m != null && THIS_NEW.equals(m[1])) return true;
+        return false;
+    }
+
+    /** Moves one uploaded document into the app folder and writes its Vault entry under the given matter. */
+    private void commitPicked(int idx, String matter, boolean general) {
+        String[] m = pickedMeta.get(idx);
+        List<Uri> group = groupOf(idx);
+        String oldPrimary = pickedUris.get(idx).toString();
+        vaultMove(group, m[0], general, 0, "");
+        pickedUris.set(idx, group.get(0));
+        pickedMore.set(idx, new ArrayList<>(group.subList(1, group.size())));
+        m[1] = matter;
+        m[3] = FileSetDialog.totalSize(this, group);
+        m[5] = FileSetDialog.label(this, group);
+        LegalStore ls = new LegalStore(this);
+        LegalStore.Doc d = null;
+        for (LegalStore.Doc x : ls.docs()) if (oldPrimary.equals(x.uri)) { d = x; break; }
+        if (d == null) { d = new LegalStore.Doc(); d.date = m[4]; }
+        d.name = pickedNames.get(idx);
+        d.caseName = matter;
+        d.category = m[0];
+        d.stage = m[2];
+        d.uri = group.get(0).toString();
+        d.more.clear();
+        for (int k = 1; k < group.size(); k++) d.more.add(group.get(k).toString());
+        d.fileName = m[5];
+        d.size = m[3];
+        ls.saveDoc(d);
+        pendingNewCaseDocs.remove(oldPrimary);
+        if (general) vaultSaved = true;
+    }
+
+    /** Every uploaded file becomes a General Vault document (wrong "Attach to matter" put right in one tap). */
+    private void setAllGeneral() {
+        for (int i = 0; i < pickedUris.size(); i++) {
+            String[] m = pickedMeta.get(i);
+            if (m != null && m.length > 1 && !m[1].isEmpty() && !GENERAL_NAME.equals(m[1])) commitPicked(i, GENERAL_NAME, true);
+        }
+        renderFiles();
+        refresh();
+        Toast.makeText(this, "All files are now General documents", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Back: files waiting for a case that was never created are not lost, nothing was moved yet. */
+    private void confirmLeave() {
+        if (!hasUncommitted()) { finish(); return; }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Case not created")
+                .setMessage("The files added for this new case are not saved yet and have not been moved. "
+                        + "Keep them as General documents?")
+                .setPositiveButton("Keep as General", (d, w) -> {
+                    for (int i = 0; i < pickedUris.size(); i++) {
+                        if (THIS_NEW.equals(pickedMeta.get(i)[1])) commitPicked(i, GENERAL_NAME, true);
+                    }
+                    finish();
+                })
+                .setNeutralButton("Discard", (d, w) -> finish())
+                .setNegativeButton("Stay", null)
+                .show();
+    }
+
+    @Override public void onBackPressed() { confirmLeave(); }
 
     /** After a PDF was edited (pages removed / photos added): keep the Vault copy pointing at the new file. */
     private void updateStoredDoc(Uri old, Uri neu) {
@@ -2809,9 +2883,15 @@ public class NewCaseActivity extends BaseActivity {
             String mt = mp.matter();
             String sg = mp.stage();
             pickedNames.set(idx, neu);
+            boolean wasWaiting = THIS_NEW.equals(m[1]);
             m[0] = cp.get();
             m[1] = mt;
             m[2] = sg;
+            if (wasWaiting && !mt.equals(THIS_NEW) && !mt.equals(MatterPicker.CREATE_NEW)) {
+                commitPicked(idx, mt, mt.equals(GENERAL_NAME));      // matter fixed later: files move only now
+                renderFiles();
+                return true;
+            }
             String uri = pickedUris.get(idx).toString();
             LegalStore ls = new LegalStore(this);
             for (LegalStore.Doc d : ls.docs()) {
@@ -2938,6 +3018,21 @@ public class NewCaseActivity extends BaseActivity {
             LinearLayout.LayoutParams lp = lpTop(0);
             lp.bottomMargin = dp(8);
             filesBox.addView(row, lp);
+        }
+        boolean anyCase = false;
+        for (String[] pm : pickedMeta) if (pm != null && pm.length > 1 && !pm[1].isEmpty() && !GENERAL_NAME.equals(pm[1])) anyCase = true;
+        if (anyCase) {
+            TextView allGen = CaseViews.text(this, "Set all files as General documents", 13, AppTheme.accent(this), true);
+            allGen.setGravity(Gravity.CENTER);
+            allGen.setPadding(dp(14), dp(10), dp(14), dp(10));
+            allGen.setBackground(CaseViews.box(this, 0x00000000, 20, AppTheme.accent(this), 1));
+            allGen.setOnClickListener(v -> PickerDialogs.confirm(this, "Set all as General documents?",
+                    "Every uploaded file is put in the General Document Vault, not in any case.",
+                    "Set all", this::setAllGeneral));
+            LinearLayout.LayoutParams agl = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            agl.topMargin = dp(6);
+            filesBox.addView(allGen, agl);
         }
         filesBox.setPadding(dp(16), 0, dp(16), pickedUris.isEmpty() ? 0 : dp(8));
         tintUploadCard();
@@ -3820,6 +3915,9 @@ public class NewCaseActivity extends BaseActivity {
         c.acts = actsText();
 
         store.saveCase(c);
+        for (int pi = 0; pi < pickedUris.size(); pi++) {        // files that waited for this case: move and attach now
+            if (THIS_NEW.equals(pickedMeta.get(pi)[1])) commitPicked(pi, c.title(), false);
+        }
         if (!pendingNewCaseDocs.isEmpty()) {
             LegalStore docStore = new LegalStore(this);
             for (LegalStore.Doc pd : docStore.docs()) {
