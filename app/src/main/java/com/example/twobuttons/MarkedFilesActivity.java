@@ -329,6 +329,7 @@ public class MarkedFilesActivity extends BaseActivity {
         items.clear();
         for (Item it : all) {
             if (pickMode && it.doc == null) continue;          // only saved documents can take the shared file
+            if (pickMode && getIntent().getBooleanExtra("pick_general_only", false) && !isGeneral(it)) continue;
             if (q.isEmpty() || matches(it, q)) items.add(it);
         }
         status.setText((pickMode ? "Select the document the shared file(s) join  \u2022  " : "") + items.size() + " marked files" + (q.isEmpty() ? "" : "  \u2022  filtered by \"" + q + "\""));

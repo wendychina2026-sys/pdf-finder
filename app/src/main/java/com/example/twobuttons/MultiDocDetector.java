@@ -58,4 +58,17 @@ final class MultiDocDetector {
                 .setNegativeButton("No, one document", (d, w) -> no.run())
                 .show();
     }
+
+    /** Same question as above, but as a sheet with a cross: cross / back / outside tap = cancel. */
+    static void confirm(Activity a, int files, int pages, Runnable yes, Runnable no, Runnable cancel) {
+        String what = files > 1
+                ? files + " files" + (pages > files ? " (" + pages + " pages)" : "")
+                : pages + " pages";
+        java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("Yes, per file");
+        items.add("No, one document");
+        PickerDialogs.optionSheet(a, "Multiple documents detected",
+                what + " found. Set name, category, stage and matter for each file separately?",
+                items, -1, which -> { if (which == 0) yes.run(); else no.run(); }, cancel);
+    }
 }

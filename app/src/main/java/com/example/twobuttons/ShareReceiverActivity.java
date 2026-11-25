@@ -128,22 +128,16 @@ public class ShareReceiverActivity extends Activity {
                             Toast.LENGTH_LONG).show();
                 }
                 // new document (page marker) or attach to a document already in the Vault
-                if (!attachableDocs(true).isEmpty()) {
-                    askNewOrAttach(pdfs, true);
-                    return;                 // finishes after the choice
-                }
-                openMarker(first0);
+                askNewOrAttach(pdfs, true);
+                return;                     // finishes after the choice
             } else {
                 if (wordCount0 > 1) {
                     Toast.makeText(this, wordCount0 + " files saved. All of them open in one upload box.",
                             Toast.LENGTH_LONG).show();
                 }
                 // a Word file or image has no pages to mark: new document, or attach to a document already in the Vault
-                if (!attachableDocs(false).isEmpty()) {
-                    askNewOrAttach(words, false);
-                    return;                 // finishes after the choice
-                }
-                openNew(words);
+                askNewOrAttach(words, false);
+                return;                     // finishes after the choice
             }
             finish();
         };
@@ -152,9 +146,8 @@ public class ShareReceiverActivity extends Activity {
             MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
                     () -> {
                         final boolean allPdf = pdfs.size() == all.size();
-                        if (attachableDocs(allPdf).isEmpty()) { openNew(all, null, MultiDocDetector.YES); finish(); }
-                        else askMulti(all, allPdf);        // same choice window as for a single file
-                    }, normal);
+                        askMulti(all, allPdf);             // same four-choice window as for a single file
+                    }, normal, this::finish);
             return;
         }
         normal.run();
@@ -197,75 +190,95 @@ public class ShareReceiverActivity extends Activity {
         return out;
     }
 
+    private static final String[] FOUR = {
+            "New General card",
+            "Attach to a saved General card",
+            "New case",
+            "Attach to a saved case"};
+
+    /** General Document Vault cards that shared files can join. */
+    private boolean hasGeneralDocs() {
+        for (LegalStore.Doc d : attachableDocs(true)) {
+            String m = d.caseName == null ? "" : d.caseName.trim();
+            if (m.isEmpty() || m.equals("[]") || m.equals(MatterPicker.VAULT) || m.equals("General Document Vault")) return true;
+        }
+        return false;
+    }
+
+    /** Saved cases (never the Vault). */
+    private java.util.List<String> savedCases() {
+        java.util.List<String> out = new ArrayList<>();
+        for (DiaryStore.HCase hc : new DiaryStore(this).cases()) {
+            String t = hc.title();
+            if (t != null && !t.trim().isEmpty() && !out.contains(t)) out.add(t);
+        }
+        return out;
+    }
+
+    /** One document: 1 New General card, 2 Attach to saved General card, 3 New case, 4 Attach to saved case. */
     private void askNewOrAttach(final ArrayList<File> files, final boolean pdf) {
-        java.util.List<String> items = new ArrayList<>();
-        items.add("New document (its own separate card)");
-        items.add("New document under an already saved case");
-        items.add("Add to a saved document (joins that card)");
         PickerDialogs.optionSheet(this, "Shared file",
-                files.size() + (files.size() == 1 ? " file" : " files"), items, -1, which -> {
+                files.size() + (files.size() == 1 ? " file" : " files"), java.util.Arrays.asList(FOUR), -1, which -> {
                     if (which == 0) {
                         if (pdf) openMarker(files.get(0)); else openNew(files);
                         finish();
-                    } else if (which == 1) pickCase(files, pdf);
-                    else pickDocument(files, pdf);
+                    } else if (which == 1) {
+                        if (!hasGeneralDocs()) { noneSaved("General card", () -> askNewOrAttach(files, pdf)); return; }
+                        pickDocument(files, pdf);
+                    } else if (which == 2) {
+                        // New Case page with the files waiting in the upload box until the case is created
+                        openNew(files, MatterPicker.CREATE_NEW);
+                        finish();
+                    } else {
+                        pickCase(files, pdf, MultiDocDetector.NO);
+                    }
                 }, this::finish);
     }
 
-    /** Several files shared and "per file" confirmed: still ask new document / under a saved case / add to a saved document. */
+    /** Several files, "per file" confirmed: the same four choices; each file keeps its own details. */
     private void askMulti(final ArrayList<File> files, final boolean allPdf) {
-        java.util.List<String> items = new ArrayList<>();
-        items.add("New documents (set details for each file)");
-        items.add("New documents under an already saved case");
-        items.add("Add to a saved document (joins that card)");
-        PickerDialogs.optionSheet(this, "Shared files", files.size() + " files", items, -1, which -> {
+        PickerDialogs.optionSheet(this, "Shared files", files.size() + " files", java.util.Arrays.asList(FOUR), -1, which -> {
             if (which == 0) {
                 openNew(files, null, MultiDocDetector.YES);
                 finish();
             } else if (which == 1) {
-                final java.util.List<String> matters = new ArrayList<>();
-                for (LegalStore.Doc d : attachableDocs(allPdf)) {
-                    String m = d.caseName == null ? "" : d.caseName.trim();
-                    if (m.isEmpty() || m.equals("[]") || m.equals("General Document Vault")) m = MatterPicker.VAULT;
-                    if (!matters.contains(m)) matters.add(m);
-                }
-                java.util.List<String> shown = new ArrayList<>();
-                for (String m : matters) shown.add(m.equals(MatterPicker.VAULT) ? "General Document Vault" : m);
-                PickerDialogs.optionSheet(this, "Same case as which?", "Each file keeps its own category and stage",
-                        shown, -1, w -> {
-                            openNew(files, matters.get(w), MultiDocDetector.YES);
-                            finish();
-                        }, () -> askMulti(files, allPdf));
-            } else {
+                if (!hasGeneralDocs()) { noneSaved("General card", () -> askMulti(files, allPdf)); return; }
                 pickDocument(files, allPdf);
+            } else if (which == 2) {
+                openNew(files, MatterPicker.CREATE_NEW, MultiDocDetector.YES);
+                finish();
+            } else {
+                pickCase(files, allPdf, MultiDocDetector.YES);
             }
         }, this::finish);
     }
 
-    /** Own card with its OWN category and stage, but under the same matter as a document already saved. */
-    private void pickCase(final ArrayList<File> files, final boolean pdf) {
-        final java.util.List<String> matters = new ArrayList<>();
-        for (LegalStore.Doc d : attachableDocs(true)) {
-            String m = d.caseName == null ? "" : d.caseName.trim();
-            if (m.isEmpty() || m.equals("[]") || m.equals("General Document Vault")) m = MatterPicker.VAULT;
-            if (!matters.contains(m)) matters.add(m);
+    private void noneSaved(String what, Runnable back) {
+        Toast.makeText(this, "No saved " + what + " yet", Toast.LENGTH_SHORT).show();
+        back.run();
+    }
+
+    /** Own card(s) with their OWN category and stage, under a saved case. */
+    private void pickCase(final ArrayList<File> files, final boolean pdf, final int multiMode) {
+        final java.util.List<String> cases = savedCases();
+        if (cases.isEmpty()) {
+            noneSaved("case", () -> { if (multiMode == MultiDocDetector.YES) askMulti(files, pdf); else askNewOrAttach(files, pdf); });
+            return;
         }
-        java.util.List<String> shown = new ArrayList<>();
-        for (String m : matters) shown.add(m.equals(MatterPicker.VAULT) ? "General Document Vault" : m);
-        PickerDialogs.optionSheet(this, "Same case as which?", "The new file keeps its own category and stage",
-                shown, -1, which -> {
-                    String matter = matters.get(which);
+        PickerDialogs.optionSheet(this, "Attach to which case?", "Each file keeps its own category and stage",
+                cases, -1, which -> {
+                    String matter = cases.get(which);
                     File f = files.get(0);
-                    if (pdf) {
+                    if (multiMode == MultiDocDetector.NO && pdf && files.size() == 1) {
                         // the marker's details card starts with this matter; category (marked pages) and stage are set there
                         getSharedPreferences("pdf_matters", MODE_PRIVATE).edit()
                                 .putString(f.getAbsolutePath(), matter).apply();
                         openMarker(f);
                     } else {
-                        openNew(files, matter);
+                        openNew(files, matter, multiMode);
                     }
                     finish();
-                }, () -> askNewOrAttach(files, pdf));
+                }, () -> { if (multiMode == MultiDocDetector.YES) askMulti(files, pdf); else askNewOrAttach(files, pdf); });
     }
 
     /** The Document Vault opens in pick mode: a radio on each card, Confirm / Cancel at the bottom instead of the tabs. */
@@ -274,6 +287,7 @@ public class ShareReceiverActivity extends Activity {
         pendingPdf = pdf;
         Intent i = new Intent(this, MarkedFilesActivity.class);
         i.putExtra("pick_doc", true);
+        i.putExtra("pick_general_only", true);      // only General Document Vault cards can be chosen
         startActivityForResult(i, REQ_PICK_DOC);
     }
 
