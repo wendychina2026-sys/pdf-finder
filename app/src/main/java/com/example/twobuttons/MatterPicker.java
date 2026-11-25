@@ -21,6 +21,7 @@ final class MatterPicker {
     private final List<String> items = new ArrayList<>();
     private String matter;
     private String stage;
+    private Runnable onChange;      // runs after the user picks another matter (e.g. to show / hide the General card category)
     private final TextView matterTv, stageTv;
     private final LinearLayout stageBox;
 
@@ -73,6 +74,7 @@ final class MatterPicker {
                         items.indexOf(matter), i -> {
                             matter = items.get(i);
                             refresh();
+                            if (onChange != null) onChange.run();
                         }), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -88,6 +90,11 @@ final class MatterPicker {
     String matter() {
         return matter.equals(VAULT) ? VAULT_SAVED : matter;
     }
+
+    void onMatterChange(Runnable r) { onChange = r; }
+
+    /** True while the picked matter is the General Document Vault. */
+    boolean isGeneral() { return matter.equals(VAULT); }
 
     boolean isCreateNew() {
         return matter.equals(CREATE_NEW);

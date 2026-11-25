@@ -184,6 +184,49 @@ final class DocEdit {
         }
     }
 
+    /** "General Card Category Name" in the Edit box: shown for General Document Vault cards. A change asks first. */
+    static final class GenCatField {
+        private static final String HINT = "Select category (e.g. MCD)";
+        private final LinearLayout box;
+        private final TextView tv;
+        private String value;
+
+        GenCatField(final Activity a, LinearLayout form, String current) {
+            value = current == null ? "" : current.trim();
+            box = new LinearLayout(a);
+            box.setOrientation(LinearLayout.VERTICAL);
+            LegalUi.label(a, box, "General Card Category Name");
+            final GeneralCatStore gs = new GeneralCatStore(a);
+            tv = FieldStyle.dropdown(a, box, HINT, v ->
+                    PickerDialogs.stageSheet(a, "General card category", () -> gs.list(), value,
+                            pick -> {
+                                if (pick.equals(value)) return;
+                                String msg = value.isEmpty()
+                                        ? "Put this card under \"" + pick + "\"?"
+                                        : "Move this card from \"" + value + "\" to \"" + pick + "\"?";
+                                PickerDialogs.confirm(a, "Change card category?", msg, "Change", () -> {
+                                    value = pick;
+                                    refresh();
+                                });
+                            },
+                            added -> gs.add(added),
+                            (oldN, newN) -> {
+                                gs.rename(oldN, newN);
+                                if (oldN.equals(value)) { value = newN; refresh(); }
+                            },
+                            gone -> gs.delete(gone),
+                            (i, j) -> gs.swap(i, j)),
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            form.addView(box);
+            refresh();
+        }
+
+        private void refresh() { FieldStyle.setDropdownValue(tv, value, HINT); }
+        String value() { return value; }
+        void setShown(boolean on) { box.setVisibility(on ? View.VISIBLE : View.GONE); }
+    }
+
     /** Edit box of a card that holds several files: name / stage / matter once, then each file with its OWN category (PDF: page ranges). */
     static void showGroup(final Activity a, final java.util.List<String> paths, final Runnable after) {
         final MarkStore store = new MarkStore(a);
@@ -196,6 +239,7 @@ final class DocEdit {
         LinearLayout form = LegalUi.form(a);
         final EditText name = LegalUi.text(a, form, "Document name / caption",
                 DocFileCard.stem(cur.name.isEmpty() ? new File(head).getName() : cur.name));
+        final GenCatField gcf = new GenCatField(a, form, cur.genCat);       // second field: General card category
         final java.util.List<Ranges> rrs = new ArrayList<>();
         final java.util.List<CategoryPicker> cps = new ArrayList<>();
         for (int i = 0; i < paths.size(); i++) {
@@ -215,6 +259,8 @@ final class DocEdit {
             }
         }
         final MatterPicker mpk = new MatterPicker(a, form, matterOf(a, head), cur.stage, false);
+        gcf.setShown(mpk.isGeneral());
+        mpk.onMatterChange(() -> gcf.setShown(mpk.isGeneral()));
         LegalUi.formDialog(a, "Edit document", form, () -> {
             if (!LegalUi.need(a, name, "Document name")) return false;
             for (Ranges r : rrs) {
@@ -243,6 +289,7 @@ final class DocEdit {
             cur.name = DocFileCard.ext(newName).isEmpty() ? newName + ext : newName;
             cur.caseName = mpk.matter();
             cur.stage = mpk.stage();
+            cur.genCat = mpk.isGeneral() ? gcf.value() : "";
             cur.category = used.size() == 1 ? used.iterator().next() : "Multiple";
             ls.saveDoc(cur);
             String m = mpk.matter();
@@ -270,6 +317,7 @@ final class DocEdit {
         LinearLayout form = LegalUi.form(a);
         String shown = cur == null || cur.name.isEmpty() ? f.getName() : cur.name;
         final EditText name = LegalUi.text(a, form, "Document name / caption", DocFileCard.stem(shown));
+        final GenCatField gcf = new GenCatField(a, form, cur == null ? "" : cur.genCat);   // second field: General card category
 
         final boolean pdf = f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
         // an unmarked image / Word file is one page: its first mark goes on page 0
@@ -307,6 +355,8 @@ final class DocEdit {
             form.addView(note);
         }
         final MatterPicker mpk = new MatterPicker(a, form, savedMatter, cur == null ? "" : cur.stage, pdf);
+        gcf.setShown(mpk.isGeneral());
+        mpk.onMatterChange(() -> gcf.setShown(mpk.isGeneral()));
 
         LegalUi.formDialog(a, "Edit document", form, () -> {
             if (!LegalUi.need(a, name, "Document name")) return false;
@@ -374,6 +424,7 @@ final class DocEdit {
             d.name = stored;
             d.caseName = mpk.matter();
             d.stage = mpk.stage();
+            d.genCat = mpk.isGeneral() ? gcf.value() : "";
             // a PDF with no page marked yet: the chosen category is put on EVERY page, no range asked
             java.util.List<Integer> targets = pages;
             if (pdf && targets.isEmpty()) {
