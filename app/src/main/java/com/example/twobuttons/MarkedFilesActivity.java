@@ -56,7 +56,15 @@ public class MarkedFilesActivity extends BaseActivity {
 
     private final List<Item> all = new ArrayList<>();
     private final List<Item> items = new ArrayList<>();
+    private final List<Object> rows = new ArrayList<>();   // what the list shows: a GeneralGroup header, then its cards when open, then case cards
+    private boolean generalOpen;                          // General Document Vault group expanded?
     private BaseAdapter adapter;
+
+    /** The single main card that holds every document attached to the General Document Vault. */
+    static class GeneralGroup {
+        final List<Item> members = new ArrayList<>();
+        boolean open;
+    }
     private ListView listView;
     private TextView status;
     private EditText search;
@@ -70,6 +78,7 @@ public class MarkedFilesActivity extends BaseActivity {
         pickMode = getIntent().getBooleanExtra("pick_doc", false);
         setTitle(pickMode ? "Select document" : "Document Vault");
         store = new MarkStore(this);
+        generalOpen = getSharedPreferences("vault_ui", MODE_PRIVATE).getBoolean("general_open", false);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -94,8 +103,8 @@ public class MarkedFilesActivity extends BaseActivity {
         list.setDivider(null);
         list.setDividerHeight(0);
         list.setOnItemClickListener((parent, view, pos, id) -> {
-            if (pickMode) return;
-            openMarker(items.get(pos).path, null, null);
+            if (pickMode || pos >= rows.size() || !(rows.get(pos) instanceof Item)) return;
+            openMarker(((Item) rows.get(pos)).path, null, null);
         });
 
         Button addCase = LegalUi.outlineButton(this, "+  Add Case");
@@ -323,7 +332,64 @@ public class MarkedFilesActivity extends BaseActivity {
             if (q.isEmpty() || matches(it, q)) items.add(it);
         }
         status.setText((pickMode ? "Select the document the shared file(s) join  \u2022  " : "") + items.size() + " marked files" + (q.isEmpty() ? "" : "  \u2022  filtered by \"" + q + "\""));
+        buildRows(q);
         adapter.notifyDataSetChanged();
+    }
+
+    /** True when the card is attached to no case, i.e. it belongs to the General Document Vault. */
+    private boolean isGeneral(Item it) {
+        String m = getSharedPreferences("pdf_matters", MODE_PRIVATE).getString(it.path, "");
+        return m.isEmpty() || m.equals("[]") || m.equals(MatterPicker.VAULT) || m.equals("General Document Vault");
+    }
+
+    /** One General Document Vault card (with arrow) on top; its cards show only when it is open. Case cards follow as before. */
+    private void buildRows(String q) {
+        rows.clear();
+        GeneralGroup g = new GeneralGroup();
+        List<Item> others = new ArrayList<>();
+        for (Item it : items) { if (isGeneral(it)) g.members.add(it); else others.add(it); }
+        // searching or choosing a document must show the matching cards, so the group opens by itself then
+        g.open = generalOpen || !q.isEmpty() || pickMode;
+        if (!g.members.isEmpty()) {
+            rows.add(g);
+            if (g.open) rows.addAll(g.members);
+        }
+        rows.addAll(others);
+    }
+
+    private void toggleGeneral() {
+        generalOpen = !generalOpen;
+        getSharedPreferences("vault_ui", MODE_PRIVATE).edit().putBoolean("general_open", generalOpen).apply();
+        buildRows(search.getText().toString().trim().toLowerCase(Locale.ROOT));
+        adapter.notifyDataSetChanged();
+    }
+
+    /** The main card: folder icon, "General Document Vault", how many documents, and the dropdown arrow. */
+    private View generalHeader(final GeneralGroup g) {
+        final MarkedFilesActivity c = this;
+        LinearLayout outer = new LinearLayout(c);
+        outer.setPadding(0, CaseViews.dp(c, 5), 0, CaseViews.dp(c, 5));
+        LinearLayout card = new LinearLayout(c);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(CaseViews.dp(c, 14), CaseViews.dp(c, 14), CaseViews.dp(c, 14), CaseViews.dp(c, 14));
+        card.setBackground(CaseViews.box(c, AppTheme.card(c), 16, AppTheme.cardStroke(c), 1));
+        card.addView(CaseViews.icon(c, R.drawable.ic_folder, AppTheme.accent(c), 30));
+        LinearLayout tx = new LinearLayout(c);
+        tx.setOrientation(LinearLayout.VERTICAL);
+        tx.setPadding(CaseViews.dp(c, 12), 0, CaseViews.dp(c, 8), 0);
+        tx.addView(CaseViews.text(c, "General Document Vault", 16, AppTheme.text(c), true));
+        int n = g.members.size();
+        tx.addView(CaseViews.text(c, n + (n == 1 ? " document" : " documents"), 12, AppTheme.sub(c), false));
+        card.addView(tx, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView arrow = CaseViews.icon(c, R.drawable.ic_expand_more, AppTheme.accent(c), 28);
+        arrow.setRotation(g.open ? 180f : 0f);
+        arrow.setContentDescription(g.open ? "Collapse General Document Vault" : "Expand General Document Vault");
+        card.addView(arrow, new LinearLayout.LayoutParams(CaseViews.dp(c, 32), CaseViews.dp(c, 32)));
+        card.setOnClickListener(v -> toggleGeneral());
+        outer.addView(card, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return outer;
     }
 
     private boolean matches(Item it, String q) { return !matchNote(it, q).isEmpty(); }
@@ -822,16 +888,19 @@ public class MarkedFilesActivity extends BaseActivity {
     }
 
     private class ItemAdapter extends BaseAdapter {
-        @Override public int getCount() { return items.size(); }
-        @Override public Object getItem(int i) { return items.get(i); }
+        @Override public int getCount() { return rows.size(); }
+        @Override public Object getItem(int i) { return rows.get(i); }
         @Override public long getItemId(int i) { return i; }
 
         @Override
         public View getView(int i, View convertView, ViewGroup parent) {
-            final Item it = items.get(i);
+            final Object row = rows.get(i);
+            if (row instanceof GeneralGroup) return generalHeader((GeneralGroup) row);
+            final Item it = (Item) row;
             final MarkedFilesActivity c = MarkedFilesActivity.this;
             LinearLayout outer = new LinearLayout(c);
-            outer.setPadding(0, CaseViews.dp(c, 5), 0, CaseViews.dp(c, 5));
+            // cards opened from the General Document Vault card sit slightly inside it
+            outer.setPadding(isGeneral(it) && !pickMode ? CaseViews.dp(c, 12) : 0, CaseViews.dp(c, 5), 0, CaseViews.dp(c, 5));
 
             File f = new File(it.path);
             DocFileCard.Info info = new DocFileCard.Info();
