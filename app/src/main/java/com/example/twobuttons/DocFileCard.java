@@ -37,6 +37,7 @@ final class DocFileCard {
 
     static final class Info {
         String name = "", fileName = "", category = "", matter = "", stage = "", size = "", date = "";
+        String genCat = "";     // General card category Name (General Document Vault)
         Uri uri;
         int count = 1;          // files in this group
         String pagesLine = "";  // Document Vault: marked / unmarked / total pages
@@ -331,6 +332,7 @@ final class DocFileCard {
         // category, size, type and date already show on the card: only what is not visible
         if (in.subs.isEmpty()) detail(a, details, "File name", in.fileName.isEmpty() ? in.name : in.fileName);
         detail(a, details, "Stage", in.stage);
+        detail(a, details, "Card category", in.genCat);
         card.addView(details);
 
         top.setOnClickListener(v -> {

@@ -148,6 +148,8 @@ public class NewCaseActivity extends BaseActivity {
     private android.app.Dialog dlgSheet;          // the open Upload Legal Document sheet (multi mode greys its Save button)
     /** Details per file in "multi" mode, keyed by file uri: name, category, stage, matter, file numbers (pages). */
     private final java.util.Map<String, String[]> dlgMeta = new java.util.HashMap<>();
+    /** "General card category Name" per file (multi mode), keyed by file uri; used only for new General cards. */
+    private final java.util.Map<String, String> dlgGenCat = new java.util.HashMap<>();
     /** Note per file in the upload box, keyed by file uri (orange + blinking icon when filled). */
     private final java.util.Map<String, String> dlgNotes = new java.util.HashMap<>();
     /** Files that came from the Category marker (content uri -> real path): View opens them in the marker. */
@@ -1186,6 +1188,20 @@ public class NewCaseActivity extends BaseActivity {
             }
         });
 
+        // General card category Name: second field, only when a NEW card goes to the General Document Vault
+        final String[] genSel = {""};
+        final LinearLayout genBox = new LinearLayout(this);
+        genBox.setOrientation(LinearLayout.VERTICAL);
+        genBox.addView(dlgLbl("General Card Category Name"));
+        final TextView genTv = dropdown(genBox, "Select category (e.g. MCD)", null);
+        ((View) genTv.getTag()).setOnClickListener(v -> genCatSheet(genSel[0],
+                s2 -> { genSel[0] = s2; setChosen(genTv, s2, "Select category (e.g. MCD)"); },
+                (oldN, newN) -> { if (oldN.equals(genSel[0])) { genSel[0] = newN; setChosen(genTv, newN, "Select category (e.g. MCD)"); } },
+                g2 -> { if (g2.equals(genSel[0])) { genSel[0] = ""; setChosen(genTv, "", "Select category (e.g. MCD)"); } }));
+        f.addView(genBox);
+        final Runnable updateGen = () -> genBox.setVisibility(matterSel[0].equals(general) && !multi[0] ? View.VISIBLE : View.GONE);
+        updateGen.run();
+
         final TextView catLbl = dlgLbl("Document Category");
         f.addView(catLbl);
         TextView catTv = dropdown(f, "Select category", null);
@@ -1267,6 +1283,7 @@ public class NewCaseActivity extends BaseActivity {
                             matterTouched[0] = true;
                             matterSel[0] = pick;
                             setChosen(matterTv, matterSel[0], general);
+                            updateGen.run();
                         };
                         if (markerChoseMatter && !multi[0]) {       // it was chosen in the marker already: ask before changing it
                             PickerDialogs.confirm(this, "Change matter?", "Attach to Matter is \"" + matterSel[0]
@@ -1280,7 +1297,7 @@ public class NewCaseActivity extends BaseActivity {
         final Runnable applyMulti = () -> {
             // name / category / stage are set per file (Edit details): not shown here at all
             name.setText("");
-            for (View hv : new View[]{nameLbl, name, catLbl, (View) catTv.getTag(), stageBox}) hv.setVisibility(View.GONE);
+            for (View hv : new View[]{nameLbl, name, genBox, catLbl, (View) catTv.getTag(), stageBox}) hv.setVisibility(View.GONE);
             autoCat[0] = false;
             // Attach to Matter stays usable; files start on "Create new case" (the case being made on this page)
             if (matterSel[0].equals(general)) matterSel[0] = CREATE_NEW_CASE;
@@ -1716,6 +1733,7 @@ public class NewCaseActivity extends BaseActivity {
                 d.caseName = matterName;
                 d.category = catSel[0];
                 d.stage = stageSel[0];
+                if (matterSel[0].equals(general)) d.genCat = genSel[0];     // asked only for a NEW General card
                 d.uri = first.toString();
                 for (Uri r : rest) d.more.add(r.toString());
                 d.fileName = fname;
@@ -1766,6 +1784,8 @@ public class NewCaseActivity extends BaseActivity {
             List<Uri> left = new ArrayList<>(all);
             for (java.util.Map.Entry<Integer, List<Uri>> ge : groups.entrySet()) {
                 String[] m = dlgMeta.get(all.get(ge.getKey()).toString());
+                String gcv = dlgGenCat.get(all.get(ge.getKey()).toString());
+                genSel[0] = gcv == null ? "" : gcv;
                 name.setText(m[0]);
                 catSel[0] = m[1];
                 stageSel[0] = m[2];
@@ -1781,6 +1801,7 @@ public class NewCaseActivity extends BaseActivity {
                 left.removeAll(ge.getValue());
             }
             dlgMeta.clear();
+            dlgGenCat.clear();
         dlgNotes.clear();
             return true;
         };
@@ -2551,6 +2572,18 @@ public class NewCaseActivity extends BaseActivity {
         return t;
     }
 
+    /** The saved "General card category Name" list (add / rename / delete / reorder), as a sheet. */
+    private void genCatSheet(String selected, java.util.function.Consumer<String> pick,
+                             java.util.function.BiConsumer<String, String> renamed,
+                             java.util.function.Consumer<String> deleted) {
+        final GeneralCatStore gs = new GeneralCatStore(this);
+        PickerDialogs.stageSheet(this, "General card category", () -> gs.list(), selected,
+                pick, s -> gs.add(s),
+                (o, n) -> { gs.rename(o, n); renamed.accept(o, n); },
+                g -> { gs.delete(g); deleted.accept(g); },
+                (i, j) -> gs.swap(i, j));
+    }
+
     /** Details of one file: Document name, Category, Stage, Attach to matter, plus Page / page range (file numbers). */
     private void dlgEditMeta(final int idx, final String defMatter) { dlgEditMeta(idx, defMatter, null); }
 
@@ -2576,6 +2609,18 @@ public class NewCaseActivity extends BaseActivity {
         nm.setSingleLine(true);
         nm.setText(cur[0]);
         f.addView(nm, lpTop(0));
+
+        final String[] gsel = {dlgGenCat.get(key) == null ? "" : dlgGenCat.get(key)};
+        final boolean askGen = cur[3].equals(DLG_GENERAL);
+        if (askGen) {                      // second field: only for a NEW General card
+            f.addView(dlgLbl("General Card Category Name"));
+            final TextView gTv = dropdown(f, "Select category (e.g. MCD)", null);
+            setChosen(gTv, gsel[0], "Select category (e.g. MCD)");
+            ((View) gTv.getTag()).setOnClickListener(v -> genCatSheet(gsel[0],
+                    s2 -> { gsel[0] = s2; setChosen(gTv, s2, "Select category (e.g. MCD)"); },
+                    (oldN, newN) -> { if (oldN.equals(gsel[0])) { gsel[0] = newN; setChosen(gTv, newN, "Select category (e.g. MCD)"); } },
+                    g2 -> { if (g2.equals(gsel[0])) { gsel[0] = ""; setChosen(gTv, "", "Select category (e.g. MCD)"); } }));
+        }
 
         f.addView(dlgLbl("Document Category"));
         final TextView catTv = dropdown(f, "Select category", null);
@@ -2635,6 +2680,7 @@ public class NewCaseActivity extends BaseActivity {
                     cur[0] = LegalUi.str(nm);
                     cur[4] = ptxt;
                     dlgMeta.put(key, cur);
+                    if (askGen) dlgGenCat.put(key, gsel[0]);
                     if (dlgRefresh != null) dlgRefresh.run();
                     if (after != null) after.run();
                     return true;

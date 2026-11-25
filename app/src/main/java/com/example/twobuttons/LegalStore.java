@@ -35,6 +35,7 @@ final class LegalStore {
     static final class Doc {
         String id = UUID.randomUUID().toString();
         String name = "", caseName = "", size = "", date = "", category = "Other", stage = "", uri = "", fileName = "";
+        String genCat = "";                      // "General card category Name" (General Document Vault cards only)
         List<String> more = new ArrayList<>();   // further files of the same group (after uri)
     }
 
@@ -217,6 +218,7 @@ final class LegalStore {
                 d.date = o.optString("date");
                 d.category = o.optString("category", "Other");
                 d.stage = o.optString("stage");
+                d.genCat = o.optString("genCat");
                 d.uri = o.optString("uri");
                 d.fileName = o.optString("fileName");
                 JSONArray mo = o.optJSONArray("more");
@@ -264,6 +266,7 @@ final class LegalStore {
                 o.put("date", d.date);
                 o.put("category", d.category);
                 o.put("stage", d.stage);
+                o.put("genCat", d.genCat == null ? "" : d.genCat);
                 o.put("uri", d.uri);
                 o.put("fileName", d.fileName);
                 JSONArray mo = new JSONArray();
