@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Shaifali\'s Case Management App</string>
+    <!-- Share sheet shows the app name on one line (cut at ~13 letters) and this label under it on up to 2 lines -->
+    <string name="share_label">Shaifali\'s Case Management</string>
+    <string name="share_label_batch">Shaifali\'s Cases (Batch Mode)</string>
 </resources>
