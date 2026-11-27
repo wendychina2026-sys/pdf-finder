@@ -392,7 +392,12 @@ public class MarkedFilesActivity extends BaseActivity {
                 if (!anyCat) {
                     rows.addAll(g.members);
                 } else {
-                    java.util.TreeMap<String, List<Item>> by = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+                    // categories follow the order the user dragged them into (saved list), new ones after, A-Z
+                    final List<String> ord = catOrder(g.members);
+                    java.util.TreeMap<String, List<Item>> by = new java.util.TreeMap<>((x, y) -> {
+                        int a = ord.indexOf(catKey(x)), b = ord.indexOf(catKey(y));
+                        return a == b ? 0 : (a < b ? -1 : 1);
+                    });
                     List<Item> none = new ArrayList<>();
                     for (Item m : g.members) {
                         String c = genCatOf(m);
@@ -447,6 +452,40 @@ public class MarkedFilesActivity extends BaseActivity {
         }));
         pinHolder.setVisibility(View.VISIBLE);
         pinShown = true;
+    }
+
+    /** Category names (as typed) in display order: saved list first, then any other name A-Z. */
+    private List<String> catNamesOrdered(List<Item> members) {
+        List<String> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String n : new GeneralCatStore(this).list()) if (seen.add(catKey(n))) out.add(n);
+        java.util.TreeMap<String, String> extra = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Item m : members) { String c = genCatOf(m); if (!c.isEmpty() && !seen.contains(catKey(c))) extra.put(c, c); }
+        out.addAll(extra.values());
+        return out;
+    }
+
+    /** Same order as catNamesOrdered, as lower-case keys (what the row sort compares). */
+    private List<String> catOrder(List<Item> members) {
+        List<String> k = new ArrayList<>();
+        for (String n : catNamesOrdered(members)) k.add(catKey(n));
+        return k;
+    }
+
+    /** Long-press drag of a category card: it takes the place of the category it is dropped on; order is saved. */
+    private void moveCat(String from, String to) {
+        if (curGroup == null || catKey(from).equals(catKey(to))) return;
+        List<String> names = catNamesOrdered(curGroup.members);
+        int i = -1, j = -1;
+        for (int x = 0; x < names.size(); x++) {
+            if (catKey(names.get(x)).equals(catKey(from))) i = x;
+            if (catKey(names.get(x)).equals(catKey(to))) j = x;
+        }
+        if (i < 0 || j < 0) return;
+        names.add(j, names.remove(i));
+        new GeneralCatStore(this).setOrder(names);
+        buildRows(search.getText().toString().trim().toLowerCase(Locale.ROOT));
+        adapter.notifyDataSetChanged();
     }
 
     private static String catKey(String name) { return name.trim().toLowerCase(Locale.ROOT); }
@@ -524,6 +563,29 @@ public class MarkedFilesActivity extends BaseActivity {
         arrow.setContentDescription((h.open ? "Collapse " : "Expand ") + h.name);
         card.addView(arrow, new LinearLayout.LayoutParams(CaseViews.dp(c, 28), CaseViews.dp(c, 28)));
         card.setOnClickListener(v -> toggleCat(h.name));
+        if (!pickMode && !h.name.equals("No category")) {
+            card.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                return v.startDragAndDrop(android.content.ClipData.newPlainText("cat", h.name),
+                        new View.DragShadowBuilder(v), new Object[]{"cat", h.name}, 0);
+            });
+            card.setOnDragListener((vw, ev) -> {
+                Object st = ev.getLocalState();
+                boolean mine = st instanceof Object[] && ((Object[]) st).length == 2 && "cat".equals(((Object[]) st)[0]);
+                switch (ev.getAction()) {
+                    case android.view.DragEvent.ACTION_DRAG_STARTED: return mine;
+                    case android.view.DragEvent.ACTION_DRAG_ENTERED: vw.setAlpha(0.5f); return true;
+                    case android.view.DragEvent.ACTION_DRAG_LOCATION: c.autoScroll(vw, ev); return true;
+                    case android.view.DragEvent.ACTION_DRAG_EXITED: vw.setAlpha(1f); return true;
+                    case android.view.DragEvent.ACTION_DROP:
+                        vw.setAlpha(1f);
+                        if (mine) c.moveCat((String) ((Object[]) st)[1], h.name);
+                        return true;
+                    case android.view.DragEvent.ACTION_DRAG_ENDED: vw.setAlpha(1f); return true;
+                    default: return false;
+                }
+            });
+        }
         outer.addView(card, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return outer;

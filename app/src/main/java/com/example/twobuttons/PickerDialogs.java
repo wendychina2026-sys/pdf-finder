@@ -700,7 +700,11 @@ final class PickerDialogs {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a, 20), dp(a, 22), dp(a, 20), dp(a, 28));
         root.setBackground(panel(a, 28, 0, true));
-        root.addView(titleRow(a, d, title, "Pick a stage. Add, rename or delete. Press and hold to reorder."));
+        // same sheet serves Stage and "General card category": words follow the title
+        final boolean isCat = title.toLowerCase(Locale.ROOT).contains("category");
+        final String N = isCat ? "Category" : "Stage";        // heading form
+        final String n = isCat ? "category" : "stage";        // sentence form
+        root.addView(titleRow(a, d, title, "Pick a " + n + ". Add, rename or delete. Press and hold to reorder."));
         final EditText search = new RoundEdit(a);
         {
             LinearLayout pill = new LinearLayout(a);
@@ -709,7 +713,7 @@ final class PickerDialogs {
             pill.setPadding(dp(a, 14), 0, dp(a, 14), 0);
             pill.setBackground(CaseViews.box(a, chip(a), 28, hair(a), 1));
             pill.addView(CaseViews.icon(a, R.drawable.ic_search, ink(a), 22));
-            FieldStyle.hint(search, "Search stages...");
+            FieldStyle.hint(search, isCat ? "Search categories..." : "Search stages...");
             search.setHintTextColor(soft(a));
             search.setTextColor(ink(a));
             search.setTextSize(15);
@@ -727,14 +731,14 @@ final class PickerDialogs {
         sc.addView(list);
         final Runnable[] fill = new Runnable[1];
 
-        root.addView(addCard(a, "Add New Stage", () -> customName(a, "Add New Stage", "Stage Name*",
-                "Enter stage name", "Stage name is required", s -> {
+        root.addView(addCard(a, "Add New " + N, () -> customName(a, "Add New " + N, N + " Name*",
+                "Enter " + n + " name", N + " name is required", s -> {
                     if (hasName(source.get(), s, null)) {
                         Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     onAdd.accept(s);
-                    sel[0] = s;                          // the new stage is ticked and chosen at once
+                    sel[0] = s;                          // the new item is ticked and chosen at once
                     onPick.accept(s);
                     fill[0].run();
                 })), topMargin(a, 16));
@@ -825,15 +829,15 @@ final class PickerDialogs {
                 ImageView edit = CaseViews.icon(a, R.drawable.ic_edit, ink(a), 36);
                 edit.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
                 edit.setContentDescription("Rename " + name);
-                edit.setOnClickListener(v -> customName(a, "Rename Stage", "Stage Name*", "Enter stage name",
-                        "Stage name is required", name, "Rename", s -> {
+                edit.setOnClickListener(v -> customName(a, "Rename " + N, N + " Name*", "Enter " + n + " name",
+                        N + " name is required", name, "Rename", s -> {
                             if (s.equals(name)) return;
                             if (hasName(source.get(), s, name)) {
                                 Toast.makeText(a, "\"" + s + "\" already exists", Toast.LENGTH_SHORT).show();
                                 return;
                             }
-                            confirm(a, "Rename stage?", "\"" + name + "\" will become \"" + s
-                                    + "\". Cases using it will be updated.", "Rename", () -> {
+                            confirm(a, "Rename " + n + "?", "\"" + name + "\" will become \"" + s
+                                    + "\". " + (isCat ? "Cards" : "Cases") + " using it will be updated.", "Rename", () -> {
                                 onRename.accept(name, s);
                                 if (name.equals(sel[0])) sel[0] = s;
                                 fill[0].run();
@@ -842,8 +846,8 @@ final class PickerDialogs {
                 ImageView del = CaseViews.icon(a, R.drawable.ic_delete, LegalUi.RED, 36);
                 del.setPadding(dp(a, 8), dp(a, 8), dp(a, 8), dp(a, 8));
                 del.setContentDescription("Delete " + name);
-                del.setOnClickListener(v -> confirm(a, "Delete stage?", "\"" + name
-                        + "\" will be removed from the list. Cases keep the stage they already have.",
+                del.setOnClickListener(v -> confirm(a, "Delete " + n + "?", "\"" + name
+                        + "\" will be removed from the list. " + (isCat ? "Cards keep the category" : "Cases keep the stage") + " they already have.",
                         "Delete", () -> {
                             onDelete.accept(name);
                             if (name.equals(sel[0])) sel[0] = "";
@@ -897,7 +901,7 @@ final class PickerDialogs {
                 list.addView(r, topMargin(a, 8));
             }
             if (list.getChildCount() == 0) {
-                TextView none = CaseViews.text(a, filtering ? "No matches" : "No stages. Add one above.", 14, soft(a), false);
+                TextView none = CaseViews.text(a, filtering ? "No matches" : (isCat ? "No categories. Add one above." : "No stages. Add one above."), 14, soft(a), false);
                 none.setPadding(dp(a, 6), dp(a, 18), dp(a, 6), dp(a, 6));
                 list.addView(none);
             }

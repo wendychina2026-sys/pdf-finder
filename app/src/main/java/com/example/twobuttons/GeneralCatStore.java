@@ -70,6 +70,13 @@ final class GeneralCatStore {
         save(l);
     }
 
+    /** Saves the whole list in the given order (used when a category card is dragged in the Vault). */
+    void setOrder(List<String> names) {
+        List<String> l = new ArrayList<>();
+        for (String n : names) if (n != null && !n.trim().isEmpty() && !l.contains(n.trim())) l.add(n.trim());
+        save(l);
+    }
+
     void swap(int i, int j) {
         List<String> l = list();
         if (i < 0 || j < 0 || i >= l.size() || j >= l.size()) return;
