@@ -78,6 +78,7 @@ public class MarkedFilesActivity extends BaseActivity {
     private int generalEnd = -1;            // index of the last row that belongs to it
     private FrameLayout pinHolder;          // copy of its header, pinned on top while its cards scroll
     private boolean pinShown;
+    private boolean pinStale;               // rows were rebuilt: pin header must be rebuilt, but without hiding the pin
     private ListView listView;
     private TextView status;
     private EditText search;
@@ -429,9 +430,8 @@ public class MarkedFilesActivity extends BaseActivity {
             generalEnd = rows.size() - 1;
         }
         rows.addAll(others);
-        // rows rebuilt (also on screen off/on): drop the old pin completely so no empty pin box is left behind
-        pinShown = false;
-        if (pinHolder != null) { pinHolder.removeAllViews(); pinHolder.setVisibility(View.GONE); }
+        // rows rebuilt (also on screen off/on): the pin keeps showing, its header is swapped in place (no hide/show = no blink)
+        pinStale = true;
         if (listView != null) listView.post(this::updatePin);
     }
 
@@ -451,14 +451,22 @@ public class MarkedFilesActivity extends BaseActivity {
             }
             return;
         }
-        if (pinShown) return;
-        pinHolder.removeAllViews();
-        pinHolder.addView(generalHeader(curGroup, () -> {
+        if (pinShown && !pinStale) return;
+        View hv = generalHeader(curGroup, () -> {
             toggleGeneral();
             if (listView != null) listView.setSelection(0);
-        }));
+        });
+        int w = pinHolder.getWidth();
+        pinHolder.removeAllViews();
+        pinHolder.addView(hv);
+        if (w > 0) {      // size it right now: a header swapped in mid-layout must not be blank for a frame
+            hv.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            hv.layout(0, 0, hv.getMeasuredWidth(), hv.getMeasuredHeight());
+        }
         pinHolder.setVisibility(View.VISIBLE);
         pinShown = true;
+        pinStale = false;
         // updatePin can run inside the list's own layout pass: the new header would get no size (blank box). Lay it out again.
         pinHolder.post(() -> { pinHolder.requestLayout(); pinHolder.invalidate(); });
     }
