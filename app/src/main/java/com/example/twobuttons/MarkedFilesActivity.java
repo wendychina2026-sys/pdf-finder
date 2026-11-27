@@ -70,7 +70,8 @@ public class MarkedFilesActivity extends BaseActivity {
     static class CatHeader {
         final String name;
         final int count;
-        CatHeader(String name, int count) { this.name = name; this.count = count; }
+        final boolean open;
+        CatHeader(String name, int count, boolean open) { this.name = name; this.count = count; this.open = open; }
     }
 
     private GeneralGroup curGroup;          // the General Document Vault card in the list (null = none)
@@ -139,7 +140,7 @@ public class MarkedFilesActivity extends BaseActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP));
         list.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
             @Override public void onScrollStateChanged(android.widget.AbsListView v, int st) { }
-            @Override public void onScroll(android.widget.AbsListView v, int first, int vis, int total) { updatePin(first); }
+            @Override public void onScroll(android.widget.AbsListView v, int first, int vis, int total) { updatePin(); }
         });
         root.addView(listFrame, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -400,13 +401,18 @@ public class MarkedFilesActivity extends BaseActivity {
                         if (l == null) { l = new ArrayList<>(); by.put(c, l); }
                         l.add(m);
                     }
+                    boolean forceOpen = !q.isEmpty() || pickMode;   // searching / picking must show the matches
+                    java.util.Set<String> openCats = openCatSet();
                     for (java.util.Map.Entry<String, List<Item>> e : by.entrySet()) {
-                        rows.add(new CatHeader(genCatOf(e.getValue().get(0)), e.getValue().size()));
-                        rows.addAll(e.getValue());
+                        String nm = genCatOf(e.getValue().get(0));
+                        boolean o = forceOpen || openCats.contains(catKey(nm));
+                        rows.add(new CatHeader(nm, e.getValue().size(), o));
+                        if (o) rows.addAll(e.getValue());
                     }
                     if (!none.isEmpty()) {
-                        rows.add(new CatHeader("No category", none.size()));
-                        rows.addAll(none);
+                        boolean o = forceOpen || openCats.contains(catKey("No category"));
+                        rows.add(new CatHeader("No category", none.size(), o));
+                        if (o) rows.addAll(none);
                     }
                 }
             }
@@ -414,13 +420,17 @@ public class MarkedFilesActivity extends BaseActivity {
         }
         rows.addAll(others);
         pinShown = false;
-        if (listView != null) listView.post(() -> updatePin(listView.getFirstVisiblePosition()));
+        if (listView != null) listView.post(this::updatePin);
     }
 
     /** While the open General Document Vault cards scroll, its header stays pinned on top (tap = close it). */
-    private void updatePin(int first) {
-        if (pinHolder == null) return;
-        boolean show = curGroup != null && curGroup.open && first >= 1 && first <= generalEnd;
+    private void updatePin() {
+        if (pinHolder == null || listView == null) return;
+        int first = listView.getFirstVisiblePosition();
+        View c0 = listView.getChildAt(0);
+        // pinned from the first pixel the real header scrolls off the top, so it never looks cut off
+        boolean headerClipped = first >= 1 || (c0 != null && c0.getTop() < 0);
+        boolean show = curGroup != null && curGroup.open && headerClipped && first <= generalEnd;
         if (!show) {
             if (pinShown || pinHolder.getVisibility() != View.GONE) {
                 pinHolder.setVisibility(View.GONE);
@@ -437,6 +447,22 @@ public class MarkedFilesActivity extends BaseActivity {
         }));
         pinHolder.setVisibility(View.VISIBLE);
         pinShown = true;
+    }
+
+    private static String catKey(String name) { return name.trim().toLowerCase(Locale.ROOT); }
+
+    private java.util.Set<String> openCatSet() {
+        return new java.util.HashSet<>(getSharedPreferences("vault_ui", MODE_PRIVATE)
+                .getStringSet("gen_cat_open", new java.util.HashSet<String>()));
+    }
+
+    private void toggleCat(String name) {
+        java.util.Set<String> s = openCatSet();
+        String k = catKey(name);
+        if (!s.remove(k)) s.add(k);
+        getSharedPreferences("vault_ui", MODE_PRIVATE).edit().putStringSet("gen_cat_open", s).apply();
+        buildRows(search.getText().toString().trim().toLowerCase(Locale.ROOT));
+        adapter.notifyDataSetChanged();
     }
 
     private void toggleGeneral() {
@@ -477,16 +503,29 @@ public class MarkedFilesActivity extends BaseActivity {
     }
 
     /** Heading of one "General card category Name" inside the open General Document Vault card. */
-    private View catHeaderView(CatHeader h) {
+    private View catHeaderView(final CatHeader h) {
         final MarkedFilesActivity c = this;
         LinearLayout outer = new LinearLayout(c);
-        outer.setPadding(CaseViews.dp(c, 12), CaseViews.dp(c, 10), 0, CaseViews.dp(c, 2));
-        outer.setGravity(Gravity.CENTER_VERTICAL);
-        outer.addView(CaseViews.icon(c, R.drawable.ic_folder, AppTheme.sub(c), 16));
-        TextView t = CaseViews.text(c, h.name + "  \u2022  " + h.count + (h.count == 1 ? " card" : " cards"),
-                13, AppTheme.sub(c), true);
-        t.setPadding(CaseViews.dp(c, 8), 0, 0, 0);
-        outer.addView(t);
+        outer.setPadding(CaseViews.dp(c, 12), CaseViews.dp(c, 5), 0, CaseViews.dp(c, 5));
+        LinearLayout card = new LinearLayout(c);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(CaseViews.dp(c, 12), CaseViews.dp(c, 10), CaseViews.dp(c, 12), CaseViews.dp(c, 10));
+        card.setBackground(CaseViews.box(c, AppTheme.card(c), 14, AppTheme.cardStroke(c), 1));
+        card.addView(CaseViews.icon(c, R.drawable.ic_folder, AppTheme.accent(c), 22));
+        LinearLayout tx = new LinearLayout(c);
+        tx.setOrientation(LinearLayout.VERTICAL);
+        tx.setPadding(CaseViews.dp(c, 10), 0, CaseViews.dp(c, 8), 0);
+        tx.addView(CaseViews.text(c, h.name, 15, AppTheme.text(c), true));
+        tx.addView(CaseViews.text(c, h.count + (h.count == 1 ? " card" : " cards"), 12, AppTheme.sub(c), false));
+        card.addView(tx, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView arrow = CaseViews.icon(c, R.drawable.ic_expand_more, AppTheme.accent(c), 24);
+        arrow.setRotation(h.open ? 180f : 0f);
+        arrow.setContentDescription((h.open ? "Collapse " : "Expand ") + h.name);
+        card.addView(arrow, new LinearLayout.LayoutParams(CaseViews.dp(c, 28), CaseViews.dp(c, 28)));
+        card.setOnClickListener(v -> toggleCat(h.name));
+        outer.addView(card, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return outer;
     }
 
