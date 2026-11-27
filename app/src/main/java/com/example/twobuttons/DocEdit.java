@@ -22,6 +22,11 @@ final class DocEdit {
     private DocEdit() {}
 
     /** The uploaded-document record behind this file, or null for a plain marked PDF. */
+    /** Category (e.g. MCD) chosen in the share sheet for a shared PDF that has no card yet. */
+    static String pendingGenCat(Context a, String path) {
+        return a.getSharedPreferences("pdf_gen_cat", Context.MODE_PRIVATE).getString(path, "");
+    }
+
     static LegalStore.Doc docFor(Activity a, String path) {
         try {
             String uri = PhotoFlow.uri(a, new File(path)).toString();
@@ -317,7 +322,8 @@ final class DocEdit {
         LinearLayout form = LegalUi.form(a);
         String shown = cur == null || cur.name.isEmpty() ? f.getName() : cur.name;
         final EditText name = LegalUi.text(a, form, "Document name / caption", DocFileCard.stem(shown));
-        final GenCatField gcf = new GenCatField(a, form, cur == null ? "" : cur.genCat);   // second field: General card category
+        final GenCatField gcf = new GenCatField(a, form, cur == null || cur.genCat == null || cur.genCat.isEmpty()
+                ? pendingGenCat(a, path) : cur.genCat);   // second field: General card category
 
         final boolean pdf = f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf");
         // an unmarked image / Word file is one page: its first mark goes on page 0
@@ -447,6 +453,7 @@ final class DocEdit {
             }
             final String origin = DataFolder.originalOf(a, ff);
             ls.saveDoc(d);
+            a.getSharedPreferences("pdf_gen_cat", Context.MODE_PRIVATE).edit().remove(path).remove(curPath).apply();
             String m = mpk.matter();
             mp.edit().putString(curPath, m.equals("General Document Vault") ? MatterPicker.VAULT : m).apply();
             if (!curPath.equals(path) && movedTo != null) movedTo.accept(curPath);

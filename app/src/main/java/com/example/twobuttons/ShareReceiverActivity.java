@@ -168,7 +168,13 @@ public class ShareReceiverActivity extends Activity {
     }
 
     private void openNew(ArrayList<File> files, String matter, int multiMode) {
+        openNew(files, matter, multiMode, null);
+    }
+
+    /** genCat (e.g. MCD) = the saved General card category the new card goes under; null = ask as usual. */
+    private void openNew(ArrayList<File> files, String matter, int multiMode, String genCat) {
         Intent i = new Intent(this, NewCaseActivity.class);
+        if (genCat != null && !genCat.isEmpty()) i.putExtra(NewCaseActivity.EXTRA_UPLOAD_GENCAT, genCat);
         i.putExtra(MultiDocDetector.EXTRA_MODE, multiMode);
         i.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, files.get(0).getAbsolutePath());
         if (files.size() > 1) {
@@ -192,6 +198,7 @@ public class ShareReceiverActivity extends Activity {
 
     private static final String[] FOUR = {
             "New General card",
+            "New card in a saved category",
             "Attach to a saved General card",
             "New case",
             "Attach to a saved case"};
@@ -215,7 +222,41 @@ public class ShareReceiverActivity extends Activity {
         return out;
     }
 
-    /** One document: 1 New General card, 2 Attach to saved General card, 3 New case, 4 Attach to saved case. */
+    /** Saved General card category names (e.g. MCD): the saved list, plus any name already on a General card. */
+    private java.util.List<String> savedGenCats() {
+        java.util.List<String> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String n : new GeneralCatStore(this).list()) {
+            if (n != null && !n.trim().isEmpty() && seen.add(n.trim().toLowerCase(java.util.Locale.ROOT))) out.add(n.trim());
+        }
+        for (LegalStore.Doc d : new LegalStore(this).docs()) {
+            String n = d.genCat == null ? "" : d.genCat.trim();
+            if (!n.isEmpty() && seen.add(n.toLowerCase(java.util.Locale.ROOT))) out.add(n);
+        }
+        return out;
+    }
+
+    /** New card filed straight under a saved General card category: the category is not asked again. */
+    private void pickGenCat(final ArrayList<File> files, final boolean pdf, final int multiMode) {
+        final java.util.List<String> cats = savedGenCats();
+        final Runnable back = () -> { if (multiMode == MultiDocDetector.YES) askMulti(files, pdf); else askNewOrAttach(files, pdf); };
+        if (cats.isEmpty()) { noneSaved("category", back); return; }
+        PickerDialogs.optionSheet(this, "Which category?", "A new General card is made under it",
+                cats, -1, which -> {
+                    String cat = cats.get(which);
+                    if (multiMode == MultiDocDetector.NO && pdf && files.size() == 1) {
+                        // the marker opens as for a new General card; its Edit box already shows this category
+                        getSharedPreferences("pdf_gen_cat", MODE_PRIVATE).edit()
+                                .putString(files.get(0).getAbsolutePath(), cat).apply();
+                        openMarker(files.get(0));
+                    } else {
+                        openNew(files, null, multiMode, cat);
+                    }
+                    finish();
+                }, back);
+    }
+
+    /** One document: 1 New General card, 2 New card in saved category, 3 Attach to saved General card, 4 New case, 5 Attach to saved case. */
     private void askNewOrAttach(final ArrayList<File> files, final boolean pdf) {
         PickerDialogs.optionSheet(this, "Shared file",
                 files.size() + (files.size() == 1 ? " file" : " files"), java.util.Arrays.asList(FOUR), -1, which -> {
@@ -223,9 +264,11 @@ public class ShareReceiverActivity extends Activity {
                         if (pdf) openMarker(files.get(0)); else openNew(files);
                         finish();
                     } else if (which == 1) {
+                        pickGenCat(files, pdf, MultiDocDetector.NO);
+                    } else if (which == 2) {
                         if (!hasGeneralDocs()) { noneSaved("General card", () -> askNewOrAttach(files, pdf)); return; }
                         pickDocument(files, pdf);
-                    } else if (which == 2) {
+                    } else if (which == 3) {
                         // New Case page with the files waiting in the upload box until the case is created
                         openNew(files, MatterPicker.CREATE_NEW);
                         finish();
@@ -242,9 +285,11 @@ public class ShareReceiverActivity extends Activity {
                 openNew(files, null, MultiDocDetector.YES);
                 finish();
             } else if (which == 1) {
+                pickGenCat(files, allPdf, MultiDocDetector.YES);
+            } else if (which == 2) {
                 if (!hasGeneralDocs()) { noneSaved("General card", () -> askMulti(files, allPdf)); return; }
                 pickDocument(files, allPdf);
-            } else if (which == 2) {
+            } else if (which == 3) {
                 openNew(files, MatterPicker.CREATE_NEW, MultiDocDetector.YES);
                 finish();
             } else {

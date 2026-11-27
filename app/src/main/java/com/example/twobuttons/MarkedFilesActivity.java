@@ -202,6 +202,7 @@ public class MarkedFilesActivity extends BaseActivity {
     }
 
     private void reload() {
+        pendingCats = getSharedPreferences("pdf_gen_cat", MODE_PRIVATE);
         // File.exists() per marked PDF is disk work; keep it off the UI thread so the tab opens instantly.
         new Thread(() -> {
             final List<Item> loaded = readAll();
@@ -368,8 +369,12 @@ public class MarkedFilesActivity extends BaseActivity {
         return m.isEmpty() || m.equals("[]") || m.equals(MatterPicker.VAULT) || m.equals("General Document Vault");
     }
 
+    private static android.content.SharedPreferences pendingCats;     // path -> category chosen in the share sheet
+
     private static String genCatOf(Item it) {
-        return it.doc != null && it.doc.genCat != null ? it.doc.genCat.trim() : "";
+        String c = it.doc != null && it.doc.genCat != null ? it.doc.genCat.trim() : "";
+        if (c.isEmpty() && it.doc == null && pendingCats != null) c = pendingCats.getString(it.path, "").trim();
+        return c;
     }
 
     /** One General Document Vault card (with arrow) on top; its cards show only when it is open.

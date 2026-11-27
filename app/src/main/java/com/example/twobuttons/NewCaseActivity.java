@@ -136,6 +136,9 @@ public class NewCaseActivity extends BaseActivity {
 
     /** Intent extra: path of a PDF from the Category marker; opens the upload popup with it loaded. */
     static final String EXTRA_UPLOAD_PDF = "upload_pdf";
+    /** Share sheet "saved category": the General card category (e.g. MCD) the new card(s) go under. */
+    static final String EXTRA_UPLOAD_GENCAT = "upload_gencat";
+    private String markerGenCat = "";
     /** Intent extra: the Attach to Matter choice made in the marker (vault, saved case or Create new case). */
     static final String EXTRA_UPLOAD_MATTER = "upload_matter";
     /** Intent extra: paths of the OTHER shared files (images / Word) that join the first one in the upload popup. */
@@ -184,6 +187,8 @@ public class NewCaseActivity extends BaseActivity {
                 : getIntent().getIntExtra(MultiDocDetector.EXTRA_MODE, MultiDocDetector.ASK);
         String mm = getIntent().getStringExtra(EXTRA_UPLOAD_MATTER);
         markerMatter = (mm == null || savedInstanceState != null) ? "" : mm;
+        String mgc = getIntent().getStringExtra(EXTRA_UPLOAD_GENCAT);
+        markerGenCat = (mgc == null || savedInstanceState != null) ? "" : mgc.trim();
         store = new DiaryStore(this);
         legal = new LegalStore(this);
         stages = new StageStore(this);
@@ -1189,7 +1194,7 @@ public class NewCaseActivity extends BaseActivity {
         });
 
         // General card category Name: second field, only when a NEW card goes to the General Document Vault
-        final String[] genSel = {""};
+        final String[] genSel = {markerGenCat};
         final LinearLayout genBox = new LinearLayout(this);
         genBox.setOrientation(LinearLayout.VERTICAL);
         genBox.addView(dlgLbl("General Card Category Name"));
@@ -1198,6 +1203,7 @@ public class NewCaseActivity extends BaseActivity {
                 s2 -> { genSel[0] = s2; setChosen(genTv, s2, "Select category (e.g. MCD)"); },
                 (oldN, newN) -> { if (oldN.equals(genSel[0])) { genSel[0] = newN; setChosen(genTv, newN, "Select category (e.g. MCD)"); } },
                 g2 -> { if (g2.equals(genSel[0])) { genSel[0] = ""; setChosen(genTv, "", "Select category (e.g. MCD)"); } }));
+        setChosen(genTv, genSel[0], "Select category (e.g. MCD)");
         f.addView(genBox);
         final Runnable updateGen = () -> genBox.setVisibility(matterSel[0].equals(general) && !multi[0] ? View.VISIBLE : View.GONE);
         updateGen.run();
@@ -1785,7 +1791,7 @@ public class NewCaseActivity extends BaseActivity {
             for (java.util.Map.Entry<Integer, List<Uri>> ge : groups.entrySet()) {
                 String[] m = dlgMeta.get(all.get(ge.getKey()).toString());
                 String gcv = dlgGenCat.get(all.get(ge.getKey()).toString());
-                genSel[0] = gcv == null ? "" : gcv;
+                genSel[0] = gcv == null ? markerGenCat : gcv;
                 name.setText(m[0]);
                 catSel[0] = m[1];
                 stageSel[0] = m[2];
@@ -2610,7 +2616,7 @@ public class NewCaseActivity extends BaseActivity {
         nm.setText(cur[0]);
         f.addView(nm, lpTop(0));
 
-        final String[] gsel = {dlgGenCat.get(key) == null ? "" : dlgGenCat.get(key)};
+        final String[] gsel = {dlgGenCat.get(key) == null ? markerGenCat : dlgGenCat.get(key)};
         final boolean askGen = cur[3].equals(DLG_GENERAL);
         if (askGen) {                      // second field: only for a NEW General card
             f.addView(dlgLbl("General Card Category Name"));
