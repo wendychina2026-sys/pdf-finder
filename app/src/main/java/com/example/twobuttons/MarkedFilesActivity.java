@@ -429,7 +429,9 @@ public class MarkedFilesActivity extends BaseActivity {
             generalEnd = rows.size() - 1;
         }
         rows.addAll(others);
+        // rows rebuilt (also on screen off/on): drop the old pin completely so no empty pin box is left behind
         pinShown = false;
+        if (pinHolder != null) { pinHolder.removeAllViews(); pinHolder.setVisibility(View.GONE); }
         if (listView != null) listView.post(this::updatePin);
     }
 
@@ -457,6 +459,8 @@ public class MarkedFilesActivity extends BaseActivity {
         }));
         pinHolder.setVisibility(View.VISIBLE);
         pinShown = true;
+        // updatePin can run inside the list's own layout pass: the new header would get no size (blank box). Lay it out again.
+        pinHolder.post(() -> { pinHolder.requestLayout(); pinHolder.invalidate(); });
     }
 
     /** Category names (as typed) in display order: saved list first, then any other name A-Z. */
