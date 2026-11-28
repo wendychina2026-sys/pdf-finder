@@ -52,7 +52,8 @@ final class DocEdit {
 
     /** Marker only: one row per page range, each with its own category. Reopening shows the current ranges. */
     static final class Ranges {
-        private static final class Row { android.widget.EditText pg; String cat = ""; View card; }
+        private static final class Row { android.widget.EditText pg; String cat = ""; View card; boolean auto; }
+        private boolean syncing;
         private final Activity a;
         private final LinearLayout box;
         private final java.util.List<Row> rows = new ArrayList<>();
@@ -76,6 +77,7 @@ final class DocEdit {
                 }
                 for (Map.Entry<String, java.util.List<Integer>> e : by.entrySet()) addRow(format(e.getValue()), e.getKey());
             }
+            syncRest();
             TextView add = CaseViews.text(a, "+ Add another range", 13, IconPalette.pick(a, 0xFF1A237E, 0xFFFFD54F), true);
             add.setPadding(0, CaseViews.dp(a, 8), 0, CaseViews.dp(a, 2));
             add.setOnClickListener(v -> addRow("", ""));
@@ -86,7 +88,37 @@ final class DocEdit {
             form.addView(note);
         }
 
-        private void addRow(String pages, String cat) {
+        /** Pages no range covers yet get a range of their own (category still to pick), kept in step while typing. */
+        private void syncRest() {
+            if (syncing || pc < 2) return;
+            syncing = true;
+            try {
+                boolean[] cov = new boolean[pc];
+                Row auto = null;
+                for (Row r : rows) {
+                    if (r.auto) { auto = r; continue; }
+                    for (int p : parse(r.pg.getText().toString())) cov[p] = true;
+                }
+                java.util.List<Integer> rest = new ArrayList<>();
+                for (int p = 0; p < pc; p++) if (!cov[p]) rest.add(p);
+                if (!rest.isEmpty()) {
+                    String t = format(rest);
+                    if (auto == null) {
+                        Row n = addRow(t, "");
+                        n.auto = true;
+                    } else if (!auto.pg.getText().toString().equals(t)) {
+                        auto.pg.setText(t);
+                    }
+                } else if (auto != null) {
+                    if (auto.cat.trim().isEmpty()) { rows.remove(auto); box.removeView(auto.card); }
+                    else auto.auto = false;
+                }
+            } finally {
+                syncing = false;
+            }
+        }
+
+        private Row addRow(String pages, String cat) {
             final Row r = new Row();
             r.cat = cat;
             LinearLayout card = new LinearLayout(a);
@@ -98,12 +130,23 @@ final class DocEdit {
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             cl.bottomMargin = CaseViews.dp(a, 6);
             r.pg = LegalUi.text(a, card, "Pages (1 to " + pc + ", e.g. 1-3, 5)", pages);
+            r.pg.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence c, int s, int b, int n) { }
+                @Override public void onTextChanged(CharSequence c, int s, int b, int n) { }
+                @Override public void afterTextChanged(android.text.Editable e) {
+                    if (syncing) return;
+                    r.auto = false;                 // typed by the user: it is a normal range now
+                    syncRest();
+                }
+            });
             LegalUi.label(a, card, "Category");
             final TextView[] tv = new TextView[1];
             tv[0] = FieldStyle.dropdown(a, card, "Select category", v ->
                     CategoryPicker.pick(a, r.cat, s -> {
                         r.cat = s;
+                        r.auto = false;             // category chosen: the range is the user's now
                         FieldStyle.setDropdownValue(tv[0], s, "Select category");
+                        syncRest();
                     }), new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             FieldStyle.setDropdownValue(tv[0], cat, "Select category");
@@ -116,11 +159,13 @@ final class DocEdit {
                 }
                 rows.remove(r);
                 box.removeView(r.card);
+                syncRest();
             });
             card.addView(rm);
             r.card = card;
             rows.add(r);
             box.addView(card, cl);
+            return r;
         }
 
         /** "1-3, 6" for 0-based pages. */
@@ -394,6 +439,9 @@ final class DocEdit {
                 android.content.Intent nc = new android.content.Intent(a, NewCaseActivity.class);
                 nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_PDF, path);
                 nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_MATTER, MatterPicker.CREATE_NEW);
+                // details already filled here travel along: the upload box fills itself, only the case details are left
+                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_NAME, LegalUi.str(name));
+                nc.putExtra(NewCaseActivity.EXTRA_UPLOAD_STAGE, mpk.stage());
                 a.startActivity(nc);
                 if (a instanceof MarkActivity) a.finish();      // no stale marker behind the New Case popup
                 else if (after != null) after.run();

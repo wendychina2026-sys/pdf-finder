@@ -139,6 +139,11 @@ public class NewCaseActivity extends BaseActivity {
     /** Share sheet "saved category": the General card category (e.g. MCD) the new card(s) go under. */
     static final String EXTRA_UPLOAD_GENCAT = "upload_gencat";
     private String markerGenCat = "";
+    /** Details already typed in the Category marker (Create new case): the upload box is filled and saved by itself. */
+    static final String EXTRA_UPLOAD_NAME = "upload_name";
+    static final String EXTRA_UPLOAD_STAGE = "upload_stage";
+    private String markerName = "";
+    private String markerStage = "";
     /** Intent extra: the Attach to Matter choice made in the marker (vault, saved case or Create new case). */
     static final String EXTRA_UPLOAD_MATTER = "upload_matter";
     /** Intent extra: paths of the OTHER shared files (images / Word) that join the first one in the upload popup. */
@@ -189,6 +194,10 @@ public class NewCaseActivity extends BaseActivity {
         markerMatter = (mm == null || savedInstanceState != null) ? "" : mm;
         String mgc = getIntent().getStringExtra(EXTRA_UPLOAD_GENCAT);
         markerGenCat = (mgc == null || savedInstanceState != null) ? "" : mgc.trim();
+        String mnm = getIntent().getStringExtra(EXTRA_UPLOAD_NAME);
+        markerName = (mnm == null || savedInstanceState != null) ? "" : mnm.trim();
+        String mst = getIntent().getStringExtra(EXTRA_UPLOAD_STAGE);
+        markerStage = (mst == null || savedInstanceState != null) ? "" : mst.trim();
         store = new DiaryStore(this);
         legal = new LegalStore(this);
         stages = new StageStore(this);
@@ -1115,6 +1124,10 @@ public class NewCaseActivity extends BaseActivity {
         markerPdf = "";
         final String markerMatterPick = markerMatter;
         markerMatter = "";
+        final String markerNamePick = markerName;
+        final String markerStagePick = markerStage;
+        markerName = "";
+        markerStage = "";
         final java.util.ArrayList<String> extraPaths = markerExtras;
         markerExtras = new java.util.ArrayList<>();
         final java.io.File marked = markerPath.isEmpty() ? null : new java.io.File(markerPath);
@@ -1153,7 +1166,7 @@ public class NewCaseActivity extends BaseActivity {
                 }
             }
         }
-        final String[] stageSel = {""};
+        final String[] stageSel = {markerStagePick};
         final boolean[] dupOk = {false};
         final int[] wholeMode = {-1};              // multi-page PDF, one category: -1 not asked, 0 all pages, 1 some pages, 2 mark later
         final String[] wholeRange = {""};
@@ -1181,6 +1194,7 @@ public class NewCaseActivity extends BaseActivity {
         FieldStyle.smallHint(name, "e.g. Interim Injunction Application");
         name.setSingleLine(true);
         if (draft != null) name.setText(draft.name);
+        else if (!markerNamePick.isEmpty()) name.setText(markerNamePick);
         f.addView(name, lpTop(0));
         dlgSingleNow = () -> new String[]{LegalUi.str(name), catSel[0], stageSel[0], matterSel[0]};
         final Runnable singleRedraw = () -> { if (!multi[0] && dlgRefresh != null) dlgRefresh.run(); };
@@ -1243,6 +1257,7 @@ public class NewCaseActivity extends BaseActivity {
         stageBox.setOrientation(LinearLayout.VERTICAL);
         stageBox.addView(stageLbl);
         TextView stageTv = dropdown(stageBox, "Select stage", null);
+        if (!stageSel[0].isEmpty()) setChosen(stageTv, stageSel[0], "Select stage");
         // hearing stages: same list as Filter cases > Hearing stage and New Case > Current Stage
         final StageStore docStages = new StageStore(this);
         ((View) stageTv.getTag()).setOnClickListener(v ->
@@ -1858,7 +1873,21 @@ public class NewCaseActivity extends BaseActivity {
                 });
         dlgSheet = dlg[0];
         dlgSaveLook(multi[0]);
-        if (fromMarker && !multi[0]) {       // arriving from the Category marker: cursor straight in Document Name
+        // Create new case from the marker with details already filled: no need to ask again. The file is added
+        // to the case being created with those details; the user goes on with the case details.
+        final boolean autoFill = fromMarker && draft == null && !multi[0]
+                && matterSel[0].equals(CREATE_NEW_CASE) && !markerNamePick.isEmpty();
+        if (autoFill) {
+            final View dv = dlg[0] != null && dlg[0].getWindow() != null ? dlg[0].getWindow().getDecorView() : null;
+            if (dv != null) dv.setAlpha(0f);                     // no flash of the sheet
+            name.post(() -> {
+                if (multiSave.getAsBoolean()) {
+                    if (dlg[0] != null) dlg[0].dismiss();
+                } else if (dv != null) {
+                    dv.setAlpha(1f);                             // something is missing: let the user fix it
+                }
+            });
+        } else if (fromMarker && !multi[0]) {       // arriving from the Category marker: cursor straight in Document Name
             name.requestFocus();
             if (dlg[0] != null && dlg[0].getWindow() != null) {
                 dlg[0].getWindow().setSoftInputMode(
