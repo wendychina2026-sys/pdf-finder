@@ -59,7 +59,11 @@ public class ShareReceiverActivity extends Activity {
         handle(intent);
     }
 
+    /** One multi-page PDF shared with "per page / range of pages": every route opens the page marker. */
+    private boolean pagesMode;
+
     private void handle(Intent in) {
+        pagesMode = false;
         ArrayList<Uri> uris = new ArrayList<>();
         String action = in == null ? null : in.getAction();
         if (Intent.ACTION_SEND.equals(action)) {
@@ -145,11 +149,21 @@ public class ShareReceiverActivity extends Activity {
         // several files, or one PDF with several pages -> "Multiple documents detected"
         if (all.size() > 1 || MultiDocDetector.totalPages(all) > 1) {
             // wait for the user to confirm, then details are set per file
-            MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
-                    () -> {
-                        final boolean allPdf = pdfs.size() == all.size();
-                        askMulti(all, allPdf);             // same four-choice window as for a single file
-                    }, normal, this::finish);
+            final boolean allPdf0 = pdfs.size() == all.size();
+            final Runnable yes = () -> {
+                if (allPdf0 && all.size() == 1) {
+                    // ONE multi-page PDF, "per page / range": same choices, but every route ends in the page marker
+                    pagesMode = true;
+                    askNewOrAttach(all, true);
+                } else {
+                    askMulti(all, allPdf0);                // same choice window as for a single file
+                }
+            };
+            if (allPdf0) {
+                MultiDocDetector.confirmPdf(this, all.size(), MultiDocDetector.totalPages(all), yes, normal, this::finish);
+            } else {
+                MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all), yes, normal, this::finish);
+            }
             return;
         }
         normal.run();
@@ -271,6 +285,14 @@ public class ShareReceiverActivity extends Activity {
                         if (!hasGeneralDocs()) { noneSaved("General card", () -> askNewOrAttach(files, pdf)); return; }
                         pickDocument(files, pdf);
                     } else if (which == 3) {
+                        if (pagesMode && pdf && files.size() == 1) {
+                            // pages must be marked first: marker opens, its matter already says "new case"
+                            getSharedPreferences("pdf_new_case", MODE_PRIVATE).edit()
+                                    .putBoolean(files.get(0).getAbsolutePath(), true).apply();
+                            openMarker(files.get(0));
+                            finish();
+                            return;
+                        }
                         // New Case page with the files waiting in the upload box until the case is created
                         openNew(files, MatterPicker.CREATE_NEW);
                         finish();

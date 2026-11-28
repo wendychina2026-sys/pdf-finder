@@ -59,6 +59,19 @@ final class MultiDocDetector {
                 .show();
     }
 
+    /** PDFs only: one multi-page PDF (or several PDFs) - mark pages / page ranges, or keep it as one document. */
+    static void confirmPdf(Activity a, int files, int pages, Runnable yes, Runnable no, Runnable cancel) {
+        String what = files > 1
+                ? files + " PDFs (" + pages + " pages)"
+                : pages + " pages";
+        java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("Yes, per page / range of pages");
+        items.add("No, whole document (one type)");
+        PickerDialogs.optionSheet(a, "Multiple documents detected",
+                what + " found. Mark pages with different categories (e.g. pages 1-2 notice, page 3 affidavit)?",
+                items, -1, which -> { if (which == 0) yes.run(); else no.run(); }, cancel);
+    }
+
     /** Same question as above, but as a sheet with a cross: cross / back / outside tap = cancel. */
     static void confirm(Activity a, int files, int pages, Runnable yes, Runnable no, Runnable cancel) {
         String what = files > 1

@@ -317,7 +317,10 @@ final class DocEdit {
         final LegalStore.Doc cur = docFor(a, path);
         final String ext = DocFileCard.ext(f.getName()).isEmpty() ? "" : "." + DocFileCard.ext(f.getName());
         final SharedPreferences mp = a.getSharedPreferences("pdf_matters", Context.MODE_PRIVATE);
-        String savedMatter = matterOf(a, path);
+        final String savedMatter = matterOf(a, path).equals("General Document Vault")
+                && a.getSharedPreferences("pdf_new_case", Context.MODE_PRIVATE).getBoolean(path, false)
+                ? MatterPicker.CREATE_NEW      // shared with "New case": marker starts on a NEW case
+                : matterOf(a, path);
 
         LinearLayout form = LegalUi.form(a);
         String shown = cur == null || cur.name.isEmpty() ? f.getName() : cur.name;
@@ -377,6 +380,7 @@ final class DocEdit {
                 android.widget.Toast.makeText(a, "Select a category", android.widget.Toast.LENGTH_SHORT).show();
                 return false;
             }
+            a.getSharedPreferences("pdf_new_case", Context.MODE_PRIVATE).edit().remove(path).apply();
             if (mpk.isCreateNew()) {
                 // attach this file to a NEW case: same route as the marker's old "Create new case"
                 if (rr != null) {
