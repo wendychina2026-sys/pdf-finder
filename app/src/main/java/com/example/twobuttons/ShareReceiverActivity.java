@@ -141,8 +141,11 @@ public class ShareReceiverActivity extends Activity {
             }
             finish();
         };
-        if (all.size() > 1) {
-            // more than one file shared: wait for the user to confirm, then details are set per file
+        // shared through the "(Batch Mode)" entry: one PDF with several pages counts as a batch too
+        final boolean viaBatch = in != null && in.getComponent() != null
+                && in.getComponent().getClassName().endsWith("ShareReceiverBatch");
+        if (all.size() > 1 || (viaBatch && all.size() == 1 && MultiDocDetector.totalPages(all) > 1)) {
+            // more than one file (or one multi-page PDF via Batch Mode): wait for the user to confirm, then details are set per file
             MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
                     () -> {
                         final boolean allPdf = pdfs.size() == all.size();
