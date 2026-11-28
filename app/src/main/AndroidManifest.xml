@@ -64,9 +64,26 @@
         <activity
             android:name=".ShareReceiverActivity"
             android:exported="true"
-            android:label="@string/share_label"
+            android:label="@string/share_label_batch"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true">
+            <!-- several files shared at once: same entry, same screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -92,30 +109,6 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
-
-        <!-- Same screen, own share-sheet entry: shows when several files are shared -->
-        <activity-alias
-            android:name=".ShareReceiverBatch"
-            android:targetActivity=".ShareReceiverActivity"
-            android:exported="true"
-            android:label="@string/share_label_batch">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/msword" />
-                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-        </activity-alias>
 
         <receiver
             android:name=".BackupReminderReceiver"
