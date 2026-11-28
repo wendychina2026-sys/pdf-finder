@@ -54,6 +54,7 @@ final class DocEdit {
     static final class Ranges {
         private static final class Row { android.widget.EditText pg; String cat = ""; View card; boolean auto; }
         private boolean syncing;
+        private TextView addLink;               // "+ Add another range": only useful while pages are left over
         private final Activity a;
         private final LinearLayout box;
         private final java.util.List<Row> rows = new ArrayList<>();
@@ -79,6 +80,7 @@ final class DocEdit {
             }
             syncRest();
             TextView add = CaseViews.text(a, "+ Add another range", 13, IconPalette.pick(a, 0xFF1A237E, 0xFFFFD54F), true);
+            addLink = add;
             add.setPadding(0, CaseViews.dp(a, 8), 0, CaseViews.dp(a, 2));
             add.setOnClickListener(v -> addRow("", ""));
             form.addView(add);
@@ -86,12 +88,14 @@ final class DocEdit {
                     + "Example: 1-3 Petition, 4-6 Evidence.", 11, AppTheme.sub(a), false);
             note.setPadding(0, CaseViews.dp(a, 2), 0, CaseViews.dp(a, 2));
             form.addView(note);
+            syncRest();
         }
 
         /** Pages no range covers yet get a range of their own (category still to pick), kept in step while typing. */
         private void syncRest() {
             if (syncing || pc < 2) return;
             syncing = true;
+            boolean left = false;
             try {
                 boolean[] cov = new boolean[pc];
                 Row auto = null;
@@ -101,6 +105,7 @@ final class DocEdit {
                 }
                 java.util.List<Integer> rest = new ArrayList<>();
                 for (int p = 0; p < pc; p++) if (!cov[p]) rest.add(p);
+                left = !rest.isEmpty();
                 if (!rest.isEmpty()) {
                     String t = format(rest);
                     if (auto == null) {
@@ -113,6 +118,7 @@ final class DocEdit {
                     if (auto.cat.trim().isEmpty()) { rows.remove(auto); box.removeView(auto.card); }
                     else auto.auto = false;
                 }
+                if (addLink != null) addLink.setVisibility(left ? View.VISIBLE : View.GONE);   // all pages marked: nothing to add
             } finally {
                 syncing = false;
             }
