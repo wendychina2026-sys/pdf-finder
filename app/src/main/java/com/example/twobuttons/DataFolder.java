@@ -466,7 +466,31 @@ final class DataFolder {
                 File hit = searchName(new File(sd, r), name, size, 4);
                 if (hit != null) return hit;
             }
+            // not in the usual folders (Drive PDF viewer, Telegram, Bluetooth, any custom folder): look through all
+            // shared storage, except the app's own folder (its copy has the same name + size), within a time limit
+            File own = root();
+            File hit0 = searchNameTimed(sd, name, size, 8, System.nanoTime() + 2_500_000_000L, own);
+            if (hit0 != null) return hit0;
         } catch (Exception ignored) { }
+        return null;
+    }
+
+    private static File searchNameTimed(File dir, String name, long size, int depth, long deadline, File skip) {
+        if (System.nanoTime() > deadline) return null;
+        File[] kids = dir.listFiles();
+        if (kids == null) return null;
+        for (File f : kids) {
+            if (f.isFile() && f.getName().equals(name) && f.length() == size) return f;
+        }
+        if (depth > 0) {
+            for (File f : kids) {
+                if (!f.isDirectory() || f.getName().startsWith(".")) continue;
+                if (skip != null && f.equals(skip)) continue;
+                if (dir.getName().equals("Android") && !f.getName().equals("media")) continue;
+                File hit = searchNameTimed(f, name, size, depth - 1, deadline, skip);
+                if (hit != null) return hit;
+            }
+        }
         return null;
     }
 
