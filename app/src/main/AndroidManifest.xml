@@ -99,12 +99,6 @@
             android:targetActivity=".ShareReceiverActivity"
             android:exported="true"
             android:label="@string/share_label_batch">
-            <!-- one multi-page PDF: also offered under the Batch Mode entry -->
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />

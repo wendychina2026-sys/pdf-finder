@@ -141,11 +141,10 @@ public class ShareReceiverActivity extends Activity {
             }
             finish();
         };
-        // shared through the "(Batch Mode)" entry: one PDF with several pages counts as a batch too
-        final boolean viaBatch = in != null && in.getComponent() != null
-                && in.getComponent().getClassName().endsWith("ShareReceiverBatch");
-        if (all.size() > 1 || (viaBatch && all.size() == 1 && MultiDocDetector.totalPages(all) > 1)) {
-            // more than one file (or one multi-page PDF via Batch Mode): wait for the user to confirm, then details are set per file
+        // share sheet cannot read page counts, so ONE entry per kind of share; the app checks here:
+        // several files, or one PDF with several pages -> "Multiple documents detected"
+        if (all.size() > 1 || MultiDocDetector.totalPages(all) > 1) {
+            // wait for the user to confirm, then details are set per file
             MultiDocDetector.confirm(this, all.size(), MultiDocDetector.totalPages(all),
                     () -> {
                         final boolean allPdf = pdfs.size() == all.size();
